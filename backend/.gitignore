@@ -1,0 +1,13 @@
+# ─────────────────────────────────────────────────────
+#  backend/.gitignore
+# ─────────────────────────────────────────────────────
+
+node_modules/
+.env
+.env.local
+.env.*.local
+!.env.example
+coverage/
+.nyc_output/
+*.log
+dist/

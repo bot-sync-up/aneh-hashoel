@@ -1,0 +1,544 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties ─── */
+:root {
+  /* Brand colors */
+  --color-navy: #1B2B5E;
+  --color-navy-light: #2A3F7E;
+  --color-navy-dark: #111D42;
+  --color-gold: #B8973A;
+  --color-gold-light: #D4AF57;
+  --color-gold-dark: #9A7C2E;
+
+  /* Semantic tokens – light */
+  --bg-page: #F8F6F1;
+  --bg-surface: #FFFFFF;
+  --bg-surface-raised: #F8F6F1;
+  --bg-muted: #EDE9E0;
+  --border-default: #D8D2C4;
+  --border-strong: #B8AFA0;
+  --text-primary: #1B2B5E;
+  --text-secondary: #4A5568;
+  --text-muted: #718096;
+  --text-inverted: #FFFFFF;
+  --accent: #B8973A;
+  --accent-hover: #9A7C2E;
+  --focus-ring: rgba(184, 151, 58, 0.4);
+
+  /* Sidebar */
+  --sidebar-bg: #1B2B5E;
+  --sidebar-text: rgba(255, 255, 255, 0.85);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-item-active-bg: rgba(184, 151, 58, 0.18);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.08);
+
+  /* Shadows */
+  --shadow-soft: 0 2px 8px rgba(27, 43, 94, 0.08);
+  --shadow-card: 0 4px 16px rgba(27, 43, 94, 0.10);
+  --shadow-card-hover: 0 8px 24px rgba(27, 43, 94, 0.14);
+  --shadow-modal: 0 20px 60px rgba(27, 43, 94, 0.20);
+
+  /* Motion */
+  --transition-fast: 150ms ease;
+  --transition-default: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* ─── Dark mode tokens ─── */
+.dark {
+  --bg-page: #0F1A3A;
+  --bg-surface: #1A2F5E;
+  --bg-surface-raised: #223570;
+  --bg-muted: #162347;
+  --border-default: #2A3F7E;
+  --border-strong: #3A5298;
+  --text-primary: #E8E0CC;
+  --text-secondary: #B8C2D8;
+  --text-muted: #8A98B8;
+  --text-inverted: #0F1A3A;
+  --accent: #C9A84C;
+  --accent-hover: #DFC070;
+  --focus-ring: rgba(201, 168, 76, 0.4);
+
+  --sidebar-bg: #0F1A3A;
+  --sidebar-text: rgba(232, 224, 204, 0.80);
+  --sidebar-text-active: #E8E0CC;
+  --sidebar-item-active-bg: rgba(201, 168, 76, 0.18);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.06);
+
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.40);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.60);
+}
+
+/* ─── Base HTML / RTL ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  direction: rtl;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  direction: rtl;
+  text-align: right;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-default), color var(--transition-default);
+}
+
+/* ─── Typography ─── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* ─── Focus Visible ─── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Custom Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-muted);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ─── Selection ─── */
+::selection {
+  background-color: rgba(184, 151, 58, 0.25);
+  color: var(--text-primary);
+}
+
+/* ─── Tiptap Editor RTL Styles ─── */
+.ProseMirror {
+  direction: rtl;
+  text-align: right;
+  outline: none;
+  min-height: 120px;
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: right;
+  color: var(--text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-right: 1.5rem;
+  padding-left: 0;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.25rem;
+}
+
+.ProseMirror blockquote {
+  border-right: 3px solid var(--accent);
+  border-left: none;
+  padding-right: 1rem;
+  padding-left: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-right: 0;
+}
+
+.ProseMirror code {
+  background-color: var(--bg-muted);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+  font-family: 'Courier New', monospace;
+}
+
+.ProseMirror pre {
+  background: var(--bg-muted);
+  border-radius: 8px;
+  padding: 1rem;
+  direction: ltr;
+  text-align: left;
+}
+
+.ProseMirror strong {
+  font-weight: 700;
+}
+
+.ProseMirror h1 { font-size: 1.75rem; font-weight: 700; }
+.ProseMirror h2 { font-size: 1.4rem; font-weight: 700; }
+.ProseMirror h3 { font-size: 1.15rem; font-weight: 600; }
+
+/* Editor toolbar */
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface-raised);
+  border-radius: 8px 8px 0 0;
+  direction: rtl;
+}
+
+.tiptap-toolbar button {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tiptap-toolbar button:hover {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+.tiptap-toolbar button.is-active {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* ─── Utility Animations ─── */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.25s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.25s ease-out;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.25s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.15s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Page Transitions ─── */
+.page-enter {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+/* ─── Form elements RTL ─── */
+input, textarea, select {
+  direction: rtl;
+  text-align: right;
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+}
+
+/* Placeholder RTL */
+input::placeholder,
+textarea::placeholder {
+  text-align: right;
+}
+
+/* ─── Tables ─── */
+table {
+  direction: rtl;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* ─── Backdrop blur utility ─── */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ─── Hebrew number display ─── */
+.hebrew-counter {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Notification dot pulse ─── */
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.notification-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ─── Skeleton loading ─── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 25%,
+    var(--bg-surface-raised) 50%,
+    var(--bg-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* ─── Divider with text ─── */
+.divider-text {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.divider-text::before,
+.divider-text::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+/* ─── Sidebar transitions ─── */
+.sidebar-transition {
+  transition: width var(--transition-slow), transform var(--transition-slow);
+}
+
+/* ─── Card hover lift ─── */
+.card-hover {
+  transition: box-shadow var(--transition-default), transform var(--transition-default);
+}
+
+.card-hover:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+/* ─── Prose Hebrew — styled answer content ─── */
+.prose-hebrew {
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+  direction: rtl;
+  text-align: right;
+  line-height: 1.8;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.prose-hebrew p {
+  margin-bottom: 0.9em;
+}
+
+.prose-hebrew h1,
+.prose-hebrew h2,
+.prose-hebrew h3,
+.prose-hebrew h4 {
+  font-family: 'Heebo', 'Assistant', Arial, sans-serif;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.35;
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+}
+
+.prose-hebrew h1 { font-size: 1.6rem; }
+.prose-hebrew h2 { font-size: 1.3rem; }
+.prose-hebrew h3 { font-size: 1.1rem; }
+
+.prose-hebrew ul,
+.prose-hebrew ol {
+  padding-right: 1.5rem;
+  padding-left: 0;
+  margin-bottom: 0.9em;
+}
+
+.prose-hebrew li {
+  margin-bottom: 0.35em;
+}
+
+.prose-hebrew blockquote {
+  border-right: 3px solid var(--accent);
+  border-left: none;
+  padding-right: 1.1rem;
+  padding-left: 0;
+  color: var(--text-secondary);
+  font-style: normal;
+  margin-right: 0;
+  margin-bottom: 0.9em;
+  background: var(--bg-muted);
+  border-radius: 0 6px 6px 0;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+}
+
+.prose-hebrew strong {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.prose-hebrew em {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.prose-hebrew code {
+  background: var(--bg-muted);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.875em;
+  font-family: 'Courier New', monospace;
+  direction: ltr;
+  display: inline-block;
+}
+
+.prose-hebrew pre {
+  background: var(--bg-muted);
+  border-radius: 8px;
+  padding: 1em;
+  direction: ltr;
+  text-align: left;
+  overflow-x: auto;
+  margin-bottom: 0.9em;
+}
+
+.prose-hebrew hr {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: 1.5em 0;
+}
+
+.prose-hebrew a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--transition-fast);
+}
+
+.prose-hebrew a:hover {
+  color: var(--accent-hover);
+}
+
+/* ─── Print styles ─── */
+@media print {
+  .sidebar,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+}

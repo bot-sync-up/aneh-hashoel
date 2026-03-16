@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>{{TITLE}}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background-color: #f0f2f7;
+      font-family: 'Heebo', Arial, sans-serif;
+      direction: rtl; text-align: right;
+      -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;
+    }
+    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; }
+      .email-body { padding: 20px 16px !important; }
+      .btn-answer, .btn-cancel { display: block !important; width: 90% !important; margin: 8px auto !important; }
+      .question-full { padding: 16px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f0f2f7;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="background-color:#f0f2f7; padding:28px 16px;">
+  <tr>
+    <td align="center">
+
+      <table role="presentation" class="email-container" cellpadding="0" cellspacing="0"
+             style="max-width:600px; width:100%; border-radius:10px; overflow:hidden;
+                    box-shadow:0 2px 12px rgba(0,0,0,0.12);">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#1B2B5E; padding:28px 32px; text-align:center;">
+            <h1 style="margin:0 0 4px; color:#B8973A; font-size:26px; font-weight:700;
+                       font-family:'Heebo',Arial,sans-serif; line-height:1.3;">
+              ענה את השואל
+            </h1>
+            <p style="margin:0; color:#a0aac4; font-size:13px; font-family:'Heebo',Arial,sans-serif;">
+              פלטפורמת שאלות ותשובות הלכתיות — המרכז למורשת מרן
+            </p>
+          </td>
+        </tr>
+
+        <!-- TITLE BAR -->
+        <tr>
+          <td style="background-color:#B8973A; padding:14px 32px; text-align:center;">
+            <h2 style="margin:0; color:#1B2B5E; font-size:18px; font-weight:700;
+                       font-family:'Heebo',Arial,sans-serif; line-height:1.3;">
+              {{TITLE}}
+            </h2>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td class="email-body"
+              style="background-color:#ffffff; padding:32px 36px;
+                     font-family:'Heebo',Arial,sans-serif; direction:rtl; text-align:right;">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 6px; font-size:16px; color:#1B2B5E; font-weight:700;">
+              {{RABBI_TITLE}} {{RABBI_NAME}} שליט"א,
+            </p>
+            <p style="margin:0 0 24px; font-size:15px; color:#444; line-height:1.7;">
+              תפסתם את השאלה בהצלחה. השאלה שמורה לטיפולכם.
+              אנא ענו בהקדם האפשרי.
+            </p>
+
+            <!-- Full question card -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   class="question-full"
+                   style="background-color:#f8f8fc; border-radius:8px;
+                          border-right:4px solid #1B2B5E; margin-bottom:28px;">
+              <tr>
+                <td style="padding:22px 26px;">
+
+                  <!-- Question ID tag -->
+                  <p style="margin:0 0 10px;">
+                    <span style="display:inline-block; background-color:#1B2B5E;
+                                 color:#B8973A; font-size:11px; font-weight:700;
+                                 padding:3px 10px; border-radius:4px;
+                                 font-family:'Heebo',Arial,sans-serif; letter-spacing:0.5px;">
+                      מזהה שאלה: {{QUESTION_ID}}
+                    </span>
+                    <span style="display:inline-block; background-color:{{URGENCY_BG}};
+                                 color:{{URGENCY_FG}}; font-size:12px; font-weight:600;
+                                 padding:3px 10px; border-radius:20px; margin-right:8px;
+                                 font-family:'Heebo',Arial,sans-serif;">
+                      {{URGENCY_LABEL}}
+                    </span>
+                  </p>
+
+                  <!-- Question title -->
+                  <h3 style="margin:0 0 12px; font-size:17px; font-weight:700;
+                             color:#1B2B5E; font-family:'Heebo',Arial,sans-serif; line-height:1.4;">
+                    {{QUESTION_TITLE}}
+                  </h3>
+
+                  <!-- Category -->
+                  <p style="margin:0 0 14px; font-size:13px; color:#777;
+                            font-family:'Heebo',Arial,sans-serif;">
+                    קטגוריה: <strong style="color:#1B2B5E;">{{CATEGORY}}</strong>
+                  </p>
+
+                  <!-- Divider -->
+                  <hr style="border:none; border-top:1px solid #e0e0e8; margin:0 0 16px;" />
+
+                  <!-- Full question text -->
+                  <div style="font-size:15px; color:#333; line-height:1.8;
+                              font-family:'Heebo',Arial,sans-serif; white-space:pre-wrap;">
+                    {{QUESTION_FULL_TEXT}}
+                  </div>
+
+                  <!-- Asker name (if provided) -->
+                  {{#if ASKER_NAME}}
+                  <p style="margin:16px 0 0; font-size:13px; color:#999;
+                            font-family:'Heebo',Arial,sans-serif;">
+                    שאל: {{ASKER_NAME}}
+                  </p>
+                  {{/if}}
+
+                  <!-- Timestamp -->
+                  <p style="margin:6px 0 0; font-size:12px; color:#bbb;
+                            font-family:'Heebo',Arial,sans-serif;">
+                    נשלחה ב: {{SENT_AT}}
+                  </p>
+
+                </td>
+              </tr>
+            </table>
+
+            <!-- Instruction: reply by email -->
+            <p style="margin:0 0 20px; font-size:14px; color:#555; line-height:1.7;
+                      background-color:#fffbf0; border:1px solid #e8d98a;
+                      padding:14px 18px; border-radius:6px; font-family:'Heebo',Arial,sans-serif;">
+              <strong style="color:#1B2B5E;">ניתן לענות בשתי דרכים:</strong><br/>
+              1. לחץ על כפתור "כתוב תשובה" למטה כדי לפתוח את עורך התשובות.<br/>
+              2. השב ישירות על מייל זה — תשובתך תישמר אוטומטית במערכת.
+            </p>
+
+            <!-- Action buttons -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="margin-bottom:20px;">
+              <tr>
+                <td align="center" style="padding:4px 0 8px;">
+                  <!-- Answer button -->
+                  <a href="{{ANSWER_URL}}"
+                     class="btn-answer"
+                     target="_blank"
+                     style="display:inline-block;
+                            background-color:#1B2B5E;
+                            color:#B8973A;
+                            text-decoration:none;
+                            padding:14px 36px;
+                            border-radius:8px;
+                            font-size:16px;
+                            font-weight:700;
+                            font-family:'Heebo',Arial,sans-serif;
+                            line-height:1.4;
+                            margin-left:10px;
+                            mso-padding-alt:0;">
+                    כתוב תשובה
+                  </a>
+                  <!-- Cancel button -->
+                  <a href="{{RELEASE_URL}}"
+                     class="btn-cancel"
+                     target="_blank"
+                     style="display:inline-block;
+                            background-color:#ffffff;
+                            color:#888;
+                            text-decoration:none;
+                            padding:13px 24px;
+                            border-radius:8px;
+                            font-size:14px;
+                            font-weight:600;
+                            font-family:'Heebo',Arial,sans-serif;
+                            line-height:1.4;
+                            border:1px solid #ccc;
+                            mso-padding-alt:0;">
+                    ביטול תפיסה
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Fallback links -->
+            <p style="margin:0; font-size:11px; color:#bbb; text-align:center;
+                      font-family:'Heebo',Arial,sans-serif; line-height:1.7;">
+              כתיבת תשובה: <span style="color:#1B2B5E; word-break:break-all;">{{ANSWER_URL}}</span><br/>
+              ביטול תפיסה: <span style="word-break:break-all;">{{RELEASE_URL}}</span>
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#1B2B5E; padding:20px 32px; text-align:center;
+                     border-radius:0 0 10px 10px;">
+            <p style="margin:0 0 6px; color:#8899bb; font-size:12px;
+                      font-family:'Heebo',Arial,sans-serif; line-height:1.6;">
+              הודעה זו נשלחה ממערכת "ענה את השואל" — המרכז למורשת מרן
+            </p>
+            <p style="margin:0; color:#6677aa; font-size:11px;
+                      font-family:'Heebo',Arial,sans-serif; line-height:1.5;">
+              לשינוי העדפות התראות, פנה למנהל המערכת
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

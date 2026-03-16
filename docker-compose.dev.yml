@@ -1,0 +1,44 @@
+# Development override — merge with:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# What changes in dev:
+#   • No frontend container — use `npm run dev` locally (Vite port 5173)
+#   • Source code volumes mounted into backend for nodemon hot-reload
+#   • DEBUG logging enabled
+#   • Postgres + Redis ports exposed (already in base file, but documented here)
+
+version: '3.9'
+
+services:
+  postgres:
+    # Persist between restarts but keep easy access in dev
+    environment:
+      POSTGRES_DB: ${DB_NAME:-aneh_hashoel_dev}
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      target: dependencies   # stop at the deps stage — no production hardening
+    command: npx nodemon src/server.js
+    environment:
+      NODE_ENV: development
+      DEBUG: "aneh:*"
+    volumes:
+      # Mount source for hot-reload; keep node_modules from container image
+      - ./backend/src:/app/src
+      - ./backend/package.json:/app/package.json
+      - ./backend/package-lock.json:/app/package-lock.json
+      - ./uploads:/app/uploads
+    ports:
+      - "3001:3001"
+
+  # Frontend is intentionally absent in dev — run `npm run dev` locally.
+  # The Vite dev server proxies /api → http://localhost:3001 (see vite.config.js).
+  frontend:
+    profiles:
+      - donotstart   # prevents this service from starting in dev mode

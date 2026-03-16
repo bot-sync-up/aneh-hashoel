@@ -1,0 +1,39 @@
+{
+  "name": "aneh-hashoel-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --watch src src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "migrate:rollback": "node src/db/migrate.js rollback"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "pg": "^8.12.0",
+    "redis": "^4.7.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "socket.io": "^4.7.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
+    "@sendgrid/mail": "^8.1.0",
+    "axios": "^1.7.0",
+    "node-html-parser": "^6.1.0",
+    "he": "^1.2.0",
+    "googleapis": "^140.0.0",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.33.0",
+    "zxcvbn": "^4.4.2",
+    "express-rate-limit": "^7.3.0",
+    "express-validator": "^7.1.0",
+    "dotenv": "^16.4.0",
+    "winston": "^3.13.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

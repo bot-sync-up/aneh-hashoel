@@ -1,0 +1,783 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { clsx } from 'clsx';
+import {
+  Flame,
+  Lock,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Heart,
+  Calendar,
+  MessageSquare,
+  User,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Pencil,
+  Send,
+} from 'lucide-react';
+import PageHeader, { Breadcrumb } from '../components/layout/PageHeader';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import { BlockSpinner } from '../components/ui/Spinner';
+import ClaimConfirmModal from '../components/questions/ClaimConfirmModal';
+import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
+import TransferModal from '../components/questions/TransferModal';
+import { get, post, put } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
+import {
+  formatDate,
+  formatRelative,
+  getCategoryLabel,
+  colorFromCategory,
+  stripHtml,
+  truncate,
+} from '../lib/utils';
+
+export default function QuestionDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { rabbi } = useAuth();
+  const { on } = useSocket();
+
+  const [question, setQuestion] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Modals
+  const [showClaim, setShowClaim] = useState(false);
+  const [showRelease, setShowRelease] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [showCreateDiscussion, setShowCreateDiscussion] = useState(false);
+
+  // UI state
+  const [notesOpen, setNotesOpen] = useState(false);
+
+  // ── Fetch question ────────────────────────────────────────────────────────
+
+  const fetchQuestion = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await get(`/questions/${id}`);
+      setQuestion(data.question || data);
+    } catch (err) {
+      setError(err.message || 'שגיאה בטעינת השאלה.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchQuestion();
+  }, [fetchQuestion]);
+
+  // ── Socket events ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const offClaimed = on('question:claimed', ({ id: qId, assigned_rabbi, status }) => {
+      if (String(qId) !== String(id)) return;
+      setQuestion((prev) => prev ? { ...prev, status, assigned_rabbi } : prev);
+    });
+
+    const offReleased = on('question:released', ({ id: qId }) => {
+      if (String(qId) !== String(id)) return;
+      setQuestion((prev) =>
+        prev ? { ...prev, status: 'pending', assigned_rabbi: null } : prev
+      );
+    });
+
+    const offAnswered = on('question:answered', (payload) => {
+      if (String(payload.id) !== String(id)) return;
+      setQuestion((prev) => prev ? { ...prev, ...payload } : prev);
+    });
+
+    const offThank = on('question:thanked', ({ id: qId, thank_count }) => {
+      if (String(qId) !== String(id)) return;
+      setQuestion((prev) => prev ? { ...prev, thank_count } : prev);
+    });
+
+    return () => {
+      offClaimed();
+      offReleased();
+      offAnswered();
+      offThank();
+    };
+  }, [on, id]);
+
+  // ── Derived state ─────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div dir="rtl">
+        <PageHeader title="טוען שאלה..." />
+        <div className="p-6">
+          <BlockSpinner label="טוען שאלה..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !question) {
+    return (
+      <div dir="rtl">
+        <PageHeader title="שגיאה" />
+        <div className="p-6 text-center py-16">
+          <AlertCircle size={40} className="text-red-500 mx-auto mb-4" />
+          <p className="text-[var(--text-primary)] font-heebo font-medium mb-2">
+            {error || 'השאלה לא נמצאה'}
+          </p>
+          <Button variant="outline" onClick={() => navigate('/questions')} leftIcon={<ArrowRight size={14} />}>
+            חזור לכל השאלות
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    title,
+    content,
+    category,
+    status,
+    is_urgent,
+    created_at,
+    answered_at,
+    assigned_rabbi,
+    answer,
+    view_count = 0,
+    thank_count = 0,
+    follow_up_question,
+    follow_up_answer,
+    follow_up_count = 0,
+    private_notes,
+    discussion_count = 0,
+  } = question;
+
+  const isMe = rabbi && assigned_rabbi && String(assigned_rabbi.id) === String(rabbi?.id);
+  const isPending = status === 'pending';
+  const isInProcess = status === 'in_process';
+  const isAnswered = status === 'answered';
+  const isInProcessByOther = isInProcess && !isMe;
+
+  return (
+    <div className="page-enter" dir="rtl">
+      {/* Header */}
+      <PageHeader
+        title={truncate(title || 'שאלה', 60)}
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { label: 'כל השאלות', href: '/questions' },
+              { label: `שאלה #${id}` },
+            ]}
+          />
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {discussion_count > 0 && (
+              <Link
+                to={`/discussions?question_id=${id}`}
+                className="flex items-center gap-1.5 text-sm text-brand-navy dark:text-dark-accent font-heebo hover:underline"
+              >
+                <MessageSquare size={14} />
+                {discussion_count} דיונים קשורים
+              </Link>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<MessageSquare size={14} />}
+              onClick={() => setShowCreateDiscussion(true)}
+            >
+              פתח דיון
+            </Button>
+            {isInProcess && isMe && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTransfer(true)}
+              >
+                העבר
+              </Button>
+            )}
+          </div>
+        }
+      />
+
+      <div className="p-6 max-w-4xl mx-auto space-y-5">
+        {/* Main question card */}
+        <Card>
+          {/* Meta row */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            {is_urgent && (
+              <span className="flex items-center gap-1 text-xs font-bold text-red-600 font-heebo">
+                <Flame size={14} className="text-red-500 fill-red-400" />
+                דחוף
+              </span>
+            )}
+            {category && (
+              <span
+                className={clsx(
+                  'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium font-heebo',
+                  colorFromCategory(category)
+                )}
+              >
+                {getCategoryLabel(category)}
+              </span>
+            )}
+            <Badge status={status} withDot className="mr-auto" />
+          </div>
+
+          {/* Title */}
+          <h1 className="text-xl font-bold text-[var(--text-primary)] font-heebo leading-snug mb-4">
+            {title}
+          </h1>
+
+          {/* Content */}
+          <div className="prose prose-sm max-w-none text-[var(--text-secondary)] font-heebo leading-relaxed whitespace-pre-wrap">
+            {content}
+          </div>
+
+          {/* Footer meta */}
+          <div className="flex items-center gap-4 text-xs text-[var(--text-muted)] font-heebo mt-5 pt-4 border-t border-[var(--border-default)] flex-wrap">
+            <span className="flex items-center gap-1">
+              <Calendar size={12} />
+              {formatDate(created_at)}
+            </span>
+            {isAnswered && (
+              <>
+                <span className="flex items-center gap-1">
+                  <Eye size={12} />
+                  {view_count} צפיות
+                </span>
+                <span className="flex items-center gap-1">
+                  <Heart size={12} />
+                  {thank_count} תודות
+                </span>
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Status-driven action area ──────────────────────────────────── */}
+
+        {/* PENDING: large claim button */}
+        {isPending && (
+          <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
+            <p className="text-[var(--text-muted)] font-heebo text-sm">
+              השאלה ממתינה לטיפול
+            </p>
+            <Button
+              variant="secondary"
+              size="lg"
+              leftIcon={<Flame size={18} />}
+              onClick={() => setShowClaim(true)}
+              className="bg-brand-gold hover:bg-brand-gold-dark text-white min-w-[220px]"
+            >
+              תפוס ועָנֵה
+            </Button>
+          </div>
+        )}
+
+        {/* IN PROCESS — by me: AnswerEditor */}
+        {isInProcess && isMe && (
+          <AnswerEditor
+            questionId={id}
+            initialDraft={question.answer_draft}
+            onPublished={(updatedQuestion) => setQuestion(updatedQuestion)}
+          />
+        )}
+
+        {/* IN PROCESS — by another rabbi */}
+        {isInProcessByOther && (
+          <div className="flex items-center gap-3 p-5 bg-blue-50 border border-blue-200 rounded-card dark:bg-blue-900/20 dark:border-blue-700">
+            <User size={20} className="text-blue-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 font-heebo">
+                בטיפול אצל רב אחר
+              </p>
+              {assigned_rabbi && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-heebo mt-0.5">
+                  הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ANSWERED: full answer display */}
+        {isAnswered && answer && (
+          <Card header={
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                <span className="font-semibold text-[var(--text-primary)] font-heebo">
+                  תשובת הרב
+                </span>
+              </div>
+              <span className="text-xs text-[var(--text-muted)] font-heebo">
+                {formatDate(answered_at)}
+              </span>
+            </div>
+          }>
+            {/* Answer content — allow HTML from rich text editor */}
+            <div
+              className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: answer }}
+            />
+
+            {/* Rabbi signature */}
+            {assigned_rabbi && (
+              <div className="mt-6 pt-4 border-t border-[var(--border-default)] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-brand-navy/10 flex items-center justify-center">
+                  <User size={16} className="text-brand-navy" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)] font-heebo">
+                    הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+                  </p>
+                  {assigned_rabbi.title && (
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">
+                      {assigned_rabbi.title}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Thank count */}
+            <div className="mt-4 flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo">
+              <Heart size={12} />
+              {thank_count} אנשים הודו על התשובה
+            </div>
+          </Card>
+        )}
+
+        {/* ── Follow-up section ──────────────────────────────────────────── */}
+        {isAnswered && (
+          <FollowUpSection
+            questionId={id}
+            followUpQuestion={follow_up_question}
+            followUpAnswer={follow_up_answer}
+            followUpCount={follow_up_count}
+            isMe={isMe}
+          />
+        )}
+
+        {/* ── Private notes accordion (only shown to owning rabbi) ───────── */}
+        {isMe && (
+          <div className="rounded-card border border-amber-200 dark:border-amber-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setNotesOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-5 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-sm font-medium font-heebo hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Lock size={14} />
+                הערות פרטיות שלי
+              </span>
+              {notesOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {notesOpen && (
+              <PrivateNotesEditor
+                questionId={id}
+                initialNotes={private_notes}
+                onSaved={(notes) =>
+                  setQuestion((prev) => prev ? { ...prev, private_notes: notes } : prev)
+                }
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <ClaimConfirmModal
+        isOpen={showClaim}
+        question={question}
+        onClose={() => setShowClaim(false)}
+        onClaimed={(updated) => setQuestion(updated)}
+      />
+
+      <ReleaseConfirmModal
+        isOpen={showRelease}
+        question={question}
+        onClose={() => setShowRelease(false)}
+        onReleased={(updated) => setQuestion(updated)}
+      />
+
+      <TransferModal
+        isOpen={showTransfer}
+        question={question}
+        onClose={() => setShowTransfer(false)}
+        onTransferred={(updated) => setQuestion(updated)}
+      />
+
+      {/* CreateDiscussionModal placeholder — rendered when imported */}
+      {showCreateDiscussion && (
+        <CreateDiscussionModal
+          isOpen={showCreateDiscussion}
+          question={question}
+          onClose={() => setShowCreateDiscussion(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── AnswerEditor ───────────────────────────────────────────────────────────
+
+function AnswerEditor({ questionId, initialDraft, onPublished }) {
+  const [draft, setDraft] = useState(initialDraft || '');
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
+  const autoSaveRef = useRef(null);
+
+  // Auto-save draft every 30 s of inactivity
+  useEffect(() => {
+    if (draft === (initialDraft || '')) return;
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    setSaved(false);
+    autoSaveRef.current = setTimeout(() => saveDraft(draft), 30_000);
+    return () => clearTimeout(autoSaveRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  const saveDraft = async (text) => {
+    setSaving(true);
+    try {
+      await put(`/questions/${questionId}/draft`, { draft: text });
+      setSaved(true);
+    } catch {
+      // silent — don't block the rabbi
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!draft.trim()) {
+      setError('יש לכתוב תשובה לפני פרסום.');
+      return;
+    }
+    setPublishing(true);
+    setError(null);
+    try {
+      const data = await post(`/questions/${questionId}/answer`, { answer: draft });
+      onPublished?.(data.question || data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'שגיאה בפרסום התשובה.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  return (
+    <Card
+      header={
+        <div className="flex items-center gap-2">
+          <Pencil size={15} className="text-brand-navy" />
+          <span className="font-semibold text-[var(--text-primary)] font-heebo">
+            כתוב תשובה
+          </span>
+        </div>
+      }
+    >
+      <textarea
+        rows={12}
+        placeholder="כתוב את תשובתך כאן..."
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        dir="rtl"
+        className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-4 py-3 resize-y focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold hover:border-[var(--border-strong)] transition-colors duration-150 placeholder:text-[var(--text-muted)]"
+      />
+
+      {error && (
+        <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-700">
+          <AlertCircle size={14} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 dark:text-red-300 font-heebo">{error}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+        <span className="text-xs text-[var(--text-muted)] font-heebo">
+          {saving
+            ? 'שומר טיוטה...'
+            : saved
+            ? 'הטיוטה נשמרה'
+            : 'הטיוטה תישמר אוטומטית'}
+        </span>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => saveDraft(draft)}
+            loading={saving}
+            disabled={saving || publishing}
+          >
+            שמור טיוטה
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handlePublish}
+            loading={publishing}
+            disabled={saving || publishing || !draft.trim()}
+            leftIcon={<Send size={14} />}
+          >
+            פרסם תשובה
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── FollowUpSection ────────────────────────────────────────────────────────
+
+function FollowUpSection({ questionId, followUpQuestion, followUpAnswer, followUpCount, isMe }) {
+  const [followUpText, setFollowUpText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  if (followUpCount >= 1 && !followUpQuestion) return null;
+
+  const handleSubmitFollowUp = async () => {
+    if (!followUpText.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await post(`/questions/${questionId}/follow-up`, { follow_up_answer: followUpText });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'שגיאה בשמירת התגובה.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card
+      header={
+        <span className="font-semibold text-[var(--text-primary)] font-heebo text-sm">
+          שאלת המשך
+        </span>
+      }
+    >
+      {/* Existing follow-up question */}
+      {followUpQuestion && (
+        <div className="mb-4 p-3 bg-[var(--bg-muted)] rounded-lg">
+          <p className="text-xs text-[var(--text-muted)] font-heebo mb-1">שאלת המשך:</p>
+          <p className="text-sm text-[var(--text-primary)] font-heebo leading-relaxed">
+            {followUpQuestion}
+          </p>
+        </div>
+      )}
+
+      {/* Existing follow-up answer */}
+      {followUpAnswer && (
+        <div
+          className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed mb-4"
+          dangerouslySetInnerHTML={{ __html: followUpAnswer }}
+        />
+      )}
+
+      {/* Answer form (only me, and only if no answer yet) */}
+      {isMe && followUpQuestion && !followUpAnswer && !submitted && (
+        <div className="space-y-3">
+          <textarea
+            rows={5}
+            placeholder="כתוב תשובה לשאלת ההמשך..."
+            value={followUpText}
+            onChange={(e) => setFollowUpText(e.target.value)}
+            dir="rtl"
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold transition-colors placeholder:text-[var(--text-muted)]"
+          />
+          {error && (
+            <p className="text-xs text-red-600 dark:text-red-400 font-heebo">{error}</p>
+          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmitFollowUp}
+            loading={submitting}
+            disabled={!followUpText.trim() || submitting}
+          >
+            שלח תגובה
+          </Button>
+        </div>
+      )}
+
+      {submitted && (
+        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-heebo">
+          התגובה נשלחה בהצלחה.
+        </p>
+      )}
+
+      {/* No follow-up yet */}
+      {followUpCount < 1 && !followUpQuestion && (
+        <p className="text-sm text-[var(--text-muted)] font-heebo">
+          אין שאלת המשך לשאלה זו.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+// ── PrivateNotesEditor ─────────────────────────────────────────────────────
+
+function PrivateNotesEditor({ questionId, initialNotes, onSaved }) {
+  const [notes, setNotes] = useState(initialNotes || '');
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSavedMsg('');
+    try {
+      await put(`/questions/${questionId}/notes`, { notes });
+      setSavedMsg('נשמר');
+      onSaved?.(notes);
+    } catch {
+      setSavedMsg('שגיאה בשמירה');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-4 bg-amber-50 dark:bg-amber-900/10 space-y-3">
+      <textarea
+        rows={4}
+        placeholder="הוסף הערות פרטיות לשאלה זו (לא יוצגו לשואל)..."
+        value={notes}
+        onChange={(e) => {
+          setNotes(e.target.value);
+          setSavedMsg('');
+        }}
+        dir="rtl"
+        className="w-full rounded-md border border-amber-200 dark:border-amber-700 bg-white dark:bg-amber-900/20 text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 transition-colors placeholder:text-amber-400"
+      />
+      <div className="flex items-center justify-between">
+        {savedMsg && (
+          <span className="text-xs font-heebo text-amber-700 dark:text-amber-400">
+            {savedMsg}
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSave}
+          loading={saving}
+          className="mr-auto text-amber-700 hover:text-amber-800 hover:bg-amber-100"
+        >
+          שמור הערות
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── CreateDiscussionModal (lightweight placeholder) ────────────────────────
+// Full implementation lives in discussions feature; this is a shim so the
+// "פתח דיון" button is functional without an import cycle.
+
+function CreateDiscussionModal({ isOpen, question, onClose }) {
+  const navigate = useNavigate();
+  const [title, setTitle] = useState(question?.title ? `דיון: ${truncate(question.title, 50)}` : '');
+  const [body, setBody] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !body.trim()) {
+      setError('יש למלא כותרת ותוכן.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const data = await post('/discussions', {
+        title,
+        body,
+        question_id: question?.id,
+      });
+      onClose();
+      navigate(`/discussions/${data.discussion?.id || data.id}`);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'שגיאה ביצירת הדיון.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-[var(--bg-surface)] rounded-card shadow-xl p-6 space-y-4"
+        dir="rtl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-[var(--text-primary)] font-heebo">
+          פתח דיון חדש
+        </h2>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-primary)] font-heebo mb-1.5">
+            כותרת הדיון
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold hover:border-[var(--border-strong)] transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-primary)] font-heebo mb-1.5">
+            תוכן הדיון
+          </label>
+          <textarea
+            rows={5}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="כתוב את תוכן הדיון כאן..."
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold hover:border-[var(--border-strong)] transition-colors placeholder:text-[var(--text-muted)]"
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400 font-heebo">{error}</p>
+        )}
+
+        <div className="flex items-center gap-3 justify-end flex-row-reverse pt-2">
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            loading={submitting}
+            disabled={submitting}
+          >
+            צור דיון
+          </Button>
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>
+            ביטול
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

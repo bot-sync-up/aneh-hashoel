@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>דו"ח שבועי — ענה את השואל</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background-color: #f0f2f7;
+      font-family: 'Heebo', Arial, sans-serif;
+      direction: rtl; text-align: right;
+      -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;
+    }
+    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; }
+      .email-body { padding: 20px 16px !important; }
+      .stat-cell {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+      }
+      .stats-row td { display: block !important; width: 100% !important; }
+      .top-question-card { padding: 14px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f0f2f7;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+       style="background-color:#f0f2f7; padding:28px 16px;">
+  <tr>
+    <td align="center">
+
+      <table role="presentation" class="email-container" cellpadding="0" cellspacing="0"
+             style="max-width:600px; width:100%; border-radius:10px; overflow:hidden;
+                    box-shadow:0 2px 12px rgba(0,0,0,0.12);">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#1B2B5E; padding:28px 32px; text-align:center;">
+            <h1 style="margin:0 0 4px; color:#B8973A; font-size:26px; font-weight:700;
+                       font-family:'Heebo',Arial,sans-serif; line-height:1.3;">
+              ענה את השואל
+            </h1>
+            <p style="margin:0; color:#a0aac4; font-size:13px; font-family:'Heebo',Arial,sans-serif;">
+              פלטפורמת שאלות ותשובות הלכתיות — המרכז למורשת מרן
+            </p>
+          </td>
+        </tr>
+
+        <!-- TITLE BAR -->
+        <tr>
+          <td style="background-color:#B8973A; padding:14px 32px; text-align:center;">
+            <h2 style="margin:0; color:#1B2B5E; font-size:18px; font-weight:700;
+                       font-family:'Heebo',Arial,sans-serif; line-height:1.3;">
+              דו"ח שבועי — {{WEEK_RANGE}}
+            </h2>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td class="email-body"
+              style="background-color:#ffffff; padding:32px 36px;
+                     font-family:'Heebo',Arial,sans-serif; direction:rtl; text-align:right;">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 6px; font-size:16px; color:#1B2B5E; font-weight:700;">
+              {{RABBI_TITLE}} {{RABBI_NAME}} שליט"א,
+            </p>
+            <p style="margin:0 0 28px; font-size:15px; color:#444; line-height:1.7;">
+              להלן סיכום פעילותכם בשבוע האחרון. תודה על מסירותכם למלאכת הקודש.
+            </p>
+
+            <!-- ═══ STATS TABLE ═══ -->
+            <table role="presentation" class="stats-row" width="100%" cellpadding="0" cellspacing="0"
+                   style="margin-bottom:28px;">
+              <tr>
+                <!-- Answers count -->
+                <td class="stat-cell" width="33%" style="padding:0 6px 0 0; vertical-align:top;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                         style="background-color:#e8eaf6; border-radius:8px; text-align:center;">
+                    <tr>
+                      <td style="padding:18px 12px;">
+                        <p style="margin:0 0 6px; font-size:30px; font-weight:700;
+                                  color:#1B2B5E; font-family:'Heebo',Arial,sans-serif;
+                                  line-height:1.2;">
+                          {{ANSWERS_COUNT}}
+                        </p>
+                        <p style="margin:0; font-size:12px; color:#555;
+                                  font-family:'Heebo',Arial,sans-serif; line-height:1.4;">
+                          תשובות שנכתבו
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+
+                <!-- Views count -->
+                <td class="stat-cell" width="33%" style="padding:0 3px; vertical-align:top;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                         style="background-color:#fff9ee; border-radius:8px; text-align:center;">
+                    <tr>
+                      <td style="padding:18px 12px;">
+                        <p style="margin:0 0 6px; font-size:30px; font-weight:700;
+                                  color:#B8973A; font-family:'Heebo',Arial,sans-serif;
+                                  line-height:1.2;">
+                          {{VIEWS_COUNT}}
+                        </p>
+                        <p style="margin:0; font-size:12px; color:#555;
+                                  font-family:'Heebo',Arial,sans-serif; line-height:1.4;">
+                          צפיות בתשובות
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+
+                <!-- Thanks count -->
+                <td class="stat-cell" width="33%" style="padding:0 0 0 6px; vertical-align:top;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                         style="background-color:#edf7ed; border-radius:8px; text-align:center;">
+                    <tr>
+                      <td style="padding:18px 12px;">
+                        <p style="margin:0 0 6px; font-size:30px; font-weight:700;
+                                  color:#2e7d32; font-family:'Heebo',Arial,sans-serif;
+                                  line-height:1.2;">
+                          {{THANKS_COUNT}}
+                        </p>
+                        <p style="margin:0; font-size:12px; color:#555;
+                                  font-family:'Heebo',Arial,sans-serif; line-height:1.4;">
+                          תודות שהתקבלו
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Top question (if provided) -->
+            {{#if TOP_QUESTION}}
+            <p style="margin:0 0 10px; font-size:14px; font-weight:700; color:#1B2B5E;
+                      font-family:'Heebo',Arial,sans-serif; border-bottom:2px solid #e8d98a;
+                      padding-bottom:6px;">
+              השאלה הפופולרית ביותר שלכם השבוע
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   class="top-question-card"
+                   style="background-color:#f8f8fc; border-radius:8px;
+                          border-right:4px solid #B8973A; margin-bottom:28px;">
+              <tr>
+                <td style="padding:18px 22px;">
+                  <p style="margin:0 0 6px; font-size:12px; color:#B8973A;
+                            font-weight:600; font-family:'Heebo',Arial,sans-serif;
+                            text-transform:uppercase; letter-spacing:0.5px;">
+                    כוכב השבוע
+                  </p>
+                  <p style="margin:0 0 8px; font-size:15px; font-weight:700;
+                            color:#1B2B5E; font-family:'Heebo',Arial,sans-serif; line-height:1.4;">
+                    {{TOP_QUESTION_TITLE}}
+                  </p>
+                  <p style="margin:0; font-size:13px; color:#777;
+                            font-family:'Heebo',Arial,sans-serif;">
+                    {{TOP_QUESTION_VIEWS}} צפיות · {{TOP_QUESTION_THANKS}} תודות
+                  </p>
+                </td>
+              </tr>
+            </table>
+            {{/if}}
+
+            <!-- Encouragement -->
+            <p style="margin:0; font-size:14px; color:#888; line-height:1.7;
+                      text-align:center; font-style:italic;
+                      font-family:'Heebo',Arial,sans-serif;">
+              "כָּל הַמְלַמֵּד תּוֹרָה לְרַבִּים — אֵין חֵטְא בָּא עַל יָדוֹ"
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#1B2B5E; padding:20px 32px; text-align:center;
+                     border-radius:0 0 10px 10px;">
+            <p style="margin:0 0 6px; color:#8899bb; font-size:12px;
+                      font-family:'Heebo',Arial,sans-serif; line-height:1.6;">
+              הודעה זו נשלחה ממערכת "ענה את השואל" — המרכז למורשת מרן
+            </p>
+            <p style="margin:0; color:#6677aa; font-size:11px;
+                      font-family:'Heebo',Arial,sans-serif; line-height:1.5;">
+              לשינוי העדפות התראות, פנה למנהל המערכת
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

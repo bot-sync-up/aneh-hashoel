@@ -20,20 +20,16 @@
  *   <project root>/uploads/   (created automatically if missing)
  */
 
-import fs   from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const fs   = require('fs');
+const path = require('path');
 
-import multer from 'multer';
-import sharp  from 'sharp';
-import { v4 as uuidv4 } from 'uuid';
+const multer        = require('multer');
+const sharp         = require('sharp');
+const { v4: uuidv4 } = require('uuid');
 
-import { logger } from '../utils/logger.js';
+const { logger } = require('../utils/logger');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
 
 /** Absolute path to the upload destination directory. */
 const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
@@ -145,7 +141,7 @@ const multerInstance = multer({
  *
  * @type {import('express').RequestHandler}
  */
-export const uploadQuestionFiles = multerInstance.array('files', 5);
+const uploadQuestionFiles = multerInstance.array('files', 5);
 
 // ─── processImages ────────────────────────────────────────────────────────────
 
@@ -167,7 +163,7 @@ export const uploadQuestionFiles = multerInstance.array('files', 5);
  *
  * @type {import('express').RequestHandler}
  */
-export async function processImages(req, _res, next) {
+async function processImages(req, _res, next) {
   if (!req.files || req.files.length === 0) {
     return next();
   }
@@ -227,3 +223,5 @@ export async function processImages(req, _res, next) {
   await Promise.allSettled(tasks);
   return next();
 }
+
+module.exports = { uploadQuestionFiles, processImages };

@@ -8,14 +8,15 @@
  * Exported limiters:
  *   apiLimiter      – 100 req / 15 min per IP           (general API routes)
  *   authLimiter     – 5 req / 15 min per IP             (login, forgot-password)
+ *   loginLimiter    – alias for authLimiter
  *   claimLimiter    – 10 req / 1 min per rabbi ID       (question claiming)
  *   thankLimiter    – 3 req / 1 hour per IP per-question (thank button, Redis-checked)
  *   webhookLimiter  – 200 req / 1 min                   (WP / email webhooks)
  */
 
-import rateLimit from 'express-rate-limit';
-import { createClient } from 'redis';
-import { logger } from '../utils/logger.js';
+const rateLimit = require('express-rate-limit');
+const { createClient } = require('redis');
+const { logger } = require('../utils/logger');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ async function getRedis() {
  * 100 requests per 15 minutes, keyed by IP address.
  * Applied to all /api/* routes that do not have a stricter limiter.
  */
-export const apiLimiter = rateLimit({
+const apiLimiter = rateLimit({
   windowMs:        15 * 60 * 1000, // 15 minutes
   max:             100,
   standardHeaders: true,
@@ -87,7 +88,7 @@ export const apiLimiter = rateLimit({
  * 5 requests per 15 minutes per IP.
  * Covers: POST /auth/login, POST /auth/forgot-password, POST /auth/resend-otp.
  */
-export const authLimiter = rateLimit({
+const authLimiter = rateLimit({
   windowMs:        15 * 60 * 1000, // 15 minutes
   max:             5,
   standardHeaders: true,
@@ -99,6 +100,9 @@ export const authLimiter = rateLimit({
   },
 });
 
+// loginLimiter is an alias for authLimiter (used by auth.js)
+const loginLimiter = authLimiter;
+
 // ─── claimLimiter ─────────────────────────────────────────────────────────────
 
 /**
@@ -108,7 +112,7 @@ export const authLimiter = rateLimit({
  *
  * Apply AFTER the authenticate middleware so req.rabbi is populated.
  */
-export const claimLimiter = rateLimit({
+const claimLimiter = rateLimit({
   windowMs:        60 * 1000, // 1 minute
   max:             10,
   standardHeaders: true,
@@ -143,7 +147,7 @@ export const claimLimiter = rateLimit({
  * because express-rate-limit does not natively support composite keys that
  * include a request body/param value.
  */
-export const thankLimiter = rateLimit({
+const thankLimiter = rateLimit({
   windowMs:        60 * 60 * 1000, // 1 hour
   max:             3,
   standardHeaders: true,
@@ -167,7 +171,7 @@ export const thankLimiter = rateLimit({
  *
  * @type {import('express').RequestHandler}
  */
-export async function thankRateLimitPerQuestion(req, res, next) {
+async function thankRateLimitPerQuestion(req, res, next) {
   const ip         = clientIp(req);
   const questionId = req.params.id || req.params.questionId;
 
@@ -217,7 +221,7 @@ export async function thankRateLimitPerQuestion(req, res, next) {
  * 200 requests per minute per IP.
  * Protects the server from runaway webhook delivery loops or spoofed traffic.
  */
-export const webhookLimiter = rateLimit({
+const webhookLimiter = rateLimit({
   windowMs:        60 * 1000, // 1 minute
   max:             200,
   standardHeaders: true,
@@ -228,3 +232,13 @@ export const webhookLimiter = rateLimit({
     error: 'יותר מדי בקשות לנקודת הקצה של ה-webhook.',
   },
 });
+
+module.exports = {
+  apiLimiter,
+  authLimiter,
+  loginLimiter,
+  claimLimiter,
+  thankLimiter,
+  thankRateLimitPerQuestion,
+  webhookLimiter,
+};

@@ -19,8 +19,8 @@
  *   verifyActionToken(token)               → decoded payload object
  */
 
-import crypto from 'crypto';
-import jwt    from 'jsonwebtoken';
+const crypto = require('crypto');
+const jwt    = require('jsonwebtoken');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ function getActionLinkSecret() {
  * @throws  {TypeError}     If text is not a string
  * @throws  {Error}         If ENCRYPTION_KEY is not configured correctly
  */
-export function encrypt(text) {
+function encrypt(text) {
   if (typeof text !== 'string') {
     throw new TypeError(`encrypt: הערך חייב להיות מחרוזת, התקבל ${typeof text}`);
   }
@@ -142,7 +142,7 @@ export function encrypt(text) {
  * @throws  {TypeError}             If encryptedStr is not a string or has wrong format
  * @throws  {Error}                 If GCM authentication fails (data tampered / wrong key)
  */
-export function decrypt(encryptedStr) {
+function decrypt(encryptedStr) {
   if (typeof encryptedStr !== 'string') {
     throw new TypeError(
       `decrypt: הערך המוצפן חייב להיות מחרוזת, התקבל ${typeof encryptedStr}`
@@ -210,7 +210,7 @@ export function decrypt(encryptedStr) {
  * @returns {string}         64-character lowercase hex SHA-256 digest
  * @throws  {TypeError}      If token is not a string
  */
-export function hashToken(token) {
+function hashToken(token) {
   if (typeof token !== 'string' || token.length === 0) {
     throw new TypeError('hashToken: הטוקן חייב להיות מחרוזת לא ריקה');
   }
@@ -226,7 +226,7 @@ export function hashToken(token) {
  * @returns {string}             Hex-encoded random string (64 chars for the default 32 bytes)
  * @throws  {RangeError}         If bytes < 8 or bytes > 512
  */
-export function generateToken(bytes = 32) {
+function generateToken(bytes = 32) {
   if (typeof bytes !== 'number' || bytes < 8 || bytes > 512) {
     throw new RangeError('generateToken: bytes חייב להיות מספר בין 8 ל-512');
   }
@@ -248,7 +248,7 @@ export function generateToken(bytes = 32) {
  * @throws  {TypeError}                 If payload is not a plain object
  * @throws  {Error}                     If ACTION_LINK_SECRET is not configured
  */
-export function generateActionToken(payload, expiresIn = '24h') {
+function generateActionToken(payload, expiresIn = '24h') {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new TypeError('generateActionToken: payload חייב להיות אובייקט');
   }
@@ -268,7 +268,7 @@ export function generateActionToken(payload, expiresIn = '24h') {
  * @returns {object}         Decoded payload
  * @throws  {Error}          With .status 401 if the token is expired or invalid
  */
-export function verifyActionToken(token) {
+function verifyActionToken(token) {
   if (!token || typeof token !== 'string') {
     const err = new Error('verifyActionToken: טוקן נדרש');
     err.status = 401;
@@ -286,3 +286,12 @@ export function verifyActionToken(token) {
     throw err;
   }
 }
+
+module.exports = {
+  encrypt,
+  decrypt,
+  hashToken,
+  generateToken,
+  generateActionToken,
+  verifyActionToken,
+};

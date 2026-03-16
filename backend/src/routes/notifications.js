@@ -19,12 +19,12 @@
  *   read_at (timestamptz nullable), dismissed_at (timestamptz nullable)
  */
 
-import express from 'express';
-import { authenticate } from '../middleware/authenticate.js';
-import { query as dbQuery } from '../db/pool.js';
-import { logger } from '../utils/logger.js';
+const express = require('express');
+const { authenticate } = require('../middleware/authenticate');
+const { query: dbQuery } = require('../db/pool');
+const { logger } = require('../utils/logger');
 
-export const router = express.Router();
+const router = express.Router();
 
 // All notification routes require an authenticated rabbi session.
 router.use(authenticate);
@@ -44,7 +44,7 @@ function refreshBadgeAsync(req, rabbiId) {
     if (!io) return;
 
     // Lazy import to avoid circular deps at module load time
-    import('../socket/notificationEvents.js')
+    Promise.resolve().then(() => require('../socket/notificationEvents'))
       .then(({ updateBadgeCount }) => {
         return dbQuery(
           `SELECT COUNT(*)::int AS unread
@@ -331,4 +331,5 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
-export default router;
+module.exports = router;
+module.exports.router = router;

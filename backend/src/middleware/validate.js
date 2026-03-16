@@ -18,8 +18,8 @@
  *   router.post('/login', validateLogin, handleValidation, loginController);
  */
 
-import { body, validationResult } from 'express-validator';
-import { parse as parseHtml }     from 'node-html-parser';
+const { body, validationResult } = require('express-validator');
+const { parse: parseHtml }       = require('node-html-parser');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ function htmlHasMinLength(html, minLength) {
  * Validates a login request body.
  * Fields: email, password
  */
-export const validateLogin = [
+const validateLogin = [
   body('email')
     .trim()
     .notEmpty()
@@ -87,7 +87,7 @@ export const validateLogin = [
  *   - At least one digit (0-9)
  *   - At least one special character (!@#$%^&* etc.)
  */
-export const validateRegister = [
+const validateRegister = [
   body('name')
     .trim()
     .notEmpty()
@@ -127,7 +127,7 @@ export const validateRegister = [
  *   - After stripping all HTML tags, the plain text must be at least 10 characters
  *     (prevents answers like "<p> </p>" or whitespace-only submissions)
  */
-export const validateAnswer = [
+const validateAnswer = [
   body('content')
     .notEmpty()
     .withMessage('תוכן התשובה נדרש')
@@ -152,7 +152,7 @@ export const validateAnswer = [
  *   - At least 1 character after trimming
  *   - At most 5000 characters
  */
-export const validateDiscussionMessage = [
+const validateDiscussionMessage = [
   body('content')
     .trim()
     .notEmpty()
@@ -178,7 +178,7 @@ export const validateDiscussionMessage = [
  *
  * @type {import('express').RequestHandler}
  */
-export function handleValidation(req, res, next) {
+function handleValidation(req, res, next) {
   const result = validationResult(req);
 
   if (result.isEmpty()) {
@@ -195,3 +195,11 @@ export function handleValidation(req, res, next) {
     errors: formatted,
   });
 }
+
+module.exports = {
+  validateLogin,
+  validateRegister,
+  validateAnswer,
+  validateDiscussionMessage,
+  handleValidation,
+};

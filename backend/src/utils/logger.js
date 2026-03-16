@@ -15,7 +15,7 @@
  *   ...meta     any additional metadata passed by the caller
  *
  * Usage:
- *   import { logger } from '../utils/logger.js';
+ *   const { logger } = require('../utils/logger');
  *
  *   logger.info('Server started', { port: 3001 });
  *   logger.warn('Rate limit approaching', { ip, endpoint });
@@ -23,12 +23,8 @@
  *   logger.debug('Cache miss', { key });
  */
 
-import { createLogger, format, transports } from 'winston';
-import path  from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const { createLogger, format, transports } = require('winston');
+const path = require('path');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -102,7 +98,7 @@ const combinedFileTransport = new transports.File({
 
 // ─── Logger instance ──────────────────────────────────────────────────────────
 
-export const logger = createLogger({
+const logger = createLogger({
   // Base level: debug lets transports apply their own per-transport levels
   level: 'debug',
 
@@ -141,14 +137,15 @@ export const logger = createLogger({
  * Morgan writes a trailing newline; we trim it before passing to Winston.
  *
  * Usage in server.js:
- *   import morgan from 'morgan';
- *   import { morganStream } from './utils/logger.js';
+ *   const morgan = require('morgan');
+ *   const { morganStream } = require('./utils/logger');
  *   app.use(morgan('combined', { stream: morganStream }));
  */
-export const morganStream = {
+const morganStream = {
   write(message) {
     logger.http(message.trimEnd());
   },
 };
 
-export default logger;
+module.exports = { logger, morganStream };
+module.exports.default = logger;

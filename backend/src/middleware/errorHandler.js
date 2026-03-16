@@ -14,7 +14,7 @@
  * DB error details (table names, constraints) are never forwarded to the client.
  */
 
-import { logger } from '../utils/logger.js';
+const { logger } = require('../utils/logger');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ function formatValidationError(ve) {
  * @param {import('express').NextFunction} _next  – must be declared even if unused
  */
 // eslint-disable-next-line no-unused-vars
-export function errorHandler(err, req, res, _next) {
+function errorHandler(err, req, res, _next) {
   const isDev = process.env.NODE_ENV === 'development';
 
   // ── 1. express-validator: errors array ──────────────────────────────────────
@@ -157,3 +157,5 @@ export function errorHandler(err, req, res, _next) {
 
   return res.status(500).json(body);
 }
+
+module.exports = { errorHandler };

@@ -233,10 +233,16 @@ const webhookLimiter = rateLimit({
   },
 });
 
+// Aliases for backward compatibility
+const forgotPasswordLimiter = authLimiter;
+const emailLimiter = authLimiter;
+
 module.exports = {
   apiLimiter,
   authLimiter,
   loginLimiter,
+  forgotPasswordLimiter,
+  emailLimiter,
   claimLimiter,
   thankLimiter,
   thankRateLimitPerQuestion,

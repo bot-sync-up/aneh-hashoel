@@ -733,4 +733,120 @@ async function _broadcastEmergencyEmail(message, targetRabbiIds) {
   console.log(`[admin] Emergency emails dispatched to ${rabbis.length} rabbis`);
 }
 
+// ─── Categories CRUD ──────────────────────────────────────────────────────────
+
+router.get('/categories', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await dbQuery(
+      'SELECT id, name, parent_id, sort_order, color, description, created_at FROM categories ORDER BY sort_order, name'
+    );
+    return res.json({ ok: true, categories: rows });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/categories', requireAdmin, async (req, res) => {
+  try {
+    const { name, parentId = null, sortOrder = 0, color = '#1B2B5E', description = null } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'שם קטגוריה נדרש' });
+    const { rows } = await dbQuery(
+      'INSERT INTO categories (name, parent_id, sort_order, color, description) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [name.trim(), parentId, sortOrder, color, description]
+    );
+    return res.status(201).json({ ok: true, category: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, color, description, sortOrder } = req.body;
+    const { rows } = await dbQuery(
+      `UPDATE categories SET
+         name        = COALESCE($2, name),
+         color       = COALESCE($3, color),
+         description = COALESCE($4, description),
+         sort_order  = COALESCE($5, sort_order),
+         updated_at  = NOW()
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, name, color, description, sortOrder]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'קטגוריה לא נמצאה' });
+    return res.json({ ok: true, category: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    await dbQuery('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── System Health ────────────────────────────────────────────────────────────
+
+router.get('/system/health', requireAdmin, async (req, res) => {
+  try {
+    const dbStart = Date.now();
+    await dbQuery('SELECT 1');
+    const dbLatency = Date.now() - dbStart;
+
+    const { rows: counts } = await dbQuery(`
+      SELECT
+        (SELECT COUNT(*) FROM questions WHERE status = 'pending')::int    AS pending_questions,
+        (SELECT COUNT(*) FROM questions WHERE status = 'in_process')::int AS active_questions,
+        (SELECT COUNT(*) FROM rabbis WHERE is_active = true)::int         AS active_rabbis,
+        (SELECT COUNT(*) FROM discussions WHERE is_open = true)::int      AS open_discussions
+    `);
+
+    return res.json({
+      ok: true,
+      status: 'healthy',
+      dbLatencyMs: dbLatency,
+      uptime: Math.floor(process.uptime()),
+      memory: process.memoryUsage(),
+      counts: counts[0],
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, status: 'degraded', error: err.message });
+  }
+});
+
+// ─── Admin Leaderboard ────────────────────────────────────────────────────────
+
+router.get('/leaderboard', requireAdmin, async (req, res) => {
+  try {
+    const period = req.query.period || 'month';
+    const intervals = { week: '7 days', month: '30 days', year: '365 days' };
+    const interval = intervals[period] || '30 days';
+
+    const { rows } = await dbQuery(`
+      SELECT
+        r.id, r.name, r.role, r.photo_url,
+        COUNT(q.id)::int                                                          AS answered,
+        COALESCE(SUM(q.thanks_count), 0)::int                                     AS total_thanks,
+        ROUND(AVG(EXTRACT(EPOCH FROM (q.answered_at - q.created_at)) / 3600)::numeric, 2) AS avg_hours
+      FROM rabbis r
+      LEFT JOIN questions q
+        ON  q.assigned_rabbi_id = r.id
+        AND q.status            = 'answered'
+        AND q.answered_at      >= NOW() - INTERVAL '${interval}'
+      WHERE r.is_active = true
+      GROUP BY r.id
+      ORDER BY answered DESC, total_thanks DESC
+      LIMIT 20
+    `);
+    return res.json({ ok: true, leaderboard: rows, period });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

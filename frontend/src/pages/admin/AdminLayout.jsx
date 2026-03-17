@@ -1,5 +1,14 @@
-import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import React, { Suspense } from 'react';
+import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { FullPageSpinner } from '../../components/ui/Spinner';
+
+const RabbisAdminPage      = React.lazy(() => import('./RabbisAdminPage'));
+const AdminQuestionsPage   = React.lazy(() => import('./AdminQuestionsPage'));
+const CategoriesAdminPage  = React.lazy(() => import('./CategoriesAdminPage'));
+const SettingsPage         = React.lazy(() => import('./SettingsPage'));
+const AuditLogPage         = React.lazy(() => import('./AuditLogPage'));
+const SystemHealthPage     = React.lazy(() => import('./SystemHealthPage'));
+const LeaderboardPage      = React.lazy(() => import('./LeaderboardPage'));
 import { clsx } from 'clsx';
 import {
   Users,
@@ -76,7 +85,18 @@ export default function AdminLayout() {
 
       {/* Page content */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
-        <Outlet />
+        <Suspense fallback={<FullPageSpinner label="טוען..." />}>
+          <Routes>
+            <Route index element={<Navigate to="rabbis" replace />} />
+            <Route path="rabbis"     element={<RabbisAdminPage />} />
+            <Route path="questions"  element={<AdminQuestionsPage />} />
+            <Route path="categories" element={<CategoriesAdminPage />} />
+            <Route path="settings"   element={<SettingsPage />} />
+            <Route path="logs"       element={<AuditLogPage />} />
+            <Route path="health"     element={<SystemHealthPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
+          </Routes>
+        </Suspense>
       </div>
     </div>
   );

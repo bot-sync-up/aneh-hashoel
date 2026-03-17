@@ -163,9 +163,13 @@ async function loginRabbi(email, password, deviceInfo = {}, app = null) {
   }
 
   const { rows } = await db(
-    `SELECT id, email, name, role, password_hash, status,
-            is_vacation, must_change_password, two_fa_enabled,
-            signature, photo_url, last_login
+    `SELECT id, email, name, role, password_hash,
+            CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+            vacation_mode AS is_vacation,
+            false AS must_change_password,
+            two_fa_enabled,
+            signature, photo_url,
+            updated_at AS last_login
      FROM   rabbis
      WHERE  email = $1
      LIMIT  1`,
@@ -309,8 +313,12 @@ async function handleGoogleOAuth(googleProfile, deviceInfo = {}, app = null) {
 
   // Try to find by google_id first (returning user)
   let { rows } = await db(
-    `SELECT id, email, name, role, status, is_vacation,
-            must_change_password, signature, photo_url, last_login
+    `SELECT id, email, name, role,
+            CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+            vacation_mode AS is_vacation,
+            false AS must_change_password,
+            signature, photo_url,
+            updated_at AS last_login
      FROM   rabbis
      WHERE  google_id = $1
      LIMIT  1`,
@@ -327,8 +335,12 @@ async function handleGoogleOAuth(googleProfile, deviceInfo = {}, app = null) {
               photo_url = COALESCE(photo_url, $2)
        WHERE  email     = $3
          AND  google_id IS NULL
-       RETURNING id, email, name, role, status, is_vacation,
-                 must_change_password, signature, photo_url, last_login`,
+       RETURNING id, email, name, role,
+                 CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+                 vacation_mode AS is_vacation,
+                 false AS must_change_password,
+                 signature, photo_url,
+                 updated_at AS last_login`,
       [googleProfile.id, googleProfile.photo || null, googleProfile.email.toLowerCase()]
     );
     rabbi = emailResult.rows[0];
@@ -655,7 +667,7 @@ async function getSessionById(sessionId, rabbiId) {
 async function updateLastLogin(rabbiId) {
   try {
     await db(
-      `UPDATE rabbis SET last_login = NOW() WHERE id = $1`,
+      `UPDATE rabbis SET updated_at = NOW() WHERE id = $1`,
       [rabbiId]
     );
   } catch (err) {

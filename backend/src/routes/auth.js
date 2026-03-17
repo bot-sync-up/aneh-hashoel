@@ -272,8 +272,13 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     // Fetch full DB profile for response
     const { rows } = await db(
       `SELECT id, email, name, role, signature, photo_url,
-              is_vacation, must_change_password, notification_pref,
-              whatsapp_number, two_fa_enabled, last_login, status
+              vacation_mode AS is_vacation,
+              false AS must_change_password,
+              notification_pref,
+              NULL AS whatsapp_number,
+              two_fa_enabled,
+              updated_at AS last_login,
+              CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status
        FROM   rabbis WHERE id = $1`,
       [rawRabbi.id]
     );
@@ -631,8 +636,14 @@ router.get('/me', authenticate, async (req, res, next) => {
   try {
     const { rows } = await db(
       `SELECT id, email, name, role, signature, photo_url,
-              is_vacation, must_change_password, notification_pref,
-              whatsapp_number, two_fa_enabled, last_login, status, created_at
+              vacation_mode AS is_vacation,
+              false AS must_change_password,
+              notification_pref,
+              NULL AS whatsapp_number,
+              two_fa_enabled,
+              updated_at AS last_login,
+              CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+              created_at
        FROM   rabbis WHERE id = $1`,
       [req.rabbi.id]
     );
@@ -715,8 +726,13 @@ router.post('/2fa/login', authLimiter, async (req, res, next) => {
 
     const { rows } = await db(
       `SELECT id, email, name, role, signature, photo_url,
-              is_vacation, must_change_password, notification_pref,
-              whatsapp_number, two_fa_enabled, last_login, status
+              vacation_mode AS is_vacation,
+              false AS must_change_password,
+              notification_pref,
+              NULL AS whatsapp_number,
+              two_fa_enabled,
+              updated_at AS last_login,
+              CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status
        FROM   rabbis WHERE id = $1`,
       [rabbiId]
     );

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  MessageCircleCheck,
+  MessageCircle,
   Timer,
   Heart,
   Inbox,
@@ -19,7 +19,7 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
       title: 'שאלות שעניתי',
       value: stats.answeredThisMonth ?? 0,
       subtitle: 'החודש הנוכחי',
-      icon: <MessageCircleCheck />,
+      icon: <MessageCircle />,
       color: 'navy',
       trend: stats.answeredTrend ?? null,
     },

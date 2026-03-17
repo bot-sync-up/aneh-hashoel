@@ -44,7 +44,7 @@ function EmptyState({
         )}
       >
         {icon ? (
-          typeof icon === 'function' ? (
+          (typeof icon === 'function' || (typeof icon === 'object' && icon?.$$typeof)) ? (
             <IconComponent
               size={28}
               strokeWidth={1.5}

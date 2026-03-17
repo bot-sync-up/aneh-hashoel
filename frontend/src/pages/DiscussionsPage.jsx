@@ -27,7 +27,10 @@ export default function DiscussionsPage() {
     error,
     execute: refetch,
     setData: setDiscussions,
-  } = useApi('/discussions', { immediate: false });
+  } = useApi('/discussions', {
+    immediate: false,
+    transform: (d) => (Array.isArray(d) ? d : d?.discussions ?? []),
+  });
 
   // Fetch on mount
   React.useEffect(() => {

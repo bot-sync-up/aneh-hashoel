@@ -145,7 +145,7 @@ function Sidebar({ notificationCount = 0 }) {
           onClick={toggleCollapsed}
           aria-label={collapsed ? 'הרחב סרגל צד' : 'כווץ סרגל צד'}
           className={clsx(
-            'hidden lg:flex items-center justify-center',
+            'hidden md:flex items-center justify-center',
             'w-7 h-7 rounded-md',
             'text-white/60 hover:text-white hover:bg-white/10',
             'transition-colors duration-150 flex-shrink-0',
@@ -259,12 +259,12 @@ function Sidebar({ notificationCount = 0 }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden lg:block h-full">{sidebarContent}</div>
+      <div className="hidden md:block h-full">{sidebarContent}</div>
 
       {/* Mobile: hamburger trigger exposed via context; overlay rendered here */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 flex"
+          className="md:hidden fixed inset-0 z-40 flex"
           onClick={() => setMobileOpen(false)}
         >
           <div className="fixed inset-0 bg-black/50" aria-hidden="true" />

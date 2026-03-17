@@ -184,12 +184,13 @@ export function AuthProvider({ children }) {
       setLoading(true);
       try {
         const { data } = await api.post('/auth/login', credentials);
-        const { rabbi: rabbiData, token: accessToken, refreshToken: refToken } = data;
+        const { rabbi: rabbiData, accessToken, token, refreshToken: refToken } = data;
+        const resolvedToken = accessToken || token;
 
         setRabbi(rabbiData);
-        setToken(accessToken);
+        setToken(resolvedToken);
         setRefreshToken(refToken || null);
-        persistAuth(rabbiData, accessToken, refToken || null);
+        persistAuth(rabbiData, resolvedToken, refToken || null);
 
         return { success: true };
       } catch (error) {

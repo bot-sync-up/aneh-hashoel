@@ -29,7 +29,7 @@ function Layout({ children, notificationCount = 0 }) {
       {/* ── Desktop Sidebar ── */}
       <div
         className={clsx(
-          'hidden lg:flex flex-col',
+          'hidden md:flex flex-col',
           'fixed inset-y-0 right-0 z-30',
           'h-screen'
         )}
@@ -41,7 +41,7 @@ function Layout({ children, notificationCount = 0 }) {
       {/* ── Mobile Sidebar Overlay ── */}
       {mobileSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40"
+          className="md:hidden fixed inset-0 z-40"
           aria-modal="true"
           role="dialog"
           aria-label="תפריט ניווט"
@@ -72,14 +72,14 @@ function Layout({ children, notificationCount = 0 }) {
           'transition-all duration-300',
           // Offset for the fixed sidebar on desktop
           // Sidebar width changes based on collapsed state — we use CSS variables via padding
-          'lg:pr-64' // default sidebar width; collapsed uses 72px
+          'md:pr-64' // default sidebar width; collapsed uses 72px
         )}
         id="main-content"
       >
         {/* Mobile top bar */}
         <header
           className={clsx(
-            'lg:hidden flex items-center justify-between',
+            'md:hidden flex items-center justify-between',
             'h-14 px-4 flex-shrink-0',
             'bg-[var(--bg-surface)] border-b border-[var(--border-default)]',
             'sticky top-0 z-20'

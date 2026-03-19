@@ -1,7 +1,6 @@
 {
   "name": "aneh-hashoel-backend",
   "version": "0.1.0",
-  "type": "module",
   "scripts": {
     "dev": "nodemon --watch src src/server.js",
     "start": "node src/server.js",

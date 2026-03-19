@@ -52,6 +52,7 @@ export default function QuestionDetailPage() {
   const [showRelease, setShowRelease] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCreateDiscussion, setShowCreateDiscussion] = useState(false);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
 
   // UI state
   const [notesOpen, setNotesOpen] = useState(false);
@@ -265,7 +266,7 @@ export default function QuestionDetailPage() {
 
         {/* ── Status-driven action area ──────────────────────────────────── */}
 
-        {/* PENDING: large claim button */}
+        {/* PENDING: claim button */}
         {isPending && (
           <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
             <p className="text-[var(--text-muted)] font-heebo text-sm">
@@ -278,18 +279,60 @@ export default function QuestionDetailPage() {
               onClick={() => setShowClaim(true)}
               className="bg-brand-gold hover:bg-brand-gold-dark text-white min-w-[220px]"
             >
-              תפוס ועָנֵה
+              תפוס שאלה
             </Button>
           </div>
         )}
 
-        {/* IN PROCESS — by me: AnswerEditor */}
+        {/* IN PROCESS — by me: answer button */}
         {isInProcess && isMe && (
-          <AnswerEditor
-            questionId={id}
-            initialDraft={question.answer_draft}
-            onPublished={(updatedQuestion) => setQuestion(updatedQuestion)}
-          />
+          <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
+            <p className="text-[var(--text-muted)] font-heebo text-sm">
+              השאלה בטיפולך — מוכן לענות?
+            </p>
+            <Button
+              variant="primary"
+              size="lg"
+              leftIcon={<Pencil size={18} />}
+              onClick={() => setShowAnswerModal(true)}
+              className="min-w-[220px]"
+            >
+              ענה על השאלה
+            </Button>
+          </div>
+        )}
+
+        {/* Answer modal */}
+        {showAnswerModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowAnswerModal(false); }}
+          >
+            <div className="bg-[var(--bg-surface)] rounded-card shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-[var(--border-default)]">
+                <h2 className="font-semibold text-[var(--text-primary)] font-heebo flex items-center gap-2">
+                  <Pencil size={16} className="text-brand-navy" />
+                  כתיבת תשובה
+                </h2>
+                <button
+                  onClick={() => setShowAnswerModal(false)}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none px-2"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4">
+                <AnswerEditor
+                  questionId={id}
+                  initialDraft={question.answer_draft}
+                  onPublished={(updatedQuestion) => {
+                    setQuestion(updatedQuestion);
+                    setShowAnswerModal(false);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* IN PROCESS — by another rabbi */}
@@ -469,7 +512,7 @@ function AnswerEditor({ questionId, initialDraft, onPublished }) {
     setPublishing(true);
     setError(null);
     try {
-      const data = await post(`/questions/${questionId}/answer`, { answer: draft });
+      const data = await post(`/questions/answer/${questionId}`, { content: draft, publishNow: true });
       onPublished?.(data.question || data);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'שגיאה בפרסום התשובה.');

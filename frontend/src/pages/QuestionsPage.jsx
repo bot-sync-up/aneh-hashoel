@@ -4,17 +4,20 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { RefreshCw, Inbox } from 'lucide-react';
+import { RefreshCw, Inbox, Pencil } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import QuestionCard from '../components/questions/QuestionCard';
 import QuestionFilters from '../components/questions/QuestionFilters';
 import ClaimConfirmModal from '../components/questions/ClaimConfirmModal';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
+import AnswerEditorAdvanced from '../components/answer/AnswerEditor';
 import { BlockSpinner } from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
-import { get } from '../lib/api';
+import { get, post } from '../lib/api';
 import { useSocket } from '../contexts/SocketContext';
+import { truncate } from '../lib/utils';
 
 const DEFAULT_FILTERS = {
   status: '',
@@ -31,6 +34,7 @@ const PAGE_SIZE = 20;
 
 export default function QuestionsPage() {
   const { on } = useSocket();
+  const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -43,6 +47,8 @@ export default function QuestionsPage() {
   // Modals
   const [claimTarget, setClaimTarget] = useState(null);
   const [releaseTarget, setReleaseTarget] = useState(null);
+  const [answerTarget, setAnswerTarget] = useState(null);
+  const [discussionTarget, setDiscussionTarget] = useState(null);
 
   // New question IDs to flash
   const [newIds, setNewIds] = useState(new Set());
@@ -284,6 +290,8 @@ export default function QuestionsPage() {
                 isNew={newIds.has(question.id)}
                 onClaim={setClaimTarget}
                 onRelease={setReleaseTarget}
+                onAnswer={setAnswerTarget}
+                onDiscussion={setDiscussionTarget}
               />
             ))}
           </div>
@@ -321,6 +329,102 @@ export default function QuestionsPage() {
         onClose={() => setReleaseTarget(null)}
         onReleased={handleReleased}
       />
+
+      {/* Answer modal */}
+      {answerTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setAnswerTarget(null); }}
+        >
+          <div className="bg-[var(--bg-surface)] rounded-card shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-default)]">
+              <h2 className="font-semibold text-[var(--text-primary)] font-heebo flex items-center gap-2">
+                <Pencil size={16} className="text-brand-navy" />
+                כתיבת תשובה — {truncate(answerTarget.title || '', 40)}
+              </h2>
+              <button
+                onClick={() => setAnswerTarget(null)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none px-2"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <AnswerEditorAdvanced
+                questionId={answerTarget.id}
+                existingAnswer=""
+                onSave={({ publishNow }) => {
+                  if (publishNow) {
+                    setQuestions((prev) =>
+                      prev.map((q) =>
+                        q.id === answerTarget.id ? { ...q, status: 'answered' } : q
+                      )
+                    );
+                    setAnswerTarget(null);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discussion modal */}
+      {discussionTarget && (
+        <DiscussionModal
+          question={discussionTarget}
+          onClose={() => setDiscussionTarget(null)}
+          onCreated={(discussionId) => {
+            setDiscussionTarget(null);
+            navigate(`/discussions/${discussionId}`);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── DiscussionModal ────────────────────────────────────────────────────────
+function DiscussionModal({ question, onClose, onCreated }) {
+  const [title, setTitle] = useState(question?.title ? `דיון: ${truncate(question.title, 50)}` : '');
+  const [body, setBody] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !body.trim()) { setError('יש למלא כותרת ותוכן.'); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const data = await post('/discussions', { title, body, question_id: question?.id });
+      onCreated?.(data.discussion?.id || data.id);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'שגיאה ביצירת הדיון.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-[var(--bg-surface)] rounded-card shadow-xl p-6 space-y-4" dir="rtl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-[var(--text-primary)] font-heebo">פתח דיון חדש</h2>
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-primary)] font-heebo mb-1.5">כותרת הדיון</label>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold hover:border-[var(--border-strong)] transition-colors" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-primary)] font-heebo mb-1.5">תוכן הדיון</label>
+          <textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder="כתוב את תוכן הדיון כאן..."
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold hover:border-[var(--border-strong)] transition-colors placeholder:text-[var(--text-muted)]" />
+        </div>
+        {error && <p className="text-sm text-red-600 dark:text-red-400 font-heebo">{error}</p>}
+        <div className="flex items-center gap-3 justify-end flex-row-reverse pt-2">
+          <Button variant="primary" onClick={handleSubmit} loading={submitting} disabled={submitting}>צור דיון</Button>
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>ביטול</Button>
+        </div>
+      </div>
     </div>
   );
 }

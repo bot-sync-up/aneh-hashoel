@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Lock,
   MessageSquare,
+  Pencil,
 } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
@@ -21,17 +22,21 @@ import { formatRelative, getCategoryLabel, colorFromCategory, truncate } from '.
  * QuestionCard — displays a question summary with contextual action buttons.
  *
  * Props:
- *   question    — question object from API
- *   showActions — whether to show claim/continue/release buttons (default true)
- *   onClaim     — callback when "תפוס ועָנֵה" is clicked; receives question
- *   onRelease   — callback when "שחרר" is clicked; receives question
- *   isNew       — if true, shows "חדש!" flash animation
+ *   question      — question object from API
+ *   showActions   — whether to show action buttons (default true)
+ *   onClaim       — callback when "תפוס" is clicked; receives question
+ *   onRelease     — callback when "שחרר" is clicked; receives question
+ *   onAnswer      — callback when "ענה" is clicked; receives question
+ *   onDiscussion  — callback when "דיון" is clicked; receives question
+ *   isNew         — if true, shows "חדש!" flash animation
  */
 function QuestionCard({
   question,
   showActions = true,
   onClaim,
   onRelease,
+  onAnswer,
+  onDiscussion,
   isNew = false,
   className,
 }) {
@@ -89,9 +94,14 @@ function QuestionCard({
     onRelease?.(question);
   };
 
-  const handleContinue = (e) => {
+  const handleAnswer = (e) => {
     e.stopPropagation();
-    navigate(`/questions/${id}`);
+    onAnswer ? onAnswer(question) : navigate(`/questions/${id}`);
+  };
+
+  const handleDiscussion = (e) => {
+    e.stopPropagation();
+    onDiscussion ? onDiscussion(question) : navigate(`/questions/${id}`);
   };
 
   return (
@@ -215,26 +225,39 @@ function QuestionCard({
         {/* Action buttons */}
         {showActions && (
           <div className="mt-4 flex items-center gap-2 flex-wrap">
+            {/* Pending: ענה + תפוס */}
             {isPending && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleClaim}
-                leftIcon={<Flame size={14} />}
-                className="bg-brand-gold hover:bg-brand-gold-dark text-white"
-              >
-                תפוס ועָנֵה
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Pencil size={13} />}
+                  onClick={handleAnswer}
+                >
+                  ענה
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Flame size={13} />}
+                  onClick={handleClaim}
+                  className="bg-brand-gold hover:bg-brand-gold-dark text-white"
+                >
+                  תפוס
+                </Button>
+              </>
             )}
 
+            {/* Mine: ענה + שחרר + דיון */}
             {isInProcess && isMe && (
               <>
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={handleContinue}
+                  leftIcon={<Pencil size={13} />}
+                  onClick={handleAnswer}
                 >
-                  המשך לענות
+                  ענה
                 </Button>
                 <Button
                   variant="ghost"
@@ -243,6 +266,14 @@ function QuestionCard({
                   className="text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
                   שחרר
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<MessageSquare size={13} />}
+                  onClick={handleDiscussion}
+                >
+                  דיון
                 </Button>
               </>
             )}

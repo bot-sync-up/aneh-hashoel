@@ -158,7 +158,10 @@ export default function QuestionDetailPage() {
     discussion_count = 0,
   } = question;
 
-  const isMe = rabbi && assigned_rabbi && String(assigned_rabbi.id) === String(rabbi?.id);
+  // assigned_rabbi may be an object {id,name} or the API may return assigned_rabbi_id + rabbi_name flat
+  const assignedRabbiId = assigned_rabbi?.id ?? question?.assigned_rabbi_id;
+  const assignedRabbiName = assigned_rabbi?.name ?? assigned_rabbi?.display_name ?? question?.rabbi_name;
+  const isMe = rabbi && assignedRabbiId && String(assignedRabbiId) === String(rabbi?.id);
   const isPending = status === 'pending';
   const isInProcess = status === 'in_process';
   const isAnswered = status === 'answered';
@@ -239,9 +242,10 @@ export default function QuestionDetailPage() {
           </h1>
 
           {/* Content */}
-          <div className="prose prose-sm max-w-none text-[var(--text-secondary)] font-heebo leading-relaxed whitespace-pre-wrap">
-            {content}
-          </div>
+          <div
+            className="prose prose-sm max-w-none text-[var(--text-secondary)] font-heebo leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
 
           {/* Footer meta */}
           <div className="flex items-center gap-4 text-xs text-[var(--text-muted)] font-heebo mt-5 pt-4 border-t border-[var(--border-default)] flex-wrap">
@@ -343,9 +347,9 @@ export default function QuestionDetailPage() {
               <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 font-heebo">
                 בטיפול אצל רב אחר
               </p>
-              {assigned_rabbi && (
+              {assignedRabbiName && (
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-heebo mt-0.5">
-                  הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+                  הרב {assignedRabbiName}
                 </p>
               )}
             </div>
@@ -381,7 +385,7 @@ export default function QuestionDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)] font-heebo">
-                    הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+                    הרב {assignedRabbiName}
                   </p>
                   {assigned_rabbi.title && (
                     <p className="text-xs text-[var(--text-muted)] font-heebo">

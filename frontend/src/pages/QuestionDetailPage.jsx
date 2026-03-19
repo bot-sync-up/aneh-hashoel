@@ -271,7 +271,7 @@ export default function QuestionDetailPage() {
 
         {/* ── Status-driven action area ──────────────────────────────────── */}
 
-        {/* PENDING: claim + answer buttons */}
+        {/* PENDING: ענה + תפוס */}
         {isPending && (
           <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
             <p className="text-[var(--text-muted)] font-heebo text-sm">
@@ -279,41 +279,57 @@ export default function QuestionDetailPage() {
             </p>
             <div className="flex items-center gap-3">
               <Button
+                variant="primary"
+                size="lg"
+                leftIcon={<Pencil size={18} />}
+                onClick={() => setShowAnswerModal(true)}
+              >
+                ענה
+              </Button>
+              <Button
                 variant="secondary"
                 size="lg"
                 leftIcon={<Flame size={18} />}
                 onClick={() => setShowClaim(true)}
                 className="bg-brand-gold hover:bg-brand-gold-dark text-white"
               >
-                תפוס שאלה
+                תפוס
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* IN PROCESS — by me: ענה + שחרר + דיון */}
+        {isInProcess && isMe && (
+          <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
+            <p className="text-[var(--text-muted)] font-heebo text-sm">
+              השאלה בטיפולך
+            </p>
+            <div className="flex items-center gap-3">
               <Button
                 variant="primary"
                 size="lg"
                 leftIcon={<Pencil size={18} />}
                 onClick={() => setShowAnswerModal(true)}
               >
-                ענה ישירות
+                ענה
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => setShowRelease(true)}
+              >
+                שחרר
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                leftIcon={<MessageSquare size={18} />}
+                onClick={() => setShowCreateDiscussion(true)}
+              >
+                דיון
               </Button>
             </div>
-          </div>
-        )}
-
-        {/* IN PROCESS — by me: answer button */}
-        {isInProcess && isMe && (
-          <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
-            <p className="text-[var(--text-muted)] font-heebo text-sm">
-              השאלה בטיפולך — מוכן לענות?
-            </p>
-            <Button
-              variant="primary"
-              size="lg"
-              leftIcon={<Pencil size={18} />}
-              onClick={() => setShowAnswerModal(true)}
-              className="min-w-[220px]"
-            >
-              ענה על השאלה
-            </Button>
           </div>
         )}
 

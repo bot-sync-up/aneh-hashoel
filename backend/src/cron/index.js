@@ -24,6 +24,7 @@ const { runWeeklyReport: runWeeklyStatsReport } = require('./jobs/weeklyReport')
 const { runRabbiOfTheWeek }     = require('./jobs/rabbiOfTheWeek');
 const { runWpSyncRetry }        = require('./jobs/wpSyncRetry');
 const { runSheetsSyncLeads }    = require('./jobs/sheetsSyncLeads');
+const { syncPendingQuestions }  = require('../services/questionSyncService');
 
 const TIMEZONE = 'Asia/Jerusalem';
 
@@ -88,6 +89,11 @@ function startCronJobs() {
 
   // ─── Every 1 hour — retry failed WordPress syncs ──────────────────────────
   cron.schedule('0 * * * *', safeJob('retryFailedWordPressSyncs', runWpSyncRetry), {
+    timezone: TIMEZONE,
+  });
+
+  // ─── Every 5 min — pull new questions from WordPress ────────────────────────
+  cron.schedule('*/5 * * * *', safeJob('syncPendingQuestionsFromWP', syncPendingQuestions), {
     timezone: TIMEZONE,
   });
 

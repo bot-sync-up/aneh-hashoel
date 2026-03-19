@@ -74,15 +74,20 @@ async function submitAnswer(questionId, rabbiId, content) {
 
   const question = questionRows[0];
 
-  if (String(question.assigned_rabbi_id) !== String(rabbiId)) {
-    const e = new Error('אינך משויך לשאלה זו');
-    e.status = 403;
-    throw e;
-  }
-
   if (question.status === 'answered') {
     const e = new Error('השאלה כבר נענתה');
     e.status = 409;
+    throw e;
+  }
+
+  // Allow direct answer on pending questions (auto-claim) or own in_process questions
+  const isAssignedToMe = String(question.assigned_rabbi_id) === String(rabbiId);
+  const isPending = question.status === 'pending';
+  const shouldAutoClaim = isPending && !question.assigned_rabbi_id;
+
+  if (!isAssignedToMe && !shouldAutoClaim) {
+    const e = new Error('אינך משויך לשאלה זו');
+    e.status = 403;
     throw e;
   }
 
@@ -117,6 +122,22 @@ async function submitAnswer(questionId, rabbiId, content) {
 
   // 4 + 5. Insert answer and update question in a transaction
   const answer = await withTransaction(async (client) => {
+    // Auto-claim if question is still pending and unassigned
+    if (shouldAutoClaim) {
+      const claimResult = await client.query(
+        `UPDATE questions
+         SET assigned_rabbi_id = $1, status = 'in_process', updated_at = NOW()
+         WHERE id = $2 AND status = 'pending' AND assigned_rabbi_id IS NULL
+         RETURNING id`,
+        [rabbiId, questionId]
+      );
+      if (claimResult.rowCount === 0) {
+        const e = new Error('השאלה כבר נתפסה על ידי רב אחר');
+        e.status = 409;
+        throw e;
+      }
+    }
+
     const { rows: answerRows } = await client.query(
       `INSERT INTO answers
          (question_id, rabbi_id, content, signature, content_versions, created_at)

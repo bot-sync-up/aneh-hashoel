@@ -23,6 +23,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { BlockSpinner } from '../components/ui/Spinner';
 import ClaimConfirmModal from '../components/questions/ClaimConfirmModal';
+import AnswerEditorAdvanced from '../components/answer/AnswerEditor';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
 import TransferModal from '../components/questions/TransferModal';
 import { get, post, put } from '../lib/api';
@@ -270,21 +271,31 @@ export default function QuestionDetailPage() {
 
         {/* ── Status-driven action area ──────────────────────────────────── */}
 
-        {/* PENDING: claim button */}
+        {/* PENDING: claim + answer buttons */}
         {isPending && (
           <div className="flex flex-col items-center gap-3 py-8 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft">
             <p className="text-[var(--text-muted)] font-heebo text-sm">
               השאלה ממתינה לטיפול
             </p>
-            <Button
-              variant="secondary"
-              size="lg"
-              leftIcon={<Flame size={18} />}
-              onClick={() => setShowClaim(true)}
-              className="bg-brand-gold hover:bg-brand-gold-dark text-white min-w-[220px]"
-            >
-              תפוס שאלה
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="lg"
+                leftIcon={<Flame size={18} />}
+                onClick={() => setShowClaim(true)}
+                className="bg-brand-gold hover:bg-brand-gold-dark text-white"
+              >
+                תפוס שאלה
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                leftIcon={<Pencil size={18} />}
+                onClick={() => setShowAnswerModal(true)}
+              >
+                ענה ישירות
+              </Button>
+            </div>
           </div>
         )}
 
@@ -326,12 +337,14 @@ export default function QuestionDetailPage() {
                 </button>
               </div>
               <div className="p-4">
-                <AnswerEditor
+                <AnswerEditorAdvanced
                   questionId={id}
-                  initialDraft={question.answer_draft}
-                  onPublished={(updatedQuestion) => {
-                    setQuestion(updatedQuestion);
-                    setShowAnswerModal(false);
+                  existingAnswer={question.answer_draft || ''}
+                  onSave={({ publishNow }) => {
+                    if (publishNow) {
+                      fetchQuestion();
+                      setShowAnswerModal(false);
+                    }
                   }}
                 />
               </div>

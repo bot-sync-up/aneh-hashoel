@@ -8,8 +8,11 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  certbot_certs:
+  certbot_www:
 
 services:
+
   # ─────────────────────────────────────────
   #  PostgreSQL 16
   # ─────────────────────────────────────────
@@ -21,8 +24,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-aneh_hashoel}
       POSTGRES_USER: ${DB_USER:-aneh_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -48,8 +49,6 @@ services:
       --appendfsync everysec
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -62,7 +61,7 @@ services:
       start_period: 10s
 
   # ─────────────────────────────────────────
-  #  Backend — Node.js / Express (port 3001)
+  #  Backend — Node.js / Express
   # ─────────────────────────────────────────
   backend:
     build:
@@ -77,8 +76,6 @@ services:
       NODE_ENV: production
       DB_HOST: postgres
       REDIS_HOST: redis
-    ports:
-      - "3001:3001"
     volumes:
       - uploads_data:/app/uploads
     networks:
@@ -90,20 +87,52 @@ services:
         condition: service_healthy
 
   # ─────────────────────────────────────────
-  #  Frontend — React + Nginx (port 80)
+  #  Frontend — React + Nginx (internal)
   # ─────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
-        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3001}
+        VITE_API_URL: ${VITE_API_URL:-https://aneh.syncup.co.il}
+        VITE_WS_URL: ${VITE_WS_URL:-wss://aneh.syncup.co.il}
     container_name: aneh-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
     networks:
       - aneh-net
     depends_on:
       - backend
+
+  # ─────────────────────────────────────────
+  #  Nginx — SSL reverse proxy (80 + 443)
+  # ─────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: aneh-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    networks:
+      - aneh-net
+    depends_on:
+      - frontend
+      - backend
+
+  # ─────────────────────────────────────────
+  #  Certbot — SSL certificate (Let's Encrypt)
+  # ─────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: aneh-certbot
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    # Auto-renew every 12 hours
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $$!; done'
+    networks:
+      - aneh-net

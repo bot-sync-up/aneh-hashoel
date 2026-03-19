@@ -179,11 +179,14 @@ async function getNewQuestions() {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.get('/questions', {
+      () => client.get('/ask-rabai', {
         params: {
-          status:   'pending',
-          _fields:  'id,title,content,meta,date',
+          status:   'publish',
+          _fields:  'id,title,meta,date',
           per_page: 50,
+          orderby:  'date',
+          order:    'desc',
+          context:  'edit',
         },
       }),
       'getNewQuestions'
@@ -246,7 +249,7 @@ async function getQuestionById(wpPostId) {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.get(`/questions/${wpPostId}`),
+      () => client.get(`/ask-rabai/${wpPostId}`, { params: { context: 'edit' } }),
       `getQuestionById(${wpPostId})`
     );
 
@@ -285,7 +288,7 @@ async function updateQuestionStatus(wpPostId, status) {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.patch(`/questions/${wpPostId}`, {
+      () => client.post(`/ask-rabai/${wpPostId}`, {
         meta: { status },
       }),
       `updateQuestionStatus(${wpPostId}, ${status})`
@@ -330,11 +333,7 @@ async function publishAnswer(wpPostId, answerData) {
 
   const payload = {
     meta: {
-      status:        'answered',
-      answer_content: answerData.content,
-      rabbi_name:     answerData.rabbiName || '',
-      rabbi_signature: answerData.signature || '',
-      published_at:  answerData.publishedAt || new Date().toISOString(),
+      'ask-answ': answerData.content,
     },
   };
 
@@ -342,7 +341,7 @@ async function publishAnswer(wpPostId, answerData) {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.patch(`/questions/${wpPostId}`, payload),
+      () => client.post(`/ask-rabai/${wpPostId}`, payload),
       `publishAnswer(${wpPostId})`
     );
 
@@ -385,10 +384,7 @@ async function publishFollowUpAnswer(wpPostId, followUpAnswer) {
 
   const payload = {
     meta: {
-      follow_up_content:      followUpAnswer.content,
-      follow_up_rabbi_name:   followUpAnswer.rabbiName || '',
-      follow_up_published_at: followUpAnswer.publishedAt || new Date().toISOString(),
-      has_follow_up:          true,
+      'ask-answ': followUpAnswer.content,
     },
   };
 
@@ -396,7 +392,7 @@ async function publishFollowUpAnswer(wpPostId, followUpAnswer) {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.patch(`/questions/${wpPostId}`, payload),
+      () => client.post(`/ask-rabai/${wpPostId}`, payload),
       `publishFollowUpAnswer(${wpPostId})`
     );
 
@@ -482,13 +478,13 @@ async function getAskerPhone(wpPostId) {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.get(`/questions/${wpPostId}`, {
-        params: { _fields: 'id,meta' },
+      () => client.get(`/ask-rabai/${wpPostId}`, {
+        params: { _fields: 'id,meta', context: 'edit' },
       }),
       `getAskerPhone(${wpPostId})`
     );
 
-    const phone = response.data?.meta?.asker_phone || null;
+    const phone = response.data?.meta?.visitor_phone || response.data?.meta?.asker_phone || null;
     return { success: true, phone };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);

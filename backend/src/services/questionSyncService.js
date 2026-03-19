@@ -109,10 +109,10 @@ async function syncPendingQuestions(io = null) {
     // Extract and normalise fields from the WP REST API response structure
     const questionData = {
       title:       _stripHtml(wpQ.title?.rendered || wpQ.title || '').trim(),
-      content:     wpQ.content?.rendered || wpQ.content || '',
-      asker_name:  meta.asker_name        || null,
+      content:     meta['ask-quest']      || '',
+      asker_name:  meta.visitor_name      || null,
       asker_email: meta.asker_email       || null,
-      asker_phone: meta.asker_phone       || null,
+      asker_phone: meta.visitor_phone     || meta.asker_phone || null,
       urgency:     meta.urgency           || 'normal',
       source:      'wordpress_poll',
       wp_post_id:  wpPostId,

@@ -14,6 +14,9 @@ ALTER TABLE answers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE
 -- audit_log: add missing user_agent column
 ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS user_agent TEXT;
 
+-- answers: add missing signature column
+ALTER TABLE answers ADD COLUMN IF NOT EXISTS signature TEXT;
+
 -- follow_up_questions: create missing table
 CREATE TABLE IF NOT EXISTS follow_up_questions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

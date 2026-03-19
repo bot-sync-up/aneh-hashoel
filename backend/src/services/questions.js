@@ -93,6 +93,11 @@ async function getQuestions(filters = {}) {
     params.push(filters.dateTo);
   }
 
+  // Non-admin rabbis: show only pending questions (never in_process / answered)
+  if (filters.rabbiViewerId) {
+    conditions.push(`q.status = 'pending'`);
+  }
+
   const whereClause = conditions.length > 0
     ? `WHERE ${conditions.join(' AND ')}`
     : '';

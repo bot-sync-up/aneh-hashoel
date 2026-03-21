@@ -157,8 +157,11 @@ router.get('/pending', authenticate, async (req, res, next) => {
  */
 router.get('/my', authenticate, async (req, res, next) => {
   try {
-    const questions = await getMyQuestions(req.rabbi.id);
-    return res.json({ questions });
+    const status = ['in_process', 'answered'].includes(req.query.status)
+      ? req.query.status
+      : null;
+    const questions = await getMyQuestions(req.rabbi.id, status);
+    return res.json({ questions, total: questions.length });
   } catch (err) {
     return next(err);
   }

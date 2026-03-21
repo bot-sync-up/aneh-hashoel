@@ -597,32 +597,51 @@ async function thankQuestion(questionId, sessionToken) {
 // ─── getMyQuestions ───────────────────────────────────────────────────────────
 
 /**
- * Get all questions assigned to a specific rabbi.
+ * Get questions for a specific rabbi filtered by status.
  *
  * @param {string} rabbiId
+ * @param {string|null} status - 'in_process' | 'answered' | null (all)
  * @returns {Promise<object[]>}
  */
-async function getMyQuestions(rabbiId) {
+async function getMyQuestions(rabbiId, status = null) {
+  const params = [rabbiId];
+  let statusClause = '';
+
+  if (status === 'in_process') {
+    // Questions I claimed and haven't answered yet
+    statusClause = `AND q.status = 'in_process' AND q.assigned_rabbi_id = $1`;
+  } else if (status === 'answered') {
+    // Questions I personally answered (assigned_rabbi_id = me AND status = answered)
+    statusClause = `AND q.status = 'answered' AND q.assigned_rabbi_id = $1`;
+  } else {
+    // All my questions (in_process + answered)
+    statusClause = `AND q.assigned_rabbi_id = $1`;
+  }
+
   const result = await query(
     `SELECT q.id, q.title, q.content, q.status, q.urgency, q.difficulty,
-            q.category_id, q.flagged, q.flag_reason,
-            q.thank_count, q.created_at, q.updated_at,
+            q.category_id, q.assigned_rabbi_id,
+            q.flagged, q.flag_reason,
+            q.thank_count, q.view_count,
+            q.created_at, q.updated_at, q.answered_at,
+            q.asker_name, q.asker_email,
             c.name AS category_name,
+            a.content AS answer_content,
+            a.created_at AS answer_created_at,
             CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS has_answer
      FROM   questions q
      LEFT JOIN categories c ON c.id = q.category_id
      LEFT JOIN answers    a ON a.question_id = q.id
-     WHERE  q.assigned_rabbi_id = $1
+     WHERE  1=1
+       ${statusClause}
      ORDER BY
-       CASE q.urgency
-         WHEN 'critical' THEN 1
-         WHEN 'high'     THEN 2
-         WHEN 'normal'   THEN 3
-         WHEN 'low'      THEN 4
-         ELSE 5
+       CASE q.status
+         WHEN 'in_process' THEN 1
+         WHEN 'answered'   THEN 2
+         ELSE 3
        END,
-       q.created_at ASC`,
-    [rabbiId]
+       COALESCE(q.answered_at, q.updated_at, q.created_at) DESC`,
+    params
   );
 
   return result.rows;

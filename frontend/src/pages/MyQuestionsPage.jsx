@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { Inbox, ClipboardEdit, CheckCircle2 } from 'lucide-react';
+import { Inbox, ClipboardEdit, CheckCircle2, Pencil, Clock, Eye, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatRelative } from '../lib/utils';
 import PageHeader from '../components/layout/PageHeader';
 import QuestionCard from '../components/questions/QuestionCard';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
@@ -270,72 +271,129 @@ export default function MyQuestionsPage() {
 
 // ── Inner card with tab-specific CTAs ─────────────────────────────────────
 
-const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   const navigate = useNavigate();
-  const { id, answered_at } = question;
+  const { id, title, category_name, answered_at, answer_content, created_at } = question;
 
-  // Check if still within 30-minute edit window
-  const canEditAnswer = tab === 'answered' && (() => {
-    if (!answered_at) return false;
-    const answeredMs = new Date(answered_at).getTime();
-    const nowMs = Date.now();
-    return (nowMs - answeredMs) < EDIT_WINDOW_MS;
-  })();
+  const canEditAnswer = tab === 'answered' && !!answered_at &&
+    (Date.now() - new Date(answered_at).getTime()) < EDIT_WINDOW_MS;
 
-  const handleContinue = (e) => {
-    e.stopPropagation();
-    navigate(`/questions/${id}`);
-  };
-  const handleEdit = (e) => {
-    e.stopPropagation();
-    navigate(`/questions/${id}`);
-  };
+  const minutesLeft = answered_at
+    ? Math.max(0, Math.ceil((EDIT_WINDOW_MS - (Date.now() - new Date(answered_at).getTime())) / 60000))
+    : 0;
 
+  if (tab === 'answered') {
+    // ── "עניתי" — תצוגת תשובה ─────────────────────────────────────────────
+    return (
+      <div
+        className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft overflow-hidden cursor-pointer hover:border-brand-gold/60 hover:shadow-lg transition-all"
+        onClick={() => navigate(`/questions/${id}`)}
+      >
+        {/* Header */}
+        <div className="px-5 pt-4 pb-2">
+          {category_name && (
+            <span className="text-xs font-medium text-brand-navy/70 font-heebo bg-brand-navy/5 px-2 py-0.5 rounded-full mb-2 inline-block">
+              {category_name}
+            </span>
+          )}
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] font-heebo leading-snug line-clamp-2">
+            {title}
+          </h3>
+          <p className="text-xs text-[var(--text-muted)] font-heebo mt-1 flex items-center gap-1">
+            <Clock size={10} />
+            נענה {answered_at ? formatRelative(answered_at) : formatRelative(created_at)}
+          </p>
+        </div>
+
+        {/* Answer preview */}
+        {answer_content && (
+          <div className="mx-5 mb-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-md">
+            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-heebo mb-1 flex items-center gap-1">
+              <CheckCircle2 size={11} />
+              תשובתי
+            </p>
+            <div
+              className="text-xs text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-3"
+              dangerouslySetInnerHTML={{ __html: answer_content }}
+            />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div
+          className="flex items-center gap-2 px-5 py-2.5 border-t border-[var(--border-default)] bg-[var(--bg-muted)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {canEditAnswer ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Pencil size={12} />}
+                onClick={() => navigate(`/questions/${id}`)}
+              >
+                ערוך תשובה
+              </Button>
+              <span className="text-xs text-amber-600 font-heebo flex items-center gap-1">
+                <Clock size={10} />
+                {minutesLeft} דק' נותרו
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-[var(--text-muted)] font-heebo flex items-center gap-1">
+              <Lock size={10} />
+              נעול לעריכה
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Eye size={12} />}
+            className="mr-auto"
+            onClick={() => navigate(`/questions/${id}`)}
+          >
+            צפה
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── "בטיפולי" — כרטיס שאלה רגיל ────────────────────────────────────────
   return (
     <div className="flex flex-col">
-      {/* Render card with its own built-in actions suppressed */}
       <QuestionCard
         question={question}
         showActions={false}
         className="flex-1 rounded-b-none border-b-0"
       />
-      {/* CTA footer strip */}
       <div className="flex items-center gap-2 flex-wrap px-5 py-3 bg-[var(--bg-surface)] border border-[var(--border-default)] border-t-0 rounded-b-card shadow-soft">
-        {tab === 'in_process' && (
-          <>
-            <Button variant="primary" size="sm" onClick={handleContinue}>
-              המשך לענות
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); onTransfer?.(question); }}
-              className="text-[var(--text-muted)]"
-            >
-              העבר
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); onRelease?.(question); }}
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            >
-              שחרר
-            </Button>
-          </>
-        )}
-        {tab === 'answered' && canEditAnswer && (
-          <Button variant="outline" size="sm" onClick={handleEdit}>
-            ערוך תשובה
-          </Button>
-        )}
-        {tab === 'answered' && !canEditAnswer && (
-          <span className="text-xs text-[var(--text-muted)] font-heebo italic">
-            חלפו 30 דקות — התשובה נעולה לעריכה
-          </span>
-        )}
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={<Pencil size={13} />}
+          onClick={(e) => { e.stopPropagation(); navigate(`/questions/${id}`); }}
+        >
+          המשך לענות
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); onTransfer?.(question); }}
+          className="text-[var(--text-muted)]"
+        >
+          העבר
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); onRelease?.(question); }}
+          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+        >
+          שחרר
+        </Button>
       </div>
     </div>
   );

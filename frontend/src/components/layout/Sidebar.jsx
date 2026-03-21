@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   MessageCircleQuestion,
   ListFilter,
+  CheckCircle2,
   MessageSquare,
   FileText,
   Bell,
@@ -35,8 +36,13 @@ const NAV_ITEMS = [
   },
   {
     to: '/questions',
-    label: 'כל השאלות',
+    label: 'שאלות פתוחות',
     icon: ListFilter,
+  },
+  {
+    to: '/answers',
+    label: 'תשובות',
+    icon: CheckCircle2,
   },
   {
     to: '/discussions',

@@ -25,6 +25,7 @@ const SetupPasswordPage = React.lazy(() => import('./pages/SetupPasswordPage'));
 const StatsPage = React.lazy(() => import('./pages/StatsPage'));
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'));
+const AnswersPage = React.lazy(() => import('./pages/AnswersPage'));
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, initializing } = useAuth();
@@ -98,6 +99,7 @@ export default function App() {
                     <Route path="questions" element={<QuestionsPage />} />
                     <Route path="questions/:id" element={<QuestionDetailPage />} />
                     <Route path="my-questions" element={<MyQuestionsPage />} />
+                    <Route path="answers" element={<AnswersPage />} />
                     <Route path="discussions" element={<DiscussionsPage />} />
                     <Route path="discussions/:id" element={<DiscussionDetailPage />} />
                     <Route path="templates" element={<TemplatesPage />} />

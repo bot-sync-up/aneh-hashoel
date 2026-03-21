@@ -17,10 +17,11 @@ import { BlockSpinner } from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
 import { get, post } from '../lib/api';
 import { useSocket } from '../contexts/SocketContext';
+import { useAuth } from '../contexts/AuthContext';
 import { truncate } from '../lib/utils';
 
 const DEFAULT_FILTERS = {
-  status: '',
+  status: 'pending',
   category: '',
   search: '',
   is_urgent: '',
@@ -34,6 +35,7 @@ const PAGE_SIZE = 20;
 
 export default function QuestionsPage() {
   const { on } = useSocket();
+  const { rabbi, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
@@ -152,11 +154,15 @@ export default function QuestionsPage() {
     });
 
     const offClaimed = on('question:claimed', ({ id, assigned_rabbi, status }) => {
-      setQuestions((prev) =>
-        prev.map((q) =>
+      // If filtering by pending only, remove claimed questions from the list
+      setQuestions((prev) => {
+        if (filters.status === 'pending' || filters.status === '') {
+          return prev.filter((q) => q.id !== id);
+        }
+        return prev.map((q) =>
           q.id === id ? { ...q, status, assigned_rabbi } : q
-        )
-      );
+        );
+      });
     });
 
     const offReleased = on('question:released', ({ id }) => {
@@ -170,11 +176,15 @@ export default function QuestionsPage() {
     const offAnswered = on(
       'question:answered',
       ({ id, status, assigned_rabbi, answered_at }) => {
-        setQuestions((prev) =>
-          prev.map((q) =>
+        // If filtering by pending only, remove answered questions from list
+        setQuestions((prev) => {
+          if (filters.status === 'pending' || filters.status === '') {
+            return prev.filter((q) => q.id !== id);
+          }
+          return prev.map((q) =>
             q.id === id ? { ...q, status, assigned_rabbi, answered_at } : q
-          )
-        );
+          );
+        });
       }
     );
 
@@ -217,11 +227,11 @@ export default function QuestionsPage() {
   return (
     <div className="page-enter" dir="rtl">
       <PageHeader
-        title="כל השאלות"
+        title="שאלות פתוחות"
         subtitle={
           total > 0
-            ? `${total.toLocaleString('he-IL')} שאלות בסך הכל`
-            : 'צפייה וניהול כל השאלות במערכת'
+            ? `${total.toLocaleString('he-IL')} שאלות ממתינות לטיפול`
+            : 'שאלות הממתינות לטיפול'
         }
         actions={
           <Button

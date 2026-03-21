@@ -168,6 +168,14 @@ export default function QuestionDetailPage() {
   const isAnswered = status === 'answered';
   const isInProcessByOther = isInProcess && !isMe;
 
+  // 30-minute edit window: only if I answered this question and within 30 min
+  const EDIT_WINDOW_MS = 30 * 60 * 1000;
+  const canEditAnswer = isAnswered && isMe && (() => {
+    if (!answered_at) return false;
+    const answeredMs = new Date(answered_at).getTime();
+    return (Date.now() - answeredMs) < EDIT_WINDOW_MS;
+  })();
+
   return (
     <div className="page-enter" dir="rtl">
       {/* Header */}
@@ -343,7 +351,7 @@ export default function QuestionDetailPage() {
               <div className="flex items-center justify-between p-4 border-b border-[var(--border-default)]">
                 <h2 className="font-semibold text-[var(--text-primary)] font-heebo flex items-center gap-2">
                   <Pencil size={16} className="text-brand-navy" />
-                  כתיבת תשובה
+                  {isAnswered ? 'עריכת תשובה' : 'כתיבת תשובה'}
                 </h2>
                 <button
                   onClick={() => setShowAnswerModal(false)}
@@ -355,7 +363,7 @@ export default function QuestionDetailPage() {
               <div className="p-4">
                 <AnswerEditorAdvanced
                   questionId={id}
-                  existingAnswer={question.answer_draft || ''}
+                  existingAnswer={isAnswered ? (answer || '') : (question.answer_draft || '')}
                   onSave={({ publishNow }) => {
                     if (publishNow) {
                       fetchQuestion();
@@ -395,9 +403,22 @@ export default function QuestionDetailPage() {
                   תשובת הרב
                 </span>
               </div>
-              <span className="text-xs text-[var(--text-muted)] font-heebo">
-                {formatDate(answered_at)}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[var(--text-muted)] font-heebo">
+                  {formatDate(answered_at)}
+                </span>
+                {canEditAnswer && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Pencil size={13} />}
+                    onClick={() => setShowAnswerModal(true)}
+                    className="text-brand-navy hover:bg-brand-navy/10"
+                  >
+                    ערוך תשובה
+                  </Button>
+                )}
+              </div>
             </div>
           }>
             {/* Answer content — allow HTML from rich text editor */}

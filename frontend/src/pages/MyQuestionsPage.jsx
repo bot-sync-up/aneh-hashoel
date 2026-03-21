@@ -270,9 +270,19 @@ export default function MyQuestionsPage() {
 
 // ── Inner card with tab-specific CTAs ─────────────────────────────────────
 
+const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+
 function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   const navigate = useNavigate();
-  const { id } = question;
+  const { id, answered_at } = question;
+
+  // Check if still within 30-minute edit window
+  const canEditAnswer = tab === 'answered' && (() => {
+    if (!answered_at) return false;
+    const answeredMs = new Date(answered_at).getTime();
+    const nowMs = Date.now();
+    return (nowMs - answeredMs) < EDIT_WINDOW_MS;
+  })();
 
   const handleContinue = (e) => {
     e.stopPropagation();
@@ -316,10 +326,15 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
             </Button>
           </>
         )}
-        {tab === 'answered' && (
+        {tab === 'answered' && canEditAnswer && (
           <Button variant="outline" size="sm" onClick={handleEdit}>
             ערוך תשובה
           </Button>
+        )}
+        {tab === 'answered' && !canEditAnswer && (
+          <span className="text-xs text-[var(--text-muted)] font-heebo italic">
+            חלפו 30 דקות — התשובה נעולה לעריכה
+          </span>
         )}
       </div>
     </div>

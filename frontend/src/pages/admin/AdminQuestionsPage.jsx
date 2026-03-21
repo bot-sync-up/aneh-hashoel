@@ -37,7 +37,7 @@ const STATUS_BADGE = {
 function SkeletonRow() {
   return (
     <tr className="border-b border-[var(--border-default)]">
-      {[...Array(8)].map((_, i) => (
+      {[...Array(9)].map((_, i) => (
         <td key={i} className="px-3 py-3">
           <div className="skeleton h-4 rounded" style={{ width: `${50 + (i * 13) % 40}%` }} />
         </td>

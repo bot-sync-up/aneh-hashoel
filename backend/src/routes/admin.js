@@ -64,6 +64,17 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
+// Alias: frontend calls /admin/dashboard/stats
+router.get('/dashboard/stats', async (req, res) => {
+  try {
+    const stats = await analyticsService.getDashboardStats();
+    return res.json({ ok: true, data: stats });
+  } catch (err) {
+    console.error('[admin] /dashboard/stats error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
 // =============================================================================
 // ANALYTICS
 // =============================================================================

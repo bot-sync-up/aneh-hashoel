@@ -63,6 +63,8 @@ function QuestionCard({
     is_urgent,
     created_at,
     assigned_rabbi,
+    assigned_rabbi_id,
+    rabbi_name,
     answered_at,
     view_count = 0,
     thank_count = 0,
@@ -70,7 +72,9 @@ function QuestionCard({
     discussion_count = 0,
   } = question;
 
-  const isMe = rabbi && assigned_rabbi && assigned_rabbi.id === rabbi.id;
+  // API may return flat fields (assigned_rabbi_id) or nested object (assigned_rabbi.id)
+  const resolvedRabbiId = assigned_rabbi?.id ?? assigned_rabbi_id;
+  const isMe = rabbi && resolvedRabbiId && String(resolvedRabbiId) === String(rabbi.id);
   const isPending = status === 'pending';
   const isInProcess = status === 'in_process';
   const isAnswered = status === 'answered';
@@ -208,7 +212,7 @@ function QuestionCard({
           {isAnswered && assigned_rabbi && (
             <span className="flex items-center gap-1 mr-auto text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 size={11} />
-              הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+              הרב {assigned_rabbi?.display_name || assigned_rabbi?.name || rabbi_name}
               {answered_at && ` · ${formatRelative(answered_at)}`}
             </span>
           )}
@@ -217,7 +221,7 @@ function QuestionCard({
           {isInProcessByOther && assigned_rabbi && (
             <span className="flex items-center gap-1 mr-auto text-blue-600 dark:text-blue-400">
               <User size={11} />
-              נלקחה ע״י הרב {assigned_rabbi.display_name || assigned_rabbi.name}
+              נלקחה ע״י הרב {assigned_rabbi?.display_name || assigned_rabbi?.name || rabbi_name}
             </span>
           )}
         </div>

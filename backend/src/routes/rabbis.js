@@ -25,7 +25,7 @@ const express = require('express');
 
 const { query }                       = require('../db/pool');
 const { authenticate, requireAdmin }  = require('../middleware/authenticate');
-const { getOnlineRabbis }             = require('../socket/helpers');
+const { getOnlineRabbiIds }           = require('../socket/helpers');
 const {
   getRabbiById,
   getRabbiStats,
@@ -580,7 +580,7 @@ router.get('/leaderboard', async (req, res, next) => {
 router.get('/online', async (req, res, next) => {
   try {
     const io        = req.app.get('io');
-    const onlineIds = getOnlineRabbis(io);
+    const onlineIds = getOnlineRabbiIds(io);
     return res.json({ online: onlineIds, count: onlineIds.length });
   } catch (err) {
     return next(err);

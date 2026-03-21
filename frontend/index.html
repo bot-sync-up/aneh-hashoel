@@ -37,16 +37,13 @@
     <script type="module" src="/src/main.jsx"></script>
 
     <script>
-      // Firebase Messaging Service Worker registration
+      // Firebase Messaging Service Worker — registered only when Firebase is configured
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker
-            .register('/firebase-messaging-sw.js')
-            .then(function (registration) {
-              console.log('SW registered:', registration.scope);
-            })
-            .catch(function (err) {
-              console.log('SW registration failed:', err);
+            .register('/firebase-messaging-sw.js', { type: 'classic' })
+            .catch(function () {
+              // Silently ignore if Firebase is not configured
             });
         });
       }

@@ -69,13 +69,17 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Inject auth header into every request
+  // Inject auth header into every request (except public auth endpoints)
   useEffect(() => {
+    const PUBLIC_ROUTES = ['/auth/login', '/auth/refresh', '/auth/register', '/auth/forgot-password', '/auth/reset-password'];
     const requestInterceptor = api.interceptors.request.use(
       (config) => {
-        const currentToken = localStorage.getItem(TOKEN_KEY);
-        if (currentToken) {
-          config.headers.Authorization = `Bearer ${currentToken}`;
+        const isPublic = PUBLIC_ROUTES.some((r) => config.url?.includes(r));
+        if (!isPublic) {
+          const currentToken = localStorage.getItem(TOKEN_KEY);
+          if (currentToken) {
+            config.headers.Authorization = `Bearer ${currentToken}`;
+          }
         }
         return config;
       },
@@ -97,7 +101,8 @@ export function AuthProvider({ children }) {
         if (
           error.response?.status === 401 &&
           !original._retry &&
-          !original.url?.includes('/auth/refresh')
+          !original.url?.includes('/auth/refresh') &&
+          !original.url?.includes('/auth/login')
         ) {
           original._retry = true;
 

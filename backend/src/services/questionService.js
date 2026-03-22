@@ -55,11 +55,10 @@ function getSocketHelpers() {
   return _socketHelpers;
 }
 
-let _wpService = null;
-/** @returns {typeof import('./wordpress')} */
-function getWPService() {
-  if (!_wpService) _wpService = require('./wordpress');
-  return _wpService;
+let _wpSyncService = null;
+function getWPSyncService() {
+  if (!_wpSyncService) _wpSyncService = require('./questionSyncService');
+  return _wpSyncService;
 }
 
 let _notificationService = null;
@@ -320,7 +319,7 @@ async function submitAnswer(questionId, rabbiId, content, publishNow = true) {
   });
 
   // Push to WordPress — fire-and-forget
-  getWPService().syncAnswerToWP(questionId).catch((err) => {
+  getWPSyncService().syncAnswersToWP().catch((err) => {
     console.error('[questionService] שגיאה בסנכרון תשובה ל-WordPress:', err.message);
   });
 
@@ -355,7 +354,7 @@ async function editAnswer(questionId, rabbiId, newContent) {
   const answer = await getAnswersService().editAnswer(answerRows[0].id, rabbiId, newContent);
 
   // Trigger WP sync after edit — fire-and-forget
-  getWPService().syncAnswerToWP(questionId).catch((err) => {
+  getWPSyncService().syncAnswersToWP().catch((err) => {
     console.error('[questionService] שגיאה בסנכרון WP לאחר עריכה:', err.message);
   });
 
@@ -454,19 +453,10 @@ async function answerFollowUp(questionId, rabbiId, content) {
     null
   );
 
-  // WP sync — fire-and-forget: use the dedicated follow-up sync so the correct
-  // meta field is updated on the WP post (not just the main answer).
-  const wpService = getWPService();
-  if (typeof wpService.syncFollowUpAnswerToWP === 'function') {
-    wpService.syncFollowUpAnswerToWP(questionId, sanitizedContent).catch((err) => {
-      console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', err.message);
-    });
-  } else {
-    // Fallback: sync the general answer (keeps WP post up-to-date at minimum)
-    wpService.syncAnswerToWP(questionId).catch((err) => {
-      console.error('[questionService] שגיאה בסנכרון תשובה ל-WordPress (fallback):', err.message);
-    });
-  }
+  // WP sync — fire-and-forget
+  getWPSyncService().syncAnswersToWP().catch((err) => {
+    console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', err.message);
+  });
 
   // Notify asker — fire-and-forget
   const ns = getNotificationService();

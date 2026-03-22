@@ -24,7 +24,10 @@ const { runWeeklyReport: runWeeklyStatsReport } = require('./jobs/weeklyReport')
 const { runRabbiOfTheWeek }     = require('./jobs/rabbiOfTheWeek');
 const { runWpSyncRetry }        = require('./jobs/wpSyncRetry');
 const { runSheetsSyncLeads }    = require('./jobs/sheetsSyncLeads');
-const { syncPendingQuestions }  = require('../services/questionSyncService');
+const {
+  syncPendingQuestions,
+  syncAnswersToWP,
+}                               = require('../services/questionSyncService');
 
 const TIMEZONE = 'Asia/Jerusalem';
 
@@ -88,6 +91,11 @@ function startCronJobs(io = null) {
   // ─── Weekly — post "Rabbi of the Week" to WordPress (default Sun 09:00) ───
   const rabbiOfWeekCron = process.env.CRON_RABBI_OF_WEEK || '0 9 * * 0';
   cron.schedule(rabbiOfWeekCron, safeJob('postRabbiOfTheWeek', runRabbiOfTheWeek), {
+    timezone: TIMEZONE,
+  });
+
+  // ─── Every 2 min — sync pending answers to WordPress ─────────────────────
+  cron.schedule('*/2 * * * *', safeJob('syncAnswersToWP', syncAnswersToWP), {
     timezone: TIMEZONE,
   });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { MessageSquarePlus, Eye, ChevronLeft } from 'lucide-react';
+import { MessageSquarePlus, Eye, ChevronLeft, Paperclip } from 'lucide-react';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import CountdownTimer from './CountdownTimer';
@@ -38,7 +38,11 @@ export default function QuestionCard({
     timeoutHours = 24,
     isUrgent,
     askerName,
+    attachment_url,
+    attachmentUrl,
   } = question;
+
+  const hasAttachment = !!(attachment_url || attachmentUrl);
 
   const questionId = _id || id;
   const titleTruncated = truncate(title || 'שאלה ללא כותרת', 80);
@@ -118,6 +122,21 @@ export default function QuestionCard({
           <p className="text-xs text-[var(--text-muted)] font-heebo">
             שואל: {askerName}
           </p>
+        )}
+
+        {/* Attachment indicator */}
+        {hasAttachment && (
+          <a
+            href={attachment_url || attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline font-heebo"
+            title="קובץ מצורף"
+          >
+            <Paperclip className="w-3 h-3" />
+            קובץ מצורף
+          </a>
         )}
 
         {/* Countdown (only for in_process / my-questions mode) */}

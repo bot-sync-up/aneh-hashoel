@@ -119,6 +119,8 @@ function normalisePayload(body) {
     categorySlug:   meta.question_category || src.category    || null,
     urgency:        meta.urgency           || src.urgency     || 'normal',
     questionStatus: meta.status            || null,
+    // file attachment from asker
+    attachmentUrl:  src.attachment_url     || src.attachmentUrl || null,
     // thank-click specific
     sessionToken:   src.session_token      || src.sessionToken || null,
     thankMessage:   src.message            || meta.message     || null,
@@ -187,14 +189,15 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
   let question;
   try {
     question = await createFromWebhook({
-      title:       payload.title,
-      content:     payload.content,
-      asker_name:  payload.askerName,
-      asker_email: payload.askerEmail,
-      asker_phone: payload.askerPhone,
-      urgency:     payload.urgency,
-      source:      'wordpress',
-      wp_post_id:  payload.wpPostId,
+      title:          payload.title,
+      content:        payload.content,
+      asker_name:     payload.askerName,
+      asker_email:    payload.askerEmail,
+      asker_phone:    payload.askerPhone,
+      urgency:        payload.urgency,
+      source:         'wordpress',
+      wp_post_id:     payload.wpPostId,
+      attachment_url: payload.attachmentUrl || null,
     });
   } catch (createErr) {
     console.error(

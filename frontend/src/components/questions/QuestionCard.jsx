@@ -11,6 +11,7 @@ import {
   Lock,
   MessageSquare,
   Pencil,
+  Paperclip,
 } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
@@ -70,6 +71,7 @@ function QuestionCard({
     thank_count = 0,
     private_notes,
     discussion_count = 0,
+    attachment_url,
   } = question;
 
   // API may return flat fields (assigned_rabbi_id) or nested object (assigned_rabbi.id)
@@ -170,6 +172,21 @@ function QuestionCard({
         <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy transition-colors">
           {truncatedTitle}
         </h3>
+
+        {/* Attachment indicator */}
+        {attachment_url && (
+          <a
+            href={attachment_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1.5 text-xs text-brand-navy/70 dark:text-dark-accent/80 hover:text-brand-navy dark:hover:text-dark-accent font-heebo mb-2 hover:underline"
+            title="פתח קובץ מצורף"
+          >
+            <Paperclip size={12} />
+            קובץ מצורף
+          </a>
+        )}
 
         {/* Private notes snippet (only shown when rabbi owns it) */}
         {private_notes && isMe && (

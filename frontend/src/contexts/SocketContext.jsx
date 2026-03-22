@@ -47,9 +47,10 @@ export function SocketProvider({ children }) {
 
     newSocket.on('disconnect', (reason) => {
       setConnected(false);
+      // 'io server disconnect' = server intentionally closed → reconnect manually
+      // Other reasons (transport error, ping timeout) → socket.io auto-reconnects
       if (reason === 'io server disconnect') {
-        // Server intentionally disconnected — do not auto-reconnect
-        newSocket.connect();
+        setTimeout(() => newSocket.connect(), RECONNECT_DELAY);
       }
     });
 

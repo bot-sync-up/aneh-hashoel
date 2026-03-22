@@ -180,11 +180,17 @@ function QuestionCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 text-xs text-brand-navy/70 dark:text-dark-accent/80 hover:text-brand-navy dark:hover:text-dark-accent font-heebo mb-2 hover:underline"
+            className="block mb-2"
             title="פתח קובץ מצורף"
           >
-            <Paperclip size={12} />
-            קובץ מצורף
+            {/\.(jpe?g|png|gif|webp)(\?|$)/i.test(attachment_url) ? (
+              <img src={attachment_url} alt="קובץ מצורף" className="max-h-32 rounded border border-gray-200 object-contain" />
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-brand-navy/70 hover:text-brand-navy hover:underline font-heebo">
+                <Paperclip size={12} />
+                קובץ מצורף
+              </span>
+            )}
           </a>
         )}
 

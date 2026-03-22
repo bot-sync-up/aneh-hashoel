@@ -131,11 +131,17 @@ export default function QuestionCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline font-heebo"
+            className="block"
             title="קובץ מצורף"
           >
-            <Paperclip className="w-3 h-3" />
-            קובץ מצורף
+            {/\.(jpe?g|png|gif|webp)(\?|$)/i.test(attachment_url || attachmentUrl) ? (
+              <img src={attachment_url || attachmentUrl} alt="קובץ מצורף" className="max-h-28 rounded border border-gray-200 object-contain mt-1" />
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline font-heebo">
+                <Paperclip className="w-3 h-3" />
+                קובץ מצורף
+              </span>
+            )}
           </a>
         )}
 

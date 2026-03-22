@@ -113,9 +113,11 @@ async function syncPendingQuestions(io = null) {
       asker_name:  meta.visitor_name      || null,
       asker_email: meta.asker_email       || null,
       asker_phone: meta.visitor_phone     || meta.asker_phone || null,
-      urgency:     meta.urgency           || 'normal',
-      source:      'wordpress_poll',
-      wp_post_id:  wpPostId,
+      urgency:        meta.urgency           || 'normal',
+      source:         'wordpress_poll',
+      wp_post_id:     wpPostId,
+      attachment_url: null, // resolved below from attachment ID if present
+      _attachmentId:  meta['ask-visitor-img'] || null,
     };
 
     if (!questionData.title || !questionData.content) {
@@ -154,6 +156,17 @@ async function syncPendingQuestions(io = null) {
         checkErr.message
       );
       // Fall through — createFromWebhook will fail on UNIQUE constraint
+    }
+
+    // ── Resolve attachment ID → URL ────────────────────────────────────────
+    if (questionData._attachmentId) {
+      try {
+        const { getAttachmentUrl } = require('./wpService');
+        if (typeof getAttachmentUrl === 'function') {
+          questionData.attachment_url = await getAttachmentUrl(questionData._attachmentId);
+        }
+      } catch (_) { /* non-fatal */ }
+      delete questionData._attachmentId;
     }
 
     // ── Persist ────────────────────────────────────────────────────────────

@@ -182,7 +182,7 @@ async function getNewQuestions() {
       () => client.get('/ask-rabai', {
         params: {
           status:   'pending',
-          _fields:  'id,title,meta,date',
+          _fields:  'id,title,meta,date,acf',
           per_page: 50,
           orderby:  'date',
           order:    'desc',
@@ -648,12 +648,31 @@ function _currentWeekLabel() {
   return `${year}-W${String(weekNum).padStart(2, '0')}`;
 }
 
-// ─── Re-export logSync for use by other modules ───────────────────────────────
+// ─── getAttachmentUrl ─────────────────────────────────────────────────────────
+
+/**
+ * Resolve a WordPress attachment ID to its source URL.
+ * @param {number|string} attachmentId
+ * @returns {Promise<string|null>}
+ */
+async function getAttachmentUrl(attachmentId) {
+  if (!attachmentId) return null;
+  try {
+    const client = buildClient();
+    const response = await client.get(`/media/${attachmentId}`, {
+      params: { _fields: 'source_url' },
+    });
+    return response.data?.source_url || null;
+  } catch (_) {
+    return null;
+  }
+}
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   getNewQuestions,
+  getAttachmentUrl,
   getQuestionById,
   updateQuestionStatus,
   publishAnswer,

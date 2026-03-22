@@ -333,7 +333,10 @@ async function publishAnswer(wpPostId, answerData) {
 
   const payload = {
     meta: {
-      'ask-answ': answerData.content,
+      'ask-answ':      answerData.content,
+      'ask-rabbi':     answerData.rabbiName   || '',
+      'ask-signature': answerData.signature   || '',
+      'ask-answered-at': answerData.publishedAt || new Date().toISOString(),
     },
   };
 

@@ -93,9 +93,13 @@ function startCronJobs() {
   });
 
   // ─── Every 5 min — pull new questions from WordPress ────────────────────────
-  cron.schedule('*/5 * * * *', safeJob('syncPendingQuestionsFromWP', syncPendingQuestions), {
-    timezone: TIMEZONE,
-  });
+  if (process.env.DISABLE_WP_SYNC !== 'true') {
+    cron.schedule('*/5 * * * *', safeJob('syncPendingQuestionsFromWP', syncPendingQuestions), {
+      timezone: TIMEZONE,
+    });
+  } else {
+    console.log('[cron] syncPendingQuestionsFromWP DISABLED (DISABLE_WP_SYNC=true)');
+  }
 
   // ─── Every 15 min — sync leads to Google Sheets ───────────────────────────
   cron.schedule('*/15 * * * *', safeJob('syncLeadsToGoogleSheets', runSheetsSyncLeads), {

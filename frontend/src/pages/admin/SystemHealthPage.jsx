@@ -151,10 +151,36 @@ export default function SystemHealthPage() {
     try {
       const [healthData, logData] = await Promise.all([
         get('/admin/system/health'),
-        get('/admin/system/sync-log', { limit: 20 }),
+        get('/admin/sync-log', { limit: 20 }),
       ]);
-      setHealth(healthData ?? DEMO_HEALTH);
-      setSyncLog(Array.isArray(logData) ? logData : logData.entries ?? DEMO_SYNC_LOG);
+
+      // Map backend health response to the shape this page expects
+      const rawHealth = healthData ?? {};
+      const mappedHealth = {
+        services: {
+          db:        { status: rawHealth.status === 'healthy' ? 'ok' : 'error', latencyMs: rawHealth.dbLatencyMs ?? null },
+          redis:     { status: 'unknown', latencyMs: null },
+          wordpress: { status: 'unknown', latencyMs: null },
+          greenapi:  { status: 'unknown', latencyMs: null },
+        },
+        uptimePercent: null,
+        uptimeDays: rawHealth.uptime != null ? Math.floor(rawHealth.uptime / 86400) : null,
+        avgResponseMs: rawHealth.dbLatencyMs ?? null,
+        pendingWpSync: rawHealth.counts?.pending_questions ?? 0,
+        failedLeads: 0,
+        ...rawHealth,
+      };
+      setHealth(mappedHealth);
+
+      const log = Array.isArray(logData) ? logData : logData.log ?? logData.entries ?? DEMO_SYNC_LOG;
+      // Map sync-log rows to the shape SyncLogTable expects
+      setSyncLog(log.map((e) => ({
+        id: e.id,
+        timestamp: e.answered_at || e.created_at || e.timestamp,
+        action: e.syncStatus === 'synced' ? 'sync-answers' : 'pending-sync',
+        details: e.title || e.details || '',
+        status: e.syncStatus === 'synced' ? 'success' : 'error',
+      })));
     } catch {
       setHealth(DEMO_HEALTH);
       setSyncLog(DEMO_SYNC_LOG);
@@ -169,7 +195,7 @@ export default function SystemHealthPage() {
   const handleRetryWpSync = async () => {
     setSyncLoading(true);
     try {
-      await post('/admin/system/sync-wp');
+      await post('/admin/sync-log/retry');
       await loadHealth();
     } catch {
     } finally {
@@ -180,7 +206,8 @@ export default function SystemHealthPage() {
   const handleRetryLeads = async () => {
     setRetryLoading((r) => ({ ...r, leads: true }));
     try {
-      await post('/admin/system/sync-leads');
+      // No dedicated leads-retry endpoint; reuse wp sync retry
+      await post('/admin/sync-log/retry');
       await loadHealth();
     } catch {
     } finally {

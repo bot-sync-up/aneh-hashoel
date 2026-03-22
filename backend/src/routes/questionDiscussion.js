@@ -110,16 +110,20 @@ router.post(
     }
 
     // ── Create discussion ───────────────────────────────────────────────────
+    const io = req.app.get('io');
+
+    // Resolve final member list: 'all' string or specific IDs
+    const resolvedMemberIds = allRabbis === true ? 'all' : (Array.isArray(memberIds) ? memberIds : []);
+
     const discussion = await createDiscussion(
-      req.rabbi.id,
       autoTitle,
       questionId,
-      Array.isArray(memberIds) ? memberIds : [],
-      allRabbis === true
+      req.rabbi.id,
+      resolvedMemberIds,
+      io
     );
 
     // ── Notify invited members via socket ───────────────────────────────────
-    const io = req.app.get('io');
     if (io && Array.isArray(memberIds) && memberIds.length > 0) {
       memberIds.forEach((memberId) => {
         if (String(memberId) !== String(req.rabbi.id)) {

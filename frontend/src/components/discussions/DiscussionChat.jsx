@@ -41,7 +41,7 @@ export default function DiscussionChat({
   const [loading, setLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
-  const [page, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState(null);
   const [error, setError] = useState(null);
 
   // Pinned message
@@ -64,24 +64,29 @@ export default function DiscussionChat({
 
   // ── Initial load ───────────────────────────────────────────────────────────
 
-  const loadMessages = useCallback(async (pageNum = 1, prepend = false) => {
+  const loadMessages = useCallback(async (cursor = null, prepend = false) => {
     try {
-      const { data } = await api.get(`/discussions/${discussionId}/messages`, {
-        params: { page: pageNum, limit: PAGE_SIZE },
-      });
+      const params = { limit: PAGE_SIZE };
+      if (cursor) params.cursor = cursor;
+
+      const { data } = await api.get(`/discussions/${discussionId}/messages`, { params });
 
       const msgs = data.messages || data.data || data || [];
-      const pagination = data.pagination || {};
+      const hasMore = data.hasMore ?? false;
+      const newCursor = data.nextCursor ?? null;
 
-      setHasOlder(pagination.page < pagination.totalPages || msgs.length === PAGE_SIZE);
+      setHasOlder(hasMore);
+      setNextCursor(newCursor);
 
       setMessages((prev) =>
         prepend ? [...msgs.reverse(), ...prev] : msgs.reverse()
       );
 
-      // Find pinned message
-      const pinned = msgs.find((m) => m.is_pinned);
-      if (pinned) setPinnedMessage(pinned);
+      // Find pinned message (only on initial load)
+      if (!prepend) {
+        const pinned = msgs.find((m) => m.is_pinned);
+        if (pinned) setPinnedMessage(pinned);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'שגיאה בטעינת ההודעות');
     }
@@ -101,12 +106,13 @@ export default function DiscussionChat({
     setLoading(true);
     setError(null);
     setMessages([]);
-    setPage(1);
+    setNextCursor(null);
+    setHasOlder(false);
     setNewMessageCount(0);
     setUserScrolledUp(false);
     setTypingNames([]);
 
-    Promise.all([loadMessages(1, false), loadDiscussion()]).finally(() => {
+    Promise.all([loadMessages(null, false), loadDiscussion()]).finally(() => {
       if (!cancelled) setLoading(false);
     });
 
@@ -223,10 +229,8 @@ export default function DiscussionChat({
     if (el.scrollTop < 80 && hasOlder && !loadingOlder) {
       const prevScrollHeight = el.scrollHeight;
       setLoadingOlder(true);
-      const nextPage = page + 1;
-      setPage(nextPage);
 
-      loadMessages(nextPage, true).finally(() => {
+      loadMessages(nextCursor, true).finally(() => {
         setLoadingOlder(false);
         // Restore scroll position after prepend
         requestAnimationFrame(() => {
@@ -236,7 +240,7 @@ export default function DiscussionChat({
         });
       });
     }
-  }, [hasOlder, loadingOlder, page, loadMessages]);
+  }, [hasOlder, loadingOlder, nextCursor, loadMessages]);
 
   // ── Mark read ──────────────────────────────────────────────────────────────
 
@@ -283,9 +287,7 @@ export default function DiscussionChat({
     async (message) => {
       const newPinned = !message.is_pinned;
       try {
-        await api.put(`/discussions/${discussionId}/messages/${message.id}/pin`, {
-          isPinned: newPinned,
-        });
+        await api.post(`/discussions/${discussionId}/messages/${message.id}/pin`);
         // Optimistic update; socket event will also arrive
         setMessages((prev) =>
           prev.map((m) =>
@@ -309,7 +311,7 @@ export default function DiscussionChat({
   const handleReact = useCallback(
     async (messageId, emoji) => {
       try {
-        await api.post(`/discussions/${discussionId}/messages/${messageId}/reactions`, {
+        await api.post(`/discussions/${discussionId}/messages/${messageId}/react`, {
           emoji,
         });
         // Optimistic handled by socket event `discussion:reaction`

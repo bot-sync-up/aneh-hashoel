@@ -65,7 +65,17 @@ export default function QuestionDetailPage() {
     setError(null);
     try {
       const data = await get(`/questions/${id}`);
-      setQuestion(data.question || data);
+      const q = data.question || data;
+
+      // Merge follow-up data (returned separately from the API) into the question object
+      // so FollowUpSection receives the correct fields.
+      if (data.followUp) {
+        q.follow_up_question  = data.followUp.asker_content  || q.follow_up_question  || null;
+        q.follow_up_answer    = data.followUp.rabbi_answer    || q.follow_up_answer    || null;
+        q.follow_up_count     = data.followUp ? 1 : (q.follow_up_count || 0);
+      }
+
+      setQuestion(q);
     } catch (err) {
       setError(err.message || 'שגיאה בטעינת השאלה.');
     } finally {
@@ -640,46 +650,136 @@ function AnswerEditor({ questionId, initialDraft, onPublished }) {
 // ── FollowUpSection ────────────────────────────────────────────────────────
 
 function FollowUpSection({ questionId, followUpQuestion, followUpAnswer, followUpCount, isMe }) {
-  const [followUpText, setFollowUpText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  // State for rabbi answering an existing follow-up
+  const [rabbiAnswerText, setRabbiAnswerText] = useState('');
+  const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  const [answerError, setAnswerError] = useState(null);
+  const [answerSubmitted, setAnswerSubmitted] = useState(false);
 
-  if (followUpCount >= 1 && !followUpQuestion) return null;
+  // State for asker submitting a new follow-up question
+  const [showAskFollowUp, setShowAskFollowUp] = useState(false);
+  const [followUpQuestionText, setFollowUpQuestionText] = useState('');
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+  const [questionError, setQuestionError] = useState(null);
+  const [questionSubmitted, setQuestionSubmitted] = useState(false);
 
-  const handleSubmitFollowUp = async () => {
-    if (!followUpText.trim()) return;
-    setSubmitting(true);
-    setError(null);
+  // Rabbi submits an answer to an existing follow-up question
+  const handleSubmitRabbiAnswer = async () => {
+    if (!rabbiAnswerText.trim()) return;
+    setSubmittingAnswer(true);
+    setAnswerError(null);
     try {
-      await post(`/questions/${questionId}/follow-up`, { follow_up_answer: followUpText });
-      setSubmitted(true);
+      await post(`/questions/followup-answer/${questionId}`, { content: rabbiAnswerText });
+      setAnswerSubmitted(true);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'שגיאה בשמירת התגובה.');
+      setAnswerError(err.response?.data?.message || err.message || 'שגיאה בשמירת התגובה.');
     } finally {
-      setSubmitting(false);
+      setSubmittingAnswer(false);
     }
   };
+
+  // Asker (or admin acting on behalf of asker) submits a follow-up question
+  const handleSubmitFollowUpQuestion = async () => {
+    if (!followUpQuestionText.trim()) return;
+    setSubmittingQuestion(true);
+    setQuestionError(null);
+    try {
+      await post(`/questions/${questionId}/follow-up`, { content: followUpQuestionText });
+      setQuestionSubmitted(true);
+      setShowAskFollowUp(false);
+    } catch (err) {
+      setQuestionError(err.response?.data?.message || err.message || 'שגיאה בשליחת שאלת ההמשך.');
+    } finally {
+      setSubmittingQuestion(false);
+    }
+  };
+
+  // If there's already a follow-up question in the system, show the full section
+  const hasFollowUpQuestion = !!followUpQuestion;
+  // Allow asking a follow-up only if none exists yet and limit not reached
+  const canAskFollowUp = !hasFollowUpQuestion && (followUpCount || 0) < 1 && !questionSubmitted;
 
   return (
     <Card
       header={
-        <span className="font-semibold text-[var(--text-primary)] font-heebo text-sm">
-          שאלת המשך
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-[var(--text-primary)] font-heebo text-sm">
+            שאלת המשך
+          </span>
+          {canAskFollowUp && !showAskFollowUp && (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<MessageSquare size={13} />}
+              onClick={() => setShowAskFollowUp(true)}
+              className="text-brand-navy hover:bg-brand-navy/10"
+            >
+              שאל שאלת המשך
+            </Button>
+          )}
+        </div>
       }
     >
-      {/* Existing follow-up question */}
-      {followUpQuestion && (
+      {/* Form to ask a new follow-up question */}
+      {showAskFollowUp && (
+        <div className="mb-4 space-y-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-300 font-heebo">
+            כתוב שאלת המשך לשאלה זו:
+          </p>
+          <textarea
+            rows={4}
+            placeholder="כתוב את שאלת ההמשך כאן..."
+            value={followUpQuestionText}
+            onChange={(e) => setFollowUpQuestionText(e.target.value)}
+            dir="rtl"
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold transition-colors placeholder:text-[var(--text-muted)]"
+          />
+          {questionError && (
+            <p className="text-xs text-red-600 dark:text-red-400 font-heebo">{questionError}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Send size={13} />}
+              onClick={handleSubmitFollowUpQuestion}
+              loading={submittingQuestion}
+              disabled={!followUpQuestionText.trim() || submittingQuestion}
+            >
+              שלח שאלה
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setShowAskFollowUp(false); setFollowUpQuestionText(''); setQuestionError(null); }}
+              disabled={submittingQuestion}
+            >
+              ביטול
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Follow-up question submitted successfully */}
+      {questionSubmitted && (
+        <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-700">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300 font-heebo">
+            שאלת ההמשך נשלחה בהצלחה. הרב יחזור אליך בהקדם.
+          </p>
+        </div>
+      )}
+
+      {/* Existing follow-up question from asker */}
+      {hasFollowUpQuestion && (
         <div className="mb-4 p-3 bg-[var(--bg-muted)] rounded-lg">
-          <p className="text-xs text-[var(--text-muted)] font-heebo mb-1">שאלת המשך:</p>
+          <p className="text-xs text-[var(--text-muted)] font-heebo mb-1">שאלת המשך מהשואל:</p>
           <p className="text-sm text-[var(--text-primary)] font-heebo leading-relaxed">
             {followUpQuestion}
           </p>
         </div>
       )}
 
-      {/* Existing follow-up answer */}
+      {/* Existing follow-up answer from rabbi */}
       {followUpAnswer && (
         <div
           className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed mb-4"
@@ -687,40 +787,45 @@ function FollowUpSection({ questionId, followUpQuestion, followUpAnswer, followU
         />
       )}
 
-      {/* Answer form (only me, and only if no answer yet) */}
-      {isMe && followUpQuestion && !followUpAnswer && !submitted && (
-        <div className="space-y-3">
+      {/* Rabbi answer form — only shown to the answering rabbi when no answer yet */}
+      {isMe && hasFollowUpQuestion && !followUpAnswer && !answerSubmitted && (
+        <div className="space-y-3 pt-2 border-t border-[var(--border-default)]">
+          <p className="text-xs font-medium text-[var(--text-muted)] font-heebo">
+            כתוב תשובה לשאלת ההמשך:
+          </p>
           <textarea
             rows={5}
             placeholder="כתוב תשובה לשאלת ההמשך..."
-            value={followUpText}
-            onChange={(e) => setFollowUpText(e.target.value)}
+            value={rabbiAnswerText}
+            onChange={(e) => setRabbiAnswerText(e.target.value)}
             dir="rtl"
             className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] text-sm font-heebo px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-gold/40 focus:border-brand-gold transition-colors placeholder:text-[var(--text-muted)]"
           />
-          {error && (
-            <p className="text-xs text-red-600 dark:text-red-400 font-heebo">{error}</p>
+          {answerError && (
+            <p className="text-xs text-red-600 dark:text-red-400 font-heebo">{answerError}</p>
           )}
           <Button
             variant="primary"
             size="sm"
-            onClick={handleSubmitFollowUp}
-            loading={submitting}
-            disabled={!followUpText.trim() || submitting}
+            leftIcon={<Send size={13} />}
+            onClick={handleSubmitRabbiAnswer}
+            loading={submittingAnswer}
+            disabled={!rabbiAnswerText.trim() || submittingAnswer}
           >
             שלח תגובה
           </Button>
         </div>
       )}
 
-      {submitted && (
+      {/* Rabbi answer submitted successfully */}
+      {answerSubmitted && (
         <p className="text-sm text-emerald-600 dark:text-emerald-400 font-heebo">
           התגובה נשלחה בהצלחה.
         </p>
       )}
 
-      {/* No follow-up yet */}
-      {followUpCount < 1 && !followUpQuestion && (
+      {/* No follow-up at all */}
+      {!hasFollowUpQuestion && !showAskFollowUp && !questionSubmitted && (
         <p className="text-sm text-[var(--text-muted)] font-heebo">
           אין שאלת המשך לשאלה זו.
         </p>
@@ -795,8 +900,8 @@ function CreateDiscussionModal({ isOpen, question, onClose }) {
   const [error, setError] = useState(null);
 
   const handleSubmit = async () => {
-    if (!title.trim() || !body.trim()) {
-      setError('יש למלא כותרת ותוכן.');
+    if (!title.trim()) {
+      setError('יש למלא כותרת לדיון.');
       return;
     }
     setSubmitting(true);
@@ -804,8 +909,7 @@ function CreateDiscussionModal({ isOpen, question, onClose }) {
     try {
       const data = await post('/discussions', {
         title,
-        body,
-        question_id: question?.id,
+        questionId: question?.id,
       });
       onClose();
       navigate(`/discussions/${data.discussion?.id || data.id}`);

@@ -402,11 +402,11 @@ function DiscussionModal({ question, onClose, onCreated }) {
   const [error, setError] = useState(null);
 
   const handleSubmit = async () => {
-    if (!title.trim() || !body.trim()) { setError('יש למלא כותרת ותוכן.'); return; }
+    if (!title.trim()) { setError('יש למלא כותרת לדיון.'); return; }
     setSubmitting(true);
     setError(null);
     try {
-      const data = await post('/discussions', { title, body, question_id: question?.id });
+      const data = await post('/discussions', { title, questionId: question?.id });
       onCreated?.(data.discussion?.id || data.id);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'שגיאה ביצירת הדיון.');

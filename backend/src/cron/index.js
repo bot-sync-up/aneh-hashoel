@@ -56,8 +56,12 @@ function safeJob(name, fn) {
 /**
  * Register and start all cron jobs.
  * Called once from server.js after DB and Redis connections are established.
+ *
+ * @param {import('socket.io').Server|null} [io]
+ *   Socket.io server instance — forwarded to syncPendingQuestions so that
+ *   new questions discovered via polling trigger real-time broadcasts.
  */
-function startCronJobs() {
+function startCronJobs(io = null) {
   console.log('[cron] Registering cron jobs (timezone: %s)...', TIMEZONE);
 
   // ─── Every 30 min — release stale in_process questions back to pending ────
@@ -94,7 +98,7 @@ function startCronJobs() {
 
   // ─── Every 5 min — pull new questions from WordPress ────────────────────────
   if (process.env.DISABLE_WP_SYNC !== 'true') {
-    cron.schedule('*/5 * * * *', safeJob('syncPendingQuestionsFromWP', syncPendingQuestions), {
+    cron.schedule('*/5 * * * *', safeJob('syncPendingQuestionsFromWP', () => syncPendingQuestions(io)), {
       timezone: TIMEZONE,
     });
   } else {

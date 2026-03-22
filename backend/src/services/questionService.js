@@ -454,10 +454,19 @@ async function answerFollowUp(questionId, rabbiId, content) {
     null
   );
 
-  // WP sync — fire-and-forget
-  getWPService().syncAnswerToWP(questionId).catch((err) => {
-    console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', err.message);
-  });
+  // WP sync — fire-and-forget: use the dedicated follow-up sync so the correct
+  // meta field is updated on the WP post (not just the main answer).
+  const wpService = getWPService();
+  if (typeof wpService.syncFollowUpAnswerToWP === 'function') {
+    wpService.syncFollowUpAnswerToWP(questionId, sanitizedContent).catch((err) => {
+      console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', err.message);
+    });
+  } else {
+    // Fallback: sync the general answer (keeps WP post up-to-date at minimum)
+    wpService.syncAnswerToWP(questionId).catch((err) => {
+      console.error('[questionService] שגיאה בסנכרון תשובה ל-WordPress (fallback):', err.message);
+    });
+  }
 
   // Notify asker — fire-and-forget
   const ns = getNotificationService();

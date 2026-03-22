@@ -238,8 +238,8 @@ async function start() {
   // Wire Socket.io authentication + event handlers
   initSocketHandlers(io);
 
-  // Start background cron jobs
-  startCronJobs();
+  // Start background cron jobs (pass io so polling sync can broadcast socket events)
+  startCronJobs(io);
 
   const PORT = parseInt(process.env.PORT || '3001', 10);
 

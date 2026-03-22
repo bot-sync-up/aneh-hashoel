@@ -9,6 +9,7 @@
  */
 
 const { query } = require('../../db/pool');
+const { notify } = require('../../services/notificationRouter');
 
 /**
  * מאתר שאלות שנמצאות בטווח אזהרה (שעה לפני timeout) ושולח התראה לרב.
@@ -63,16 +64,14 @@ async function runWarningCheck() {
       [row.id]
     );
 
-    // TODO: שליחת התראה בפועל (יוטמע ע"י סוכן ההתראות)
-    // const notificationService = require('../../services/notifications');
-    // await notificationService.sendWarning({
-    //   rabbiId:    row.assigned_rabbi_id,
-    //   rabbiEmail: row.rabbi_email,
-    //   rabbiName:  row.rabbi_name,
-    //   questionId: row.id,
-    //   title:      row.title,
-    //   preference: row.notification_pref,
-    // });
+    // שליחת התראת אזהרה לרב דרך notificationRouter
+    const minutesLeft = Math.round((hoursToTimeout - warningThresholdHours) * 60);
+    await notify(row.assigned_rabbi_id, 'timeout_warning', {
+      question:   { id: row.id, title: row.title },
+      minutesLeft,
+    }).catch((err) =>
+      console.error(`[warning-check] שגיאה בשליחת התראה לרב ${row.assigned_rabbi_id}:`, err.message)
+    );
   }
 
   console.info(`[warning-check] סומנו ${result.rowCount} שאלות כאזהרה נשלחה.`);

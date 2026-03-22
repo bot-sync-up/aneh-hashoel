@@ -114,14 +114,30 @@ export default function MessageBubble({
   // ── Reactions summary ─────────────────────────────────────────────────────
 
   const reactionGroups = React.useMemo(() => {
-    const reactions = message.reactions || [];
-    const grouped = {};
-    reactions.forEach((r) => {
-      if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, myReaction: false };
-      grouped[r.emoji].count += 1;
-      if (r.rabbi_id === currentRabbiId) grouped[r.emoji].myReaction = true;
-    });
-    return grouped;
+    const reactions = message.reactions;
+    // Backend returns reactions as an object map: { emoji: { count, reacted, rabbis[] } }
+    if (reactions && typeof reactions === 'object' && !Array.isArray(reactions)) {
+      // Normalize to { emoji: { count, myReaction } }
+      const grouped = {};
+      for (const [emoji, data] of Object.entries(reactions)) {
+        grouped[emoji] = {
+          count: data.count || 0,
+          myReaction: data.reacted || false,
+        };
+      }
+      return grouped;
+    }
+    // Fallback: legacy array format
+    if (Array.isArray(reactions)) {
+      const grouped = {};
+      reactions.forEach((r) => {
+        if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, myReaction: false };
+        grouped[r.emoji].count += 1;
+        if (String(r.rabbi_id) === String(currentRabbiId)) grouped[r.emoji].myReaction = true;
+      });
+      return grouped;
+    }
+    return {};
   }, [message.reactions, currentRabbiId]);
 
   const hasReactions = Object.keys(reactionGroups).length > 0;

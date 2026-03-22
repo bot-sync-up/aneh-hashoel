@@ -81,7 +81,7 @@ export default function DiscussionHeader({
     async (targetRabbi) => {
       try {
         await api.post(`/discussions/${discussionId}/members`, {
-          rabbi_id: targetRabbi.id,
+          rabbiIds: [targetRabbi.id],
         });
         // Update local discussion members
         onDiscussionUpdate?.((prev) => ({
@@ -105,7 +105,7 @@ export default function DiscussionHeader({
     if (!window.confirm('האם אתה בטוח שברצונך לצאת מהדיון?')) return;
     setLeavingDiscussion(true);
     try {
-      await api.delete(`/discussions/${discussionId}/members/me`);
+      await api.post(`/discussions/${discussionId}/leave`);
       onBack?.();
     } catch {
       setLeavingDiscussion(false);

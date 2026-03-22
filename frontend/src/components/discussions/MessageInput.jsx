@@ -88,7 +88,7 @@ export default function MessageInput({
     try {
       const payload = {
         content: trimmed,
-        ...(replyTo ? { parent_message_id: replyTo.id } : {}),
+        ...(replyTo ? { parentId: replyTo.id } : {}),
       };
 
       const { data } = await api.post(

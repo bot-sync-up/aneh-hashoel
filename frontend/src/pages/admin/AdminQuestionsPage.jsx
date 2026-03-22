@@ -109,7 +109,16 @@ export default function AdminQuestionsPage() {
         get('/admin/questions'),
         get('/admin/categories').catch(() => []),
       ]);
-      setQuestions(Array.isArray(qData) ? qData : qData.questions ?? DEMO_QUESTIONS);
+      const rawQuestions = Array.isArray(qData) ? qData : qData.questions ?? DEMO_QUESTIONS;
+      // Normalise snake_case backend fields to camelCase expected by the table
+      setQuestions(rawQuestions.map((q) => ({
+        ...q,
+        createdAt:      q.createdAt      ?? q.created_at,
+        assignedRabbi:  q.assignedRabbi  ?? q.rabbi_name,
+        categoryId:     q.categoryId     ?? q.category_id,
+        category:       q.category       ?? q.category_name,
+        isUrgent:       q.isUrgent       ?? (q.urgency === 'urgent'),
+      })));
       setCategories(Array.isArray(catData) ? catData : catData.categories ?? []);
     } catch {
       setQuestions(DEMO_QUESTIONS);
@@ -158,7 +167,7 @@ export default function AdminQuestionsPage() {
   const handleBulkRelease = async () => {
     try {
       await Promise.all([...selected].map((id) => patch(`/admin/questions/${id}`, { status: 'pending', assignedRabbiId: null })));
-      setQuestions((prev) => prev.map((q) => selected.has(q.id) ? { ...q, status: 'pending', assignedRabbi: null } : q));
+      setQuestions((prev) => prev.map((q) => selected.has(q.id) ? { ...q, status: 'pending', rabbi_name: null, assignedRabbi: null } : q));
       setSelected(new Set());
       showToast('השאלות שוחררו');
     } catch { showToast('שגיאה בפעולה', 'error'); }

@@ -9,6 +9,7 @@
  */
 
 const { query } = require('../../db/pool');
+const { notifyAll } = require('../../services/notificationRouter');
 
 /**
  * אוסף סטטיסטיקות על שאלות ממתינות ושולח סיכום לכל הרבנים.
@@ -80,13 +81,13 @@ async function runDailyDigest() {
     recipients: rabbisResult.rows,
   };
 
-  // TODO: שליחת הסיכום בפועל (יוטמע ע"י סוכן ההתראות)
-  // const notificationService = require('../../services/notifications');
-  // for (const rabbi of rabbisResult.rows) {
-  //   await notificationService.sendDailyDigest(rabbi, digestData);
-  // }
+  // שליחת הסיכום דרך notificationRouter לכל הרבנים הפעילים
+  const rabbiIds = rabbisResult.rows.map((r) => r.id);
+  await notifyAll('daily_digest', { pendingCount }).catch((err) =>
+    console.error('[daily-digest] שגיאה בשליחת הסיכום:', err.message)
+  );
 
-  console.info(`[daily-digest] סיכום יומי הושלם בהצלחה.`);
+  console.info(`[daily-digest] סיכום יומי הושלם בהצלחה — נשלח ל-${rabbiIds.length} רבנים.`);
 }
 
 module.exports = { runDailyDigest };

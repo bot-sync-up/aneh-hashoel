@@ -181,7 +181,7 @@ router.post('/rabbis', async (req, res) => {
       return res.status(400).json({ error: 'שם ואימייל נדרשים' });
     }
 
-    const validRoles = ['rabbi', 'admin'];
+    const validRoles = ['rabbi', 'senior', 'admin'];
     const resolvedRole = validRoles.includes(role) ? role : 'rabbi';
 
     const rabbi = await adminService.createRabbi({
@@ -399,6 +399,54 @@ router.get('/questions', async (req, res) => {
 });
 
 /**
+ * PATCH /admin/questions/:id
+ * Update a single question's status or assigned rabbi.
+ * Body: { status?, assignedRabbiId? }
+ */
+router.patch('/questions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, assignedRabbiId } = req.body;
+
+    const validStatuses = ['pending', 'in_process', 'answered', 'hidden'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'סטטוס לא חוקי' });
+    }
+
+    const { rows } = await dbQuery('SELECT id FROM questions WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'שאלה לא נמצאה' });
+
+    const fields = [];
+    const vals   = [];
+    let   idx    = 1;
+
+    if (status !== undefined) {
+      fields.push(`status = $${idx++}`);
+      vals.push(status);
+    }
+    if (assignedRabbiId !== undefined) {
+      fields.push(`assigned_rabbi_id = $${idx++}`);
+      vals.push(assignedRabbiId || null);
+    }
+
+    if (!fields.length) return res.status(400).json({ error: 'אין שדות לעדכון' });
+
+    vals.push(id);
+    const { rows: updated } = await dbQuery(
+      `UPDATE questions SET ${fields.join(', ')}, updated_at = NOW()
+       WHERE id = $${idx}
+       RETURNING id, status, assigned_rabbi_id`,
+      vals
+    );
+
+    return res.json({ ok: true, question: updated[0] });
+  } catch (err) {
+    console.error('[admin] PATCH /questions/:id error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
  * POST /admin/questions/bulk
  * Bulk actions on questions.
  * Body: { action: 'hide'|'reopen'|'reassign', questionIds: string[], targetRabbiId?: string }
@@ -547,6 +595,7 @@ router.get('/audit-log', async (req, res) => {
       actor:       req.query.rabbi_id,
       action:      req.query.action_type,
       entity_type: req.query.entity_type,
+      entity_id:   req.query.entity_id,
       dateFrom:    req.query.dateFrom,
       dateTo:      req.query.dateTo,
       page:        req.query.page,

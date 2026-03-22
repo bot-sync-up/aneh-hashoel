@@ -252,10 +252,71 @@ async function postNewsletterQuestion(questionData) {
   }
 }
 
+// ─── syncFollowUpAnswerToWP ────────────────────────────────────────────────────
+
+/**
+ * Sync a rabbi's follow-up answer to WordPress after it is saved in our DB.
+ *
+ * Fetches the question's wp_post_id and rabbi name from the DB, then calls
+ * the WP REST API to update the follow-up meta fields on the CPT post.
+ *
+ * @param {string} questionId
+ * @param {string} followUpContent  – Sanitized HTML content of the follow-up answer
+ */
+async function syncFollowUpAnswerToWP(questionId, followUpContent) {
+  const { rows } = await dbQuery(
+    `SELECT q.wp_post_id,
+            r.name AS rabbi_name
+     FROM   questions q
+     LEFT JOIN answers a ON a.question_id = q.id
+     LEFT JOIN rabbis  r ON r.id = a.rabbi_id
+     WHERE  q.id = $1
+     LIMIT  1`,
+    [questionId]
+  );
+
+  if (!rows[0]) {
+    console.error(`[wordpress] syncFollowUpAnswerToWP: שאלה ${questionId} לא נמצאה`);
+    return;
+  }
+
+  const { wp_post_id, rabbi_name } = rows[0];
+
+  if (!wp_post_id) {
+    console.warn(
+      `[wordpress] syncFollowUpAnswerToWP: לשאלה ${questionId} אין wp_post_id — דילוג`
+    );
+    return;
+  }
+
+  try {
+    const client = wpClient();
+
+    await client.post(`/questions/${wp_post_id}`, {
+      follow_up_answer_content: followUpContent,
+      follow_up_rabbi_name:     rabbi_name || '',
+      follow_up_answered_at:    new Date().toISOString(),
+    });
+
+    console.log(
+      `[wordpress] syncFollowUpAnswerToWP ✓ questionId=${questionId} wp_post_id=${wp_post_id}`
+    );
+  } catch (err) {
+    const status  = err.response?.status || 'N/A';
+    const message = err.response?.data?.message || err.message;
+    console.error(
+      `[wordpress] syncFollowUpAnswerToWP שגיאה questionId=${questionId}: ` +
+      `status=${status} — ${message}`
+    );
+    // Non-fatal — do not rethrow; the follow-up is already saved in our DB
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   syncAnswerToWP,
+  syncFollowUpAnswerToWP,
   retryFailedSyncs,
   postRabbiOfWeek,
   postNewsletterQuestion,

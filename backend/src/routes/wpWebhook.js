@@ -38,6 +38,7 @@ const { query }                    = require('../db/pool');
 const { createFromWebhook }        = require('../services/questions');
 const { sanitizeRichText }         = require('../utils/sanitize');
 const { logSync }                  = require('../services/wpService');
+const questionService              = require('../services/questionService');
 
 const {
   broadcastNewQuestion,
@@ -45,6 +46,8 @@ const {
   broadcastStatusChanged,
   notifyThankReceived,
 } = require('../socket/questionEvents');
+
+const { notifyAll } = require('../services/notificationRouter');
 
 const router = express.Router();
 
@@ -218,6 +221,15 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
     }
   }
 
+  // ── Email / WhatsApp notifications to all active rabbis ───────────────────
+  const notifType = (payload.urgency === 'critical' || payload.urgency === 'urgent')
+    ? 'urgent_question'
+    : 'question_broadcast';
+
+  notifyAll(notifType, { question }).catch((err) =>
+    console.error(`[wpWebhook] שגיאה בשליחת התראות לרבנים (${notifType}):`, err.message)
+  );
+
   await logSync(payload.wpPostId, 'webhook_new_question', 'success');
 
   console.log(
@@ -385,6 +397,94 @@ router.post('/question-updated', verifyWebhookSecret, async (req, res, next) => 
     questionId: local.id,
     wpPostId:   payload.wpPostId,
     status:     newStatus,
+  });
+});
+
+// ─── POST /follow-up-question ────────────────────────────────────────────────
+
+/**
+ * WordPress sends this when an asker submits a follow-up question on the site.
+ *
+ * Steps:
+ *   1. Validate webhook secret
+ *   2. Look up local question by wp_post_id
+ *   3. Persist the follow-up via questionService.submitFollowUp()
+ *   4. Respond 201
+ *
+ * Expected body: { wp_post_id, follow_up_content }
+ *
+ * @route POST /webhook/wordpress/follow-up-question
+ */
+router.post('/follow-up-question', verifyWebhookSecret, async (req, res, next) => {
+  const raw = req.body;
+
+  if (!raw || typeof raw !== 'object' || Object.keys(raw).length === 0) {
+    return res.status(400).json({ error: 'גוף הבקשה ריק או לא תקין' });
+  }
+
+  const wpPostId = parseInt(raw.wp_post_id || raw.post_id || 0, 10) || null;
+  const content  = (raw.follow_up_content || raw.content || '').trim();
+
+  if (!wpPostId) {
+    return res.status(400).json({ error: 'wp_post_id חסר בנתוני ה-webhook' });
+  }
+  if (!content) {
+    return res.status(400).json({ error: 'תוכן שאלת ההמשך חסר' });
+  }
+
+  console.log(
+    `[wpWebhook] follow-up-question wpPostId=${wpPostId} ip=${_clientIp(req)}`
+  );
+
+  // ── Look up local question ─────────────────────────────────────────────────
+  let question;
+  try {
+    const { rows } = await query(
+      `SELECT id, assigned_rabbi_id, status
+       FROM   questions
+       WHERE  wp_post_id = $1
+       LIMIT  1`,
+      [wpPostId]
+    );
+
+    if (rows.length === 0) {
+      console.warn(
+        `[wpWebhook] follow-up-question: wpPostId=${wpPostId} לא נמצא — מתעלם`
+      );
+      return res.status(200).json({ message: 'שאלה לא נמצאה — מתעלם' });
+    }
+
+    question = rows[0];
+  } catch (lookupErr) {
+    return next(lookupErr);
+  }
+
+  // ── Persist follow-up via questionService ─────────────────────────────────
+  let followUp;
+  try {
+    followUp = await questionService.submitFollowUp(question.id, content);
+  } catch (serviceErr) {
+    console.error(
+      `[wpWebhook] follow-up-question: שגיאה בשמירת שאלת המשך לשאלה id=${question.id}:`,
+      serviceErr.message
+    );
+    await logSync(wpPostId, 'webhook_follow_up_question', 'failed', serviceErr.message);
+    // 400-level errors from business logic should be returned as 400, not 500
+    const statusCode = serviceErr.status >= 400 && serviceErr.status < 500 ? serviceErr.status : 500;
+    return res.status(statusCode).json({ error: serviceErr.message });
+  }
+
+  await logSync(wpPostId, 'webhook_follow_up_question', 'success');
+
+  console.log(
+    `[wpWebhook] follow-up-question ✓ questionId=${question.id} wpPostId=${wpPostId}`
+  );
+
+  return res.status(201).json({
+    message:     'שאלת המשך נשמרה בהצלחה',
+    questionId:  question.id,
+    followUpId:  followUp.id,
+    wpPostId,
   });
 });
 

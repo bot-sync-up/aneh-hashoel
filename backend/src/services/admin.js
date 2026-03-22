@@ -500,6 +500,11 @@ async function getAuditLog(filters = {}) {
     params.push(filters.entity_type);
   }
 
+  if (filters.entity_id) {
+    conditions.push(`al.entity_id = $${++paramIdx}`);
+    params.push(filters.entity_id);
+  }
+
   if (filters.dateFrom) {
     conditions.push(`al.created_at >= $${++paramIdx}`);
     params.push(filters.dateFrom);

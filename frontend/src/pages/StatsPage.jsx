@@ -191,12 +191,29 @@ export default function StatsPage() {
     try {
       const [statsRes, activityRes] = await Promise.allSettled([
         api.get('/rabbis/stats'),
-        api.get('/rabbis/stats/activity'),
+        api.get('/rabbis/stats/history'),
       ]);
 
       if (statsRes.status === 'fulfilled') {
         const d = statsRes.value.data;
-        setStats(d?.stats || d?.current || d);
+        // Backend returns { this_week, last_week, all_time }
+        const current = d?.this_week || d?.stats || d?.current || d;
+        const prev    = d?.last_week || null;
+        setStats({
+          answersThisMonth:    current?.answers_count   ?? current?.answers   ?? current?.answersThisMonth,
+          answersLastMonth:    prev?.answers_count      ?? prev?.answers,
+          viewsThisMonth:      current?.views_count     ?? current?.views     ?? current?.viewsThisMonth,
+          viewsLastMonth:      prev?.views_count        ?? prev?.views,
+          thanksThisMonth:     current?.thanks_count    ?? current?.thanks    ?? current?.thanksThisMonth,
+          thanksLastMonth:     prev?.thanks_count       ?? prev?.thanks,
+          avgResponseTime:     current?.avg_response_minutes ?? current?.avgResponseMinutes ?? current?.avgResponseTime,
+          avgResponseTimePrev: prev?.avg_response_minutes ?? prev?.avgResponseMinutes,
+          totalAnswers:        d?.all_time?.answers_count ?? current?.answers_count ?? 0,
+          totalThanks:         d?.all_time?.thanks_count  ?? current?.thanks_count  ?? 0,
+          totalViews:          d?.all_time?.views_count   ?? current?.views_count   ?? 0,
+          avgResponseMinutes:  current?.avg_response_minutes ?? current?.avgResponseMinutes,
+          ...current,
+        });
         setCategoryData(
           (d?.byCategory || d?.categories || []).map((c) => ({
             label: c.label || c.name || c.category || c.key || '—',
@@ -208,7 +225,14 @@ export default function StatsPage() {
 
       if (activityRes.status === 'fulfilled') {
         const d = activityRes.value.data;
-        setWeeklyData(d?.weekly || d?.weeklyActivity || d || []);
+        // Backend returns { history: [{week_start, answers_count, ...}], weeks }
+        const rows = d?.history || d?.weekly || d?.weeklyActivity || (Array.isArray(d) ? d : []);
+        setWeeklyData(rows.map((row) => ({
+          label: row.label || row.week_start
+            ? new Date(row.week_start).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })
+            : '—',
+          count: row.count ?? row.answers_count ?? row.answers ?? 0,
+        })));
       }
     } catch {
       setError('לא ניתן לטעון את הסטטיסטיקות שלך. נסה שוב.');

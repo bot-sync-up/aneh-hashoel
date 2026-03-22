@@ -103,11 +103,8 @@ export default function CreateDiscussionModal({
       try {
         const payload = {
           title: title.trim(),
-          members_mode: membersMode,
-          ...(membersMode === 'selected'
-            ? { member_ids: selectedRabbis.map((r) => r.id) }
-            : {}),
-          ...(linkedQuestion ? { question_id: linkedQuestion.id } : {}),
+          memberIds: membersMode === 'all' ? 'all' : selectedRabbis.map((r) => r.id),
+          ...(linkedQuestion ? { questionId: linkedQuestion.id } : {}),
         };
 
         const { data } = await api.post('/discussions', payload);

@@ -475,20 +475,55 @@ router.put(
   }
 );
 
+// ─── POST /:id/follow-up — asker submits a follow-up question ────────────────
+
+/**
+ * Asker submits a follow-up question after an answered question.
+ * This endpoint is authenticated (rabbi portal) but intended to be called
+ * on behalf of the asker (e.g. via webhook or portal admin action).
+ * In practice the frontend FollowUpSection posts here when the asker
+ * wants to ask a follow-up.
+ * Body: { content: string }
+ */
+router.post('/:id/follow-up', authenticate, async (req, res, next) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({
+        error: 'תוכן שאלת ההמשך נדרש',
+        code:  'MISSING_CONTENT',
+      });
+    }
+
+    const followUp = await questionService.submitFollowUp(
+      req.params.id,
+      content
+    );
+
+    return res.status(201).json({ message: 'שאלת ההמשך נשמרה בהצלחה', followUp });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── POST /followup-answer/:id — rabbi answers follow-up ─────────────────────
 
 /**
  * The original answering rabbi responds to a follow-up question.
  * The caller must be the assigned rabbi of the question.
  * Body: { content: string }
+ * Also accepts { follow_up_answer: string } for backwards-compatibility
+ * with the frontend which previously used that field name.
  */
 router.post('/followup-answer/:id', authenticate, async (req, res, next) => {
   try {
-    const { content } = req.body;
+    // Accept both field names for compatibility
+    const content = req.body.content || req.body.follow_up_answer;
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json({
-        error: 'תוכן תשובת ההמסך נדרש',
+        error: 'תוכן תשובת ההמשך נדרש',
         code:  'MISSING_CONTENT',
       });
     }

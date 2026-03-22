@@ -56,7 +56,7 @@ function attachDiscussionHandlers(socket, io) {
     // Silently swallow DB errors — the join itself is not blocked by this.
     try {
       await db(
-        `UPDATE discussion_participants
+        `UPDATE discussion_members
          SET    last_read_at = NOW()
          WHERE  discussion_id = $1
            AND  rabbi_id      = $2`,
@@ -105,13 +105,14 @@ function attachDiscussionHandlers(socket, io) {
    * Client sends:  socket.emit('discussion:typing', { discussionId })
    * Room receives: { discussionId, rabbiId, rabbiName } (sender excluded)
    */
-  socket.on('discussion:typing', ({ discussionId } = {}) => {
+  socket.on('discussion:typing', ({ discussionId, isTyping } = {}) => {
     if (!discussionId) return;
 
     socket.to(`discussion:${discussionId}`).emit('discussion:typing', {
       discussionId,
       rabbiId,
       rabbiName,
+      isTyping: isTyping !== false, // default true; stopTyping sends false
     });
   });
 
@@ -182,13 +183,15 @@ function attachDiscussionHandlers(socket, io) {
    *
    * Client sends:  socket.emit('discussion:messagePinned', { discussionId, messageId, pinned })
    */
-  socket.on('discussion:messagePinned', ({ discussionId, messageId, pinned } = {}) => {
-    if (!discussionId || !messageId || typeof pinned !== 'boolean') return;
+  socket.on('discussion:messagePinned', ({ discussionId, messageId, isPinned, pinned } = {}) => {
+    // Accept both isPinned (canonical) and pinned (legacy)
+    const pinnedValue = typeof isPinned === 'boolean' ? isPinned : pinned;
+    if (!discussionId || !messageId || typeof pinnedValue !== 'boolean') return;
 
     emitToDiscussion(io, discussionId, 'discussion:messagePinned', {
       discussionId,
       messageId,
-      pinned,
+      isPinned:  pinnedValue,
       pinnedBy:  rabbiId,
       timestamp: new Date().toISOString(),
     });

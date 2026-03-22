@@ -129,6 +129,16 @@ async function syncPendingQuestions(io = null) {
 
     // ── Idempotency guard (belt-and-suspenders after getNewQuestions filter) ──
     try {
+      // Check blocklist first (manually rejected WP posts we never want back)
+      const blocked = await query(
+        'SELECT 1 FROM wp_post_blocklist WHERE wp_post_id = $1 LIMIT 1',
+        [wpPostId]
+      );
+      if (blocked.rowCount > 0) {
+        skipped++;
+        continue;
+      }
+
       const existing = await query(
         'SELECT id FROM questions WHERE wp_post_id = $1 LIMIT 1',
         [wpPostId]

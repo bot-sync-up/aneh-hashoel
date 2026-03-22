@@ -42,6 +42,8 @@
 const express = require('express');
 const { query } = require('../db/pool');
 const { logAction, ACTIONS } = require('../middleware/auditLog');
+const { sendMessage }        = require('../services/whatsappService');
+const questionService        = require('../services/questionService');
 
 const router = express.Router();
 
@@ -272,20 +274,61 @@ async function _processWebhookPayload(body, ip, returnDebug = false) {
     return returnDebug ? { ...debug, handled: false, reason: 'no_question_id' } : {};
   }
 
-  // ─── 7. v1 STUB ────────────────────────────────────────────────────
-  //
-  // זוהה [ID: ###] בהודעה — מתעד אך לא מעבד.
-  // ב-v1 WhatsApp הוא ערוץ הוצאה בלבד; מענה דו-כיווני מתוכנן לגרסה עתידית.
-  //
-  // בגרסה עתידית: לאמת שהשולח הוא הרב המוקצה (_validateWhatsAppSender),
-  // לנקות את גוף ההודעה ולנתב ל-answersService.
-  //
-  console.info('[whatsappWebhook] [v1-stub] זוהתה תגובה לשאלה — לוג בלבד, ללא שמירה', {
-    questionId,
-    senderPhone,
-    senderName,
-    idMessage: messageId,
-    textPreview: messageText.slice(0, 100),
+  // ─── 7. זיהוי הרב לפי מספר טלפון ───────────────────────────────────
+  const rabbiResult = await query(
+    'SELECT id FROM rabbis WHERE phone = $1 OR whatsapp_number = $1 LIMIT 1',
+    [senderPhone]
+  );
+
+  if (!rabbiResult.rows[0]) {
+    console.info(`[whatsappWebhook] מספר טלפון לא מזוהה: ${senderPhone} — מתעלם`);
+    await _logInboundMessage({ senderPhone, senderName, messageId, messageText, handled: false, questionId, ip });
+    return returnDebug ? { ...debug, handled: false, reason: 'unknown_phone' } : {};
+  }
+
+  const rabbiId = rabbiResult.rows[0].id;
+  debug.rabbiId = rabbiId;
+
+  // ─── 8. חיפוש שאלה פתוחה (in_process) של הרב ───────────────────────
+  const questionResult = await query(
+    `SELECT id FROM questions
+     WHERE  assigned_rabbi_id = $1
+       AND  status = 'in_process'
+     ORDER  BY updated_at DESC
+     LIMIT  1`,
+    [rabbiId]
+  );
+
+  if (!questionResult.rows[0]) {
+    console.info(`[whatsappWebhook] אין שאלה פתוחה לרב ${rabbiId} — שולח הודעת עזרה`);
+    await sendMessage(senderPhone, 'אין לך שאלה פתוחה כרגע').catch((err) => {
+      console.error('[whatsappWebhook] שגיאה בשליחת הודעת "אין שאלה פתוחה":', err.message);
+    });
+    await _logInboundMessage({ senderPhone, senderName, messageId, messageText, handled: false, questionId, ip });
+    return returnDebug ? { ...debug, handled: false, reason: 'no_open_question' } : {};
+  }
+
+  const openQuestionId = questionResult.rows[0].id;
+  debug.openQuestionId = openQuestionId;
+
+  // ─── 9. שמירת התשובה ────────────────────────────────────────────────
+  let answerId = null;
+  try {
+    const answer = await questionService.submitAnswer(openQuestionId, rabbiId, messageText);
+    answerId = answer?.id || null;
+    console.info(
+      `[whatsappWebhook] תשובה נשמרה — questionId=${openQuestionId}, rabbiId=${rabbiId}, answerId=${answerId}`
+    );
+  } catch (answerErr) {
+    console.error('[whatsappWebhook] שגיאה בשמירת תשובה מ-WhatsApp:', answerErr.message);
+    await sendMessage(senderPhone, '❌ אירעה שגיאה בשמירת התשובה. אנא נסה שוב או פנה למנהל המערכת.').catch(() => {});
+    await _logInboundMessage({ senderPhone, senderName, messageId, messageText, handled: false, questionId: openQuestionId, ip });
+    return returnDebug ? { ...debug, handled: false, reason: 'answer_save_error', error: answerErr.message } : {};
+  }
+
+  // ─── 10. אישור לרב ───────────────────────────────────────────────────
+  await sendMessage(senderPhone, '✅ תשובתך נקלטה בהצלחה!').catch((err) => {
+    console.error('[whatsappWebhook] שגיאה בשליחת אישור לרב:', err.message);
   });
 
   await _logInboundMessage({
@@ -293,13 +336,14 @@ async function _processWebhookPayload(body, ip, returnDebug = false) {
     senderName,
     messageId,
     messageText,
-    handled:    false,   // false כי לא מעבדים בפועל ב-v1
-    questionId,
+    handled:    true,
+    questionId: openQuestionId,
+    answerId,
     ip,
   });
 
-  debug.handled = false;
-  debug.note    = 'v1-stub: WhatsApp answering is not active in v1';
+  debug.handled    = true;
+  debug.answerId   = answerId;
   return returnDebug ? debug : {};
 }
 

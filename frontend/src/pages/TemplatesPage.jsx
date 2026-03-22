@@ -7,14 +7,17 @@ import {
   Trash2,
   Search,
   Clock,
-  Tag,
+  Hash,
+  BarChart2,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import { BlockSpinner } from '../components/ui/Spinner';
-import SaveTemplateModal from '../components/answer/SaveTemplateModal';
-import { get, del } from '../lib/api';
+import { get, post, put, del } from '../lib/api';
 import { formatRelative } from '../lib/utils';
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState([]);
@@ -26,14 +29,14 @@ export default function TemplatesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
 
-  // Delete confirmation
+  // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null); // template id
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
   const searchId = useId();
 
-  // ── Fetch ───────────────────────────────────────────────────────────────────
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -52,19 +55,19 @@ export default function TemplatesPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // ── Filtered list ───────────────────────────────────────────────────────────
+  // ── Filtered list ──────────────────────────────────────────────────────────
 
   const filtered = templates.filter((t) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
       t.title?.toLowerCase().includes(q) ||
-      t.category_name?.toLowerCase().includes(q) ||
+      t.shortcut?.toLowerCase().includes(q) ||
       t.content?.toLowerCase().includes(q)
     );
   });
 
-  // ── Modal handlers ──────────────────────────────────────────────────────────
+  // ── Modal handlers ─────────────────────────────────────────────────────────
 
   const openCreate = () => {
     setEditingTemplate(null);
@@ -82,7 +85,7 @@ export default function TemplatesPage() {
     fetchTemplates();
   };
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
+  // ── Delete ─────────────────────────────────────────────────────────────────
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -99,7 +102,7 @@ export default function TemplatesPage() {
     }
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   const isEmpty = !loading && !error && templates.length === 0;
 
@@ -122,7 +125,7 @@ export default function TemplatesPage() {
 
       <div className="p-6 space-y-4">
 
-        {/* Search */}
+        {/* Search bar — shown only when there are templates */}
         {!loading && !error && templates.length > 0 && (
           <div className="relative max-w-sm">
             <Search
@@ -134,7 +137,7 @@ export default function TemplatesPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="חיפוש לפי כותרת, קטגוריה, תוכן..."
+              placeholder="חיפוש לפי כותרת, קיצור, תוכן..."
               dir="rtl"
               className={clsx(
                 'w-full pe-9 ps-3 py-2',
@@ -209,7 +212,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Create / Edit Modal */}
-      <SaveTemplateModal
+      <TemplateFormModal
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false);
@@ -222,7 +225,7 @@ export default function TemplatesPage() {
   );
 }
 
-// ── Template card ─────────────────────────────────────────────────────────────
+// ── Template card ──────────────────────────────────────────────────────────────
 
 function TemplateCard({
   template,
@@ -234,12 +237,16 @@ function TemplateCard({
   onDeleteConfirm,
   deleteError,
 }) {
-  const { title, content, category_name, created_at } = template;
+  const { title, content, shortcut, usage_count, created_at } = template;
 
   // Strip HTML tags for preview
   const plainContent = content
     ? content.replace(/<[^>]*>/g, '').trim()
     : '';
+
+  const preview = plainContent.length > 100
+    ? plainContent.slice(0, 100) + '...'
+    : plainContent;
 
   return (
     <div
@@ -253,15 +260,35 @@ function TemplateCard({
       {/* Header */}
       <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          {category_name && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-navy/70 font-heebo bg-brand-navy/5 px-2 py-0.5 rounded-full mb-2">
-              <Tag size={10} />
-              {category_name}
-            </span>
-          )}
           <h3 className="text-sm font-semibold text-[var(--text-primary)] font-heebo leading-snug">
             {title}
           </h3>
+
+          {/* Badges row */}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {shortcut && (
+              <span className={clsx(
+                'inline-flex items-center gap-1',
+                'text-xs font-mono font-medium',
+                'bg-brand-navy/5 text-brand-navy/80 dark:bg-dark-accent/10 dark:text-dark-accent',
+                'px-2 py-0.5 rounded-full border border-brand-navy/15'
+              )}>
+                <Hash size={9} strokeWidth={2.5} />
+                {shortcut}
+              </span>
+            )}
+            {typeof usage_count === 'number' && (
+              <span className={clsx(
+                'inline-flex items-center gap-1',
+                'text-xs font-heebo font-medium',
+                'bg-[var(--bg-muted)] text-[var(--text-muted)]',
+                'px-2 py-0.5 rounded-full'
+              )}>
+                <BarChart2 size={9} strokeWidth={2.5} />
+                {usage_count} שימושים
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -296,10 +323,10 @@ function TemplateCard({
       </div>
 
       {/* Content preview */}
-      {plainContent && (
+      {preview && (
         <div className="px-5 pb-3 flex-1">
-          <p className="text-xs text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-4">
-            {plainContent}
+          <p className="text-xs text-[var(--text-secondary)] font-heebo leading-relaxed">
+            {preview}
           </p>
         </div>
       )}
@@ -321,7 +348,7 @@ function TemplateCard({
               onClick={onDeleteCancel}
               className="text-xs font-heebo text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              ביטול
+              בטל
             </button>
             <button
               type="button"
@@ -348,5 +375,211 @@ function TemplateCard({
         )}
       </div>
     </div>
+  );
+}
+
+// ── Create / Edit modal ────────────────────────────────────────────────────────
+
+function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
+  const isEdit = Boolean(existingTemplate);
+
+  const titleId = useId();
+  const contentId = useId();
+  const shortcutId = useId();
+
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [shortcut, setShortcut] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Populate fields when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEdit && existingTemplate) {
+      setTitle(existingTemplate.title ?? '');
+      setShortcut(existingTemplate.shortcut ?? '');
+      // Strip HTML tags for plain-text display
+      const plain = existingTemplate.content
+        ? existingTemplate.content.replace(/<[^>]*>/g, '').trim()
+        : '';
+      setContent(plain);
+    } else {
+      setTitle('');
+      setContent('');
+      setShortcut('');
+    }
+    setError(null);
+  }, [isOpen, isEdit, existingTemplate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      setError('יש להזין כותרת לתבנית.');
+      return;
+    }
+    if (!content.trim()) {
+      setError('יש להזין תוכן לתבנית.');
+      return;
+    }
+
+    setError(null);
+    setSaving(true);
+
+    const payload = {
+      title: title.trim(),
+      content: content.trim(),
+      ...(shortcut.trim() ? { shortcut: shortcut.trim().replace(/^\//, '') } : {}),
+    };
+
+    try {
+      if (isEdit) {
+        const tid = existingTemplate._id ?? existingTemplate.id;
+        await put(`/rabbis/templates/${tid}`, payload);
+      } else {
+        await post('/rabbis/templates', payload);
+      }
+      onSuccess?.();
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'שגיאה בשמירת התבנית. אנא נסה שוב.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = clsx(
+    'w-full px-3 py-2',
+    'text-sm font-heebo text-[var(--text-primary)]',
+    'bg-[var(--bg-surface-raised)]',
+    'border border-[var(--border-default)] rounded-md',
+    'placeholder:text-[var(--text-muted)]',
+    'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent',
+    'transition-colors duration-150'
+  );
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEdit ? 'עריכת תבנית' : 'תבנית חדשה'}
+      size="md"
+      closeOnBackdrop={!saving}
+      footer={
+        <div className="flex items-center justify-start gap-3 flex-wrap" dir="rtl">
+          <Button
+            variant="primary"
+            size="md"
+            loading={saving}
+            onClick={handleSubmit}
+            type="submit"
+          >
+            שמור
+          </Button>
+          <Button
+            variant="ghost"
+            size="md"
+            disabled={saving}
+            onClick={onClose}
+          >
+            בטל
+          </Button>
+        </div>
+      }
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+        dir="rtl"
+        noValidate
+      >
+        {/* Title */}
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor={titleId}
+            className="text-sm font-medium font-heebo text-[var(--text-primary)]"
+          >
+            כותרת <span className="text-red-500">*</span>
+          </label>
+          <input
+            id={titleId}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="למשל: ברכה לאחר הסעודה..."
+            dir="rtl"
+            maxLength={120}
+            className={inputClass}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor={contentId}
+              className="text-sm font-medium font-heebo text-[var(--text-primary)]"
+            >
+              תוכן <span className="text-red-500">*</span>
+            </label>
+            <span className="text-xs text-[var(--text-muted)] font-heebo tabular-nums">
+              {content.length.toLocaleString('he-IL')} תווים
+            </span>
+          </div>
+          <textarea
+            id={contentId}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="הקלד את תוכן התבנית כאן..."
+            dir="rtl"
+            rows={8}
+            className={clsx(inputClass, 'resize-y leading-relaxed')}
+          />
+        </div>
+
+        {/* Shortcut */}
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor={shortcutId}
+            className="text-sm font-medium font-heebo text-[var(--text-primary)]"
+          >
+            קיצור דרך{' '}
+            <span className="text-xs font-normal text-[var(--text-muted)]">(אופציונלי)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute top-1/2 -translate-y-1/2 end-3 text-[var(--text-muted)] text-sm font-mono select-none pointer-events-none">
+              /
+            </span>
+            <input
+              id={shortcutId}
+              type="text"
+              value={shortcut}
+              onChange={(e) => {
+                // strip leading slash if user types it
+                setShortcut(e.target.value.replace(/^\//, ''));
+              }}
+              placeholder="שבת"
+              dir="ltr"
+              maxLength={30}
+              className={clsx(inputClass, 'pe-7 text-left')}
+            />
+          </div>
+          <p className="text-xs text-[var(--text-muted)] font-heebo">
+            קיצור דרך מאפשר הכנסת התבנית מהיר בעורך התשובה.
+          </p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400 font-heebo">
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   );
 }

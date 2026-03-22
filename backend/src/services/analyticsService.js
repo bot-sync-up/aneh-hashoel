@@ -35,6 +35,12 @@ async function getDashboardStats() {
     periodResult,
     topRabbisResult,
     discussionsResult,
+    weeklyActivityResult,
+    categoryResult,
+    answeredTodayResult,
+    avgResponseResult,
+    activeRabbisResult,
+    thanksResult,
   ] = await Promise.all([
     // Status breakdown + avg response time
     query(`
@@ -102,6 +108,79 @@ async function getDashboardStats() {
         )::int                                                        AS recently_active
       FROM discussions d
     `),
+
+    // Weekly activity: last 7 days question counts per day
+    query(`
+      WITH date_series AS (
+        SELECT generate_series(
+          CURRENT_DATE - 6,
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        )::date AS day
+      ),
+      daily_counts AS (
+        SELECT
+          DATE(created_at AT TIME ZONE 'Asia/Jerusalem') AS day,
+          COUNT(*)::int                                  AS count
+        FROM   questions
+        WHERE  created_at >= (CURRENT_DATE - 6)::timestamptz
+          AND  status != 'hidden'
+        GROUP  BY day
+      )
+      SELECT
+        ds.day::text              AS date,
+        COALESCE(dc.count, 0)    AS count
+      FROM   date_series ds
+      LEFT JOIN daily_counts dc ON dc.day = ds.day
+      ORDER  BY ds.day ASC
+    `),
+
+    // Category breakdown
+    query(`
+      SELECT
+        COALESCE(c.name, 'כללי') AS category,
+        COUNT(q.id)::int          AS count
+      FROM      questions q
+      LEFT JOIN categories c ON c.id = q.category_id
+      WHERE     q.status != 'hidden'
+      GROUP BY  c.name
+      ORDER BY  count DESC
+    `),
+
+    // Answered today
+    query(`
+      SELECT COUNT(*)::int AS count
+      FROM   questions
+      WHERE  status = 'answered'
+        AND  DATE(answered_at AT TIME ZONE 'Asia/Jerusalem') = CURRENT_DATE
+    `),
+
+    // Avg response time in minutes (rounded)
+    query(`
+      SELECT COALESCE(
+        ROUND(AVG(EXTRACT(EPOCH FROM (answered_at - created_at)) / 60.0))::int,
+        0
+      ) AS avg_minutes
+      FROM questions
+      WHERE status = 'answered'
+        AND answered_at IS NOT NULL
+        AND answered_at > created_at
+    `),
+
+    // Active rabbis in last 7 days (had assigned question activity)
+    query(`
+      SELECT COUNT(DISTINCT assigned_rabbi_id)::int AS count
+      FROM   questions
+      WHERE  updated_at >= NOW() - INTERVAL '7 days'
+        AND  assigned_rabbi_id IS NOT NULL
+    `),
+
+    // Total thanks
+    query(`
+      SELECT COALESCE(SUM(thank_count), 0)::int AS total_thanks
+      FROM   questions
+      WHERE  status = 'answered'
+    `),
   ]);
 
   const statusRow     = statusResult.rows[0];
@@ -117,30 +196,81 @@ async function getDashboardStats() {
     WHERE  last_seen >= NOW() - INTERVAL '5 minutes'
   `);
 
+  const totalQuestions  = parseInt(statusRow.total,      10);
+  const pending         = parseInt(statusRow.pending,    10);
+  const inProcess       = parseInt(statusRow.in_process, 10);
+  const answered        = parseInt(statusRow.answered,   10);
+  const hidden          = parseInt(statusRow.hidden,     10);
+  const avgResponseHours = parseFloat(statusRow.avg_response_hours);
+  const onlineRabbis    = onlineRows[0].online_count;
+  const totalThanks     = thanksResult.rows[0].total_thanks;
+  const answeredToday   = answeredTodayResult.rows[0].count;
+  const avgResponseTime = avgResponseResult.rows[0].avg_minutes; // minutes
+  const activeRabbis    = activeRabbisResult.rows[0].count;
+
+  const weeklyActivity = weeklyActivityResult.rows.map((r) => ({
+    date:  r.date,
+    count: r.count,
+  }));
+
+  const categoryBreakdown = categoryResult.rows.map((r) => ({
+    category: r.category,
+    count:    r.count,
+  }));
+
+  const topRabbisThisWeek = topRabbisResult.rows.map((r) => ({
+    id:              r.id,
+    name:            r.name,
+    photoUrl:        r.photo_url,
+    answersThisWeek: r.answers_this_week,
+    thanksThisWeek:  r.thanks_this_week,
+  }));
+
   return {
+    // ── Flat fields used by extractAdminStats() in the frontend ──
+    totalQuestions,
+    totalPending:        pending,
+    pendingCount:        pending,
+    totalInProcess:      inProcess,
+    inProcessCount:      inProcess,
+    totalAnswered:       answered,
+    answeredToday,
+    answeredThisWeek:    parseInt(periodRow.this_week,  10),
+    answeredThisMonth:   parseInt(periodRow.this_month, 10),
+    avgResponseTime,                        // minutes
+    avgResponseHours,                       // hours (legacy)
+    avgResponseTimeLabel: avgResponseTime > 0
+      ? (avgResponseTime < 60
+          ? `${avgResponseTime}ד'`
+          : `${Math.round(avgResponseTime / 60)}ש'`)
+      : '—',
+    activeRabbis,
+    onlineRabbis,
+    totalThanks,
+
+    // ── Chart data ──
+    weeklyActivity,                         // [{ date, count }] — last 7 days
+    weeklyChart:     weeklyActivity,        // alias
+    questionsPerDay: weeklyActivity,        // alias
+    categoryBreakdown,                      // [{ category, count }]
+    categories:      categoryBreakdown,     // alias
+
+    // ── Legacy nested structure (preserved for backwards compat) ──
     questions: {
-      total:           parseInt(statusRow.total,      10),
-      pending:         parseInt(statusRow.pending,    10),
-      inProcess:       parseInt(statusRow.in_process, 10),
-      answered:        parseInt(statusRow.answered,   10),
-      hidden:          parseInt(statusRow.hidden,     10),
-      today:           parseInt(periodRow.today,      10),
-      thisWeek:        parseInt(periodRow.this_week,  10),
-      thisMonth:       parseInt(periodRow.this_month, 10),
+      total:     totalQuestions,
+      pending,
+      inProcess,
+      answered,
+      hidden,
+      today:     parseInt(periodRow.today,      10),
+      thisWeek:  parseInt(periodRow.this_week,  10),
+      thisMonth: parseInt(periodRow.this_month, 10),
     },
-    avgResponseHours:  parseFloat(statusRow.avg_response_hours),
-    topRabbisThisWeek: topRabbisResult.rows.map((r) => ({
-      id:             r.id,
-      name:           r.name,
-      photoUrl:       r.photo_url,
-      answersThisWeek: r.answers_this_week,
-      thanksThisWeek:  r.thanks_this_week,
-    })),
+    topRabbisThisWeek,
     discussions: {
-      activeCount:     discussionRow.active_count,
-      recentlyActive:  discussionRow.recently_active,
+      activeCount:    discussionRow.active_count,
+      recentlyActive: discussionRow.recently_active,
     },
-    onlineRabbis:      onlineRows[0].online_count,
   };
 }
 

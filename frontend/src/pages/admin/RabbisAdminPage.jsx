@@ -11,6 +11,8 @@ import {
   ChevronDown,
   Trash2,
   Users,
+  X,
+  Save,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -41,6 +43,171 @@ const ROLE_CONFIG = {
 function RoleBadge({ role }) {
   const cfg = ROLE_CONFIG[role] || { label: role, status: 'default' };
   return <Badge status={cfg.status} label={cfg.label} withDot />;
+}
+
+// ─── Edit Rabbi Modal ──────────────────────────────────────────────────────
+function EditRabbiModal({ rabbi, onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: rabbi.name || '',
+    email: rabbi.email || '',
+    phone: rabbi.phone || '',
+    display_name: rabbi.display_name || '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name || !form.email) { setError('שם ואימייל נדרשים'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const data = await patch(`/admin/rabbis/${rabbi.id}`, form);
+      onSave({ ...rabbi, ...form, ...(data.rabbi || {}) });
+    } catch (err) {
+      setError(err?.message || 'שגיאה בעדכון');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">עריכת פרטי רב</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">שם מלא *</label>
+            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">שם תצוגה</label>
+            <Input value={form.display_name} onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))} placeholder="שם לתצוגה ציבורית" />
+          </div>
+          <div>
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">אימייל *</label>
+            <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">טלפון</label>
+            <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="050-0000000" />
+          </div>
+          {error && <p className="text-sm text-red-500 font-heebo">{error}</p>}
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-heebo border border-[var(--border-default)] hover:bg-[var(--bg-muted)]">בטל</button>
+            <Button variant="primary" type="submit" loading={loading} leftIcon={<Save size={14} />}>שמור</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Change Role Modal ─────────────────────────────────────────────────────
+function ChangeRoleModal({ rabbi, onClose, onSave }) {
+  const [role, setRole] = useState(rabbi.role || 'rabbi');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await patch(`/admin/rabbis/${rabbi.id}`, { role });
+      onSave({ ...rabbi, role });
+    } catch (err) {
+      setError(err?.message || 'שגיאה בעדכון');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">שינוי תפקיד — {rabbi.name}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            {[
+              { value: 'rabbi',  label: 'רב — יכול לראות ולענות שאלות' },
+              { value: 'senior', label: 'בכיר — עדיפות גבוהה בשאלות' },
+              { value: 'admin',  label: 'מנהל — גישה מלאה למערכת' },
+            ].map(opt => (
+              <label key={opt.value} className={clsx(
+                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                role === opt.value
+                  ? 'border-[#1B2B5E] bg-[#1B2B5E]/5'
+                  : 'border-[var(--border-default)] hover:bg-[var(--bg-muted)]'
+              )}>
+                <input type="radio" name="role" value={opt.value} checked={role === opt.value} onChange={() => setRole(opt.value)} className="accent-[#1B2B5E]" />
+                <div>
+                  <div className="font-heebo font-medium text-[var(--text-primary)] text-sm">{ROLE_CONFIG[opt.value]?.label}</div>
+                  <div className="font-heebo text-xs text-[var(--text-muted)]">{opt.label.split(' — ')[1]}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+          {error && <p className="text-sm text-red-500 font-heebo">{error}</p>}
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-heebo border border-[var(--border-default)] hover:bg-[var(--bg-muted)]">בטל</button>
+            <Button variant="primary" type="submit" loading={loading} leftIcon={<Shield size={14} />}>עדכן תפקיד</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Audit Log Modal ───────────────────────────────────────────────────────
+function AuditLogModal({ rabbi, onClose }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    get(`/admin/audit?entity_type=rabbi&entity_id=${rabbi.id}&limit=20`)
+      .then(data => setLogs(Array.isArray(data) ? data : data.logs ?? []))
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
+  }, [rabbi.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">יומן פעילות — {rabbi.name}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
+        </div>
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="skeleton h-12 rounded" />)}</div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-12 text-[var(--text-muted)] font-heebo">אין רישומי פעילות</div>
+          ) : (
+            <div className="space-y-2">
+              {logs.map((log, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--bg-muted)] text-sm font-heebo">
+                  <div className="flex-1">
+                    <div className="font-medium text-[var(--text-primary)]">{log.action || log.action_type}</div>
+                    {log.details && <div className="text-xs text-[var(--text-muted)] mt-0.5">{typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}</div>}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] whitespace-nowrap">
+                    {log.created_at ? new Date(log.created_at).toLocaleString('he-IL') : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Row actions dropdown ──────────────────────────────────────────────────
@@ -110,6 +277,9 @@ export default function RabbisAdminPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editRabbi, setEditRabbi] = useState(null);
+  const [changeRoleRabbi, setChangeRoleRabbi] = useState(null);
+  const [auditRabbi, setAuditRabbi] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -124,8 +294,7 @@ export default function RabbisAdminPage() {
       const data = await get('/admin/rabbis');
       setRabbis(Array.isArray(data) ? data : data.rabbis ?? []);
     } catch {
-      // Use demo data if API is unavailable
-      setRabbis(DEMO_RABBIS);
+      setRabbis([]);
     } finally {
       setLoading(false);
     }
@@ -167,6 +336,18 @@ export default function RabbisAdminPage() {
     }
   };
 
+  const handleEditSave = (updated) => {
+    setRabbis(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+    setEditRabbi(null);
+    showToast('הפרטים עודכנו בהצלחה');
+  };
+
+  const handleRoleSave = (updated) => {
+    setRabbis(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+    setChangeRoleRabbi(null);
+    showToast('התפקיד עודכן בהצלחה');
+  };
+
   const handleBulkDeactivate = async () => {
     setBulkLoading(true);
     try {
@@ -193,6 +374,17 @@ export default function RabbisAdminPage() {
         >
           {toast.msg}
         </div>
+      )}
+
+      {/* Modals */}
+      {editRabbi && (
+        <EditRabbiModal rabbi={editRabbi} onClose={() => setEditRabbi(null)} onSave={handleEditSave} />
+      )}
+      {changeRoleRabbi && (
+        <ChangeRoleModal rabbi={changeRoleRabbi} onClose={() => setChangeRoleRabbi(null)} onSave={handleRoleSave} />
+      )}
+      {auditRabbi && (
+        <AuditLogModal rabbi={auditRabbi} onClose={() => setAuditRabbi(null)} />
       )}
 
       {/* Header */}
@@ -333,7 +525,12 @@ export default function RabbisAdminPage() {
                         <div className="w-8 h-8 rounded-full bg-[#1B2B5E] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {rabbi.name?.charAt(0) ?? '?'}
                         </div>
-                        <span className="font-medium text-[var(--text-primary)]">{rabbi.name}</span>
+                        <div>
+                          <div className="font-medium text-[var(--text-primary)]">{rabbi.name}</div>
+                          {rabbi.display_name && rabbi.display_name !== rabbi.name && (
+                            <div className="text-xs text-[var(--text-muted)]">{rabbi.display_name}</div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-secondary)]">{rabbi.email}</td>
@@ -358,10 +555,10 @@ export default function RabbisAdminPage() {
                     <td className="px-4 py-3">
                       <RowActions
                         rabbi={rabbi}
-                        onEdit={() => {}}
+                        onEdit={() => setEditRabbi(rabbi)}
                         onToggleActive={() => handleToggleActive(rabbi)}
-                        onChangeRole={() => {}}
-                        onAuditLog={() => {}}
+                        onChangeRole={() => setChangeRoleRabbi(rabbi)}
+                        onAuditLog={() => setAuditRabbi(rabbi)}
                       />
                     </td>
                   </tr>
@@ -380,12 +577,3 @@ export default function RabbisAdminPage() {
     </div>
   );
 }
-
-// ─── Demo data (fallback) ──────────────────────────────────────────────────
-const DEMO_RABBIS = [
-  { id: 1, name: 'הרב אברהם כהן', email: 'avraham@merkaz.org', role: 'senior', isActive: true, answersThisMonth: 42, lastLogin: '2026-03-15' },
-  { id: 2, name: 'הרב יוסף לוי', email: 'yosef@merkaz.org', role: 'rabbi', isActive: true, answersThisMonth: 28, lastLogin: '2026-03-14' },
-  { id: 3, name: 'הרב שמואל גרינברג', email: 'shmuel@merkaz.org', role: 'rabbi', isActive: false, answersThisMonth: 0, lastLogin: '2026-02-10' },
-  { id: 4, name: 'הרב דוד פרידמן', email: 'david@merkaz.org', role: 'admin', isActive: true, answersThisMonth: 15, lastLogin: '2026-03-16' },
-  { id: 5, name: 'הרב משה הורוויץ', email: 'moshe@merkaz.org', role: 'rabbi', isActive: true, answersThisMonth: 33, lastLogin: '2026-03-13' },
-];

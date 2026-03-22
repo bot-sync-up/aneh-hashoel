@@ -200,6 +200,46 @@ router.post('/rabbis', async (req, res) => {
 });
 
 /**
+ * PATCH /admin/rabbis/:id
+ * Update rabbi fields: name, email, phone, display_name, role, isActive.
+ */
+router.patch('/rabbis/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, display_name, role, isActive } = req.body;
+
+    const { rows } = await dbQuery('SELECT id FROM rabbis WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'רב לא נמצא' });
+
+    const fields = [];
+    const vals = [];
+    let idx = 1;
+
+    if (name !== undefined)         { fields.push(`name = $${idx++}`);         vals.push(name); }
+    if (email !== undefined)        { fields.push(`email = $${idx++}`);        vals.push(email); }
+    if (phone !== undefined)        { fields.push(`phone = $${idx++}`);        vals.push(phone); }
+    if (display_name !== undefined) { fields.push(`display_name = $${idx++}`); vals.push(display_name); }
+    if (role !== undefined)         { fields.push(`role = $${idx++}`);         vals.push(role); }
+    if (isActive !== undefined)     { fields.push(`is_active = $${idx++}`);    vals.push(Boolean(isActive)); }
+
+    if (!fields.length) return res.status(400).json({ error: 'אין שדות לעדכון' });
+
+    vals.push(id);
+    const { rows: updated } = await dbQuery(
+      `UPDATE rabbis SET ${fields.join(', ')}, updated_at = NOW()
+       WHERE id = $${idx}
+       RETURNING id, name, email, phone, display_name, role, is_active`,
+      vals
+    );
+
+    return res.json({ ok: true, rabbi: updated[0] });
+  } catch (err) {
+    console.error('[admin] PATCH /rabbis/:id error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
  * PUT /admin/rabbis/:id/toggle-status
  * Activate or deactivate a rabbi.
  * Body: { active: boolean }  — or infer from current state when omitted.

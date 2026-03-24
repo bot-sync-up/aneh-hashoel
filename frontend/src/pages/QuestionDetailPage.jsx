@@ -25,6 +25,7 @@ import Button from '../components/ui/Button';
 import { BlockSpinner } from '../components/ui/Spinner';
 import ClaimConfirmModal from '../components/questions/ClaimConfirmModal';
 import AnswerEditorAdvanced from '../components/answer/AnswerEditor';
+import EditAnswerEditor from '../components/answer/EditAnswerEditor';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
 import TransferModal from '../components/questions/TransferModal';
 import { get, post, put } from '../lib/api';
@@ -400,16 +401,28 @@ export default function QuestionDetailPage() {
                 </button>
               </div>
               <div className="p-4">
-                <AnswerEditorAdvanced
-                  questionId={id}
-                  existingAnswer={isAnswered ? (answer || '') : (question.answer_draft || '')}
-                  onSave={({ publishNow }) => {
-                    if (publishNow) {
+                {isAnswered ? (
+                  <EditAnswerEditor
+                    questionId={id}
+                    existingAnswer={answer || ''}
+                    updatedAt={question.updated_at || question.answered_at}
+                    onSave={() => {
                       fetchQuestion();
                       setShowAnswerModal(false);
-                    }
-                  }}
-                />
+                    }}
+                  />
+                ) : (
+                  <AnswerEditorAdvanced
+                    questionId={id}
+                    existingAnswer={question.answer_draft || ''}
+                    onSave={({ publishNow }) => {
+                      if (publishNow) {
+                        fetchQuestion();
+                        setShowAnswerModal(false);
+                      }
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>

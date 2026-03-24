@@ -4,20 +4,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import api from '../../lib/api';
 
-// Available template categories
-const CATEGORIES = [
-  'נישואין',
-  'גירושין',
-  'שבת',
-  'כשרות',
-  'אבלות',
-  'תפילה',
-  'מועדים',
-  'ברכות',
-  'ממון',
-  'משפחה',
-  'אחר',
-];
+// Categories are fetched from the DB on first render
 
 /**
  * SaveTemplateModal
@@ -50,6 +37,23 @@ export default function SaveTemplateModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(false);
+
+  // ── Load categories from DB ────────────────────────────────────────────────
+  const [categories, setCategories] = useState([]);
+  useEffect(() => {
+    api.get('/categories')
+      .then(({ data }) => {
+        // Flatten tree: take all nodes (parents + children)
+        const flat = [];
+        const walk = (nodes) => nodes?.forEach((n) => {
+          flat.push(n);
+          if (n.children?.length) walk(n.children);
+        });
+        walk(data?.categories ?? data ?? []);
+        setCategories(flat.map((c) => ({ id: c.id, name: c.name })));
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Populate fields ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -223,9 +227,9 @@ export default function SaveTemplateModal({
             )}
           >
             <option value="">ללא קטגוריה</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
               </option>
             ))}
           </select>

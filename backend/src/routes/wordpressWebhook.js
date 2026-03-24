@@ -108,6 +108,8 @@ function normaliseWebhookPayload(body) {
     urgency:       meta.urgency           || src.urgency       || 'normal',
     questionStatus:meta.status            || null,              // WP custom status field
     assignedRabbi: meta.assigned_rabbi_name || null,
+    attachmentUrl: meta['ask-visitor-img'] || meta['visitor_image'] || meta.attachment_url || src.attachment_url || null,
+    wpLink:        src.link || src.guid?.rendered || null,
   };
 }
 
@@ -173,14 +175,16 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
   let question;
   try {
     question = await createFromWebhook({
-      title:       payload.title,
-      content:     payload.content,
-      asker_name:  payload.askerName,
-      asker_email: payload.askerEmail,
-      asker_phone: payload.askerPhone,
-      urgency:     payload.urgency,
-      source:      'wordpress',
-      wp_post_id:  payload.wpPostId,
+      title:          payload.title,
+      content:        payload.content,
+      asker_name:     payload.askerName,
+      asker_email:    payload.askerEmail,
+      asker_phone:    payload.askerPhone,
+      urgency:        payload.urgency,
+      source:         'wordpress',
+      wp_post_id:     payload.wpPostId,
+      attachment_url: payload.attachmentUrl,
+      wp_link:        payload.wpLink,
       // category_id resolved from slug if needed — service handles null gracefully
     });
   } catch (createErr) {

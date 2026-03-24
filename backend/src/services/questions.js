@@ -217,9 +217,9 @@ async function createFromWebhook(data) {
   const result = await query(
     `INSERT INTO questions
        (title, content, asker_name, asker_email, asker_phone,
-        category_id, urgency, status, source, wp_post_id, attachment_url)
+        category_id, urgency, status, source, wp_post_id, attachment_url, wp_link)
      VALUES
-       ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10)
+       ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11)
      RETURNING *`,
     [
       data.title.trim(),
@@ -232,6 +232,7 @@ async function createFromWebhook(data) {
       data.source || 'wordpress',
       data.wp_post_id || null,
       data.attachment_url || null,
+      data.wp_link || null,
     ]
   );
 

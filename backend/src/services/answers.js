@@ -193,7 +193,11 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
       console.error('[answers] שגיאה בשליחת התראה לשואל:', err.message);
     });
   } else {
-    console.info(`[answers] תשובה פרטית — WP sync ושליחת מייל לשואל דולגו (questionId: ${questionId})`);
+    console.info(`[answers] תשובה פרטית — WP sync דולג, שולח מייל עם תוכן התשובה (questionId: ${questionId})`);
+    // Private answer: send email with answer content (no WP sync)
+    getNotificationService().notifyAskerPrivateAnswer(questionId).catch((err) => {
+      console.error('[answers] שגיאה בשליחת מייל תשובה פרטית לשואל:', err.message);
+    });
   }
 
   return answer;

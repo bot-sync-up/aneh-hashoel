@@ -121,6 +121,7 @@ async function syncPendingQuestions(io = null) {
       wp_post_id:     wpPostId,
       attachment_url: null, // resolved below from attachment ID if present
       _attachmentId:  meta['ask-visitor-img'] || null,
+      wp_link:        wpQ.link || null,
     };
 
     if (!questionData.title || !questionData.content) {

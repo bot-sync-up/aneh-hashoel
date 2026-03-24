@@ -64,9 +64,9 @@ function _parsePreferences(pref) {
   if (typeof pref === 'string') {
     const lower = pref.toLowerCase().trim();
     return {
-      email:    lower === 'email'    || lower === 'both',
-      whatsapp: lower === 'whatsapp' || lower === 'both',
-      push:     lower === 'push',
+      email:    lower === 'email' || lower === 'both' || lower === 'all',
+      whatsapp: lower === 'whatsapp' || lower === 'both' || lower === 'all',
+      push:     lower === 'push' || lower === 'all',
     };
   }
 

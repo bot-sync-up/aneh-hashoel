@@ -191,6 +191,27 @@ router.get('/stats/overview', authenticate, requireAdmin, async (req, res, next)
   }
 });
 
+// ─── GET /counts — sidebar badge counts ──────────────────────────────────────
+
+router.get('/counts', authenticate, async (req, res, next) => {
+  try {
+    const rabbiId = req.rabbi.id;
+    const { rows } = await require('../db').query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'pending')                              AS pending_count,
+         COUNT(*) FILTER (WHERE status = 'in_process' AND assigned_rabbi_id = $1) AS my_open_count
+       FROM questions`,
+      [rabbiId]
+    );
+    return res.json({
+      pendingCount: parseInt(rows[0].pending_count, 10),
+      myOpenCount:  parseInt(rows[0].my_open_count,  10),
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── GET /:id — single question ───────────────────────────────────────────────
 
 /**

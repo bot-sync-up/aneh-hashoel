@@ -63,8 +63,8 @@ export default function QuestionsPage() {
 
   const buildParams = (f) => {
     const params = { page: f.page, limit: PAGE_SIZE };
-    // "שאלות פתוחות" never shows answered questions
-    params.status = f.status || 'pending,in_process';
+    // "שאלות פתוחות" = only unclaimed pending questions
+    params.status = f.status || 'pending';
     if (f.category) params.category = f.category;
     if (f.search) params.search = f.search;
     if (f.is_urgent) params.is_urgent = true;

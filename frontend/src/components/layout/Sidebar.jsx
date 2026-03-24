@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSocket } from '../../contexts/SocketContext';
+import { get } from '../../lib/api';
 import Avatar from '../ui/Avatar';
 import Tooltip from '../ui/Tooltip';
 
@@ -78,7 +80,28 @@ const COLLAPSED_KEY = 'sidebar_collapsed';
 function Sidebar({ notificationCount = 0 }) {
   const { rabbi, logout, isAdmin } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { on } = useSocket();
   const location = useLocation();
+
+  const [pendingCount, setPendingCount] = useState(0);
+  const [myOpenCount, setMyOpenCount] = useState(0);
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const data = await get('/questions/counts');
+      setPendingCount(data.pendingCount ?? 0);
+      setMyOpenCount(data.myOpenCount ?? 0);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchCounts();
+    const offNew      = on('question:new',      fetchCounts);
+    const offClaimed  = on('question:claimed',  fetchCounts);
+    const offReleased = on('question:released', fetchCounts);
+    const offAnswered = on('question:answered', fetchCounts);
+    return () => { offNew(); offClaimed(); offReleased(); offAnswered(); };
+  }, [fetchCounts, on]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -178,7 +201,9 @@ function Sidebar({ notificationCount = 0 }) {
               item={item}
               collapsed={collapsed}
               notificationCount={
-                item.badge ? notificationCount : 0
+                item.to === '/my-questions'  ? myOpenCount  :
+                item.to === '/questions'     ? pendingCount :
+                item.badge                  ? notificationCount : 0
               }
             />
           ))}
@@ -291,6 +316,9 @@ function Sidebar({ notificationCount = 0 }) {
 function NavItem({ item, collapsed, notificationCount = 0 }) {
   const Icon = item.icon;
   const hasNotif = notificationCount > 0;
+  // notification items use red; question count items use gold
+  const isQCount = item.to === '/my-questions' || item.to === '/questions';
+  const badgeBg = isQCount ? 'bg-brand-gold text-brand-navy' : 'bg-red-500 text-white';
 
   const linkContent = (
     <NavLink
@@ -326,7 +354,7 @@ function NavItem({ item, collapsed, notificationCount = 0 }) {
             className={clsx(
               'absolute -top-1 -right-1',
               'min-w-[14px] h-3.5 rounded-full',
-              'bg-red-500 text-white',
+              badgeBg,
               'text-[9px] font-bold font-heebo',
               'flex items-center justify-center px-0.5',
               'notification-dot'
@@ -346,7 +374,7 @@ function NavItem({ item, collapsed, notificationCount = 0 }) {
             <span
               className={clsx(
                 'min-w-[20px] h-5 rounded-full px-1',
-                'bg-red-500 text-white',
+                badgeBg,
                 'text-xs font-bold font-heebo',
                 'flex items-center justify-center',
                 'flex-shrink-0'

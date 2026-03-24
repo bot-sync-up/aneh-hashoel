@@ -41,9 +41,9 @@ function Toggle({
   };
 
   const thumbTranslate = {
-    sm: checked ? 'translate-x-4' : 'translate-x-0.5',
-    md: checked ? 'translate-x-5' : 'translate-x-0.5',
-    lg: checked ? 'translate-x-7' : 'translate-x-0.5',
+    sm: checked ? '-translate-x-4' : '-translate-x-0.5',
+    md: checked ? '-translate-x-5' : '-translate-x-0.5',
+    lg: checked ? '-translate-x-7' : '-translate-x-0.5',
   };
 
   const handleKeyDown = (e) => {

@@ -344,6 +344,32 @@ function CategoriesTab({ rabbi }) {
   );
 }
 
+// ── PwField — defined OUTSIDE SecurityTab to prevent remount on every render ──
+
+function PwField({ id, field, showKey, label, autoComplete, form, errors, showPw, onToggle, onChange }) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-semibold font-heebo text-[var(--text-primary)] mb-1">{label}</label>
+      <div className="relative">
+        <input id={id} type={showPw[showKey] ? 'text' : 'password'} value={form[field]}
+          onChange={(e) => onChange(field, e.target.value)} autoComplete={autoComplete} dir="ltr"
+          className={clsx(
+            'block w-full px-3 py-2 pe-10 rounded-lg border text-sm font-heebo',
+            'bg-[var(--bg-surface)] text-[var(--text-primary)]',
+            'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold transition-colors duration-150',
+            errors[field] ? 'border-red-400 dark:border-red-600' : 'border-[var(--border-default)]'
+          )} />
+        <button type="button" tabIndex={-1} onClick={() => onToggle(showKey)}
+          aria-label={showPw[showKey] ? 'הסתר סיסמה' : 'הצג סיסמה'}
+          className="absolute inset-y-0 left-0 px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          {showPw[showKey] ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+        </button>
+      </div>
+      {errors[field] && <p className="mt-1 text-xs text-red-500 font-heebo" role="alert">{errors[field]}</p>}
+    </div>
+  );
+}
+
 // ── Security Tab ──────────────────────────────────────────────────────────────
 
 function SecurityTab() {
@@ -392,28 +418,6 @@ function SecurityTab() {
     }
   };
 
-  const PwField = ({ id, field, showKey, label, autoComplete }) => (
-    <div>
-      <label htmlFor={id} className="block text-sm font-semibold font-heebo text-[var(--text-primary)] mb-1">{label}</label>
-      <div className="relative">
-        <input id={id} type={showPw[showKey] ? 'text' : 'password'} value={form[field]}
-          onChange={(e) => handleChange(field, e.target.value)} autoComplete={autoComplete} dir="ltr"
-          className={clsx(
-            'block w-full px-3 py-2 pe-10 rounded-lg border text-sm font-heebo',
-            'bg-[var(--bg-surface)] text-[var(--text-primary)]',
-            'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold transition-colors duration-150',
-            errors[field] ? 'border-red-400 dark:border-red-600' : 'border-[var(--border-default)]'
-          )} />
-        <button type="button" tabIndex={-1} onClick={() => toggle(showKey)}
-          aria-label={showPw[showKey] ? 'הסתר סיסמה' : 'הצג סיסמה'}
-          className="absolute inset-y-0 left-0 px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-          {showPw[showKey] ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-        </button>
-      </div>
-      {errors[field] && <p className="mt-1 text-xs text-red-500 font-heebo" role="alert">{errors[field]}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-6" dir="rtl">
       <Card header={<Card.Title>שינוי סיסמה</Card.Title>}>
@@ -423,9 +427,9 @@ function SecurityTab() {
               {errors.global}
             </div>
           )}
-          <PwField id="cpw" field="currentPassword" showKey="current" label="סיסמה נוכחית" autoComplete="current-password" />
-          <PwField id="npw" field="newPassword" showKey="newPw" label="סיסמה חדשה" autoComplete="new-password" />
-          <PwField id="cpw2" field="confirmPassword" showKey="confirm" label="אימות סיסמה" autoComplete="new-password" />
+          <PwField id="cpw" field="currentPassword" showKey="current" label="סיסמה נוכחית" autoComplete="current-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
+          <PwField id="npw" field="newPassword" showKey="newPw" label="סיסמה חדשה" autoComplete="new-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
+          <PwField id="cpw2" field="confirmPassword" showKey="confirm" label="אימות סיסמה" autoComplete="new-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit" variant="primary" size="md" loading={saving} leftIcon={<Save className="w-4 h-4" />}>
               עדכן סיסמה

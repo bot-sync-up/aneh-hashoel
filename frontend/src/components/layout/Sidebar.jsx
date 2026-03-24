@@ -148,29 +148,31 @@ function Sidebar({ notificationCount = 0 }) {
       {/* ── Brand header ── */}
       <div
         className={clsx(
-          'flex items-center h-16 px-4 flex-shrink-0',
+          'flex flex-col items-center flex-shrink-0',
           'border-b border-white/10',
-          collapsed ? 'justify-center' : 'justify-between'
+          collapsed ? 'py-3 px-2' : 'py-5 px-4'
         )}
       >
+        {/* Logo + text (expanded) */}
         {!collapsed && (
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-white p-1 shadow-sm">
+          <div className="flex flex-col items-center gap-2 w-full">
+            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 shadow-md flex-shrink-0">
               <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
             </div>
-            <div className="flex flex-col leading-tight overflow-hidden">
-              <span className="text-white font-bold text-base font-heebo truncate">
+            <div className="text-center leading-tight">
+              <span className="block text-white font-bold text-base font-heebo">
                 ענה את השואל
               </span>
-              <span className="text-white/50 text-[11px] font-heebo truncate">
+              <span className="block text-white/50 text-[11px] font-heebo mt-0.5">
                 פלטפורמת שאלות ותשובות
               </span>
             </div>
           </div>
         )}
 
+        {/* Logo only (collapsed) */}
         {collapsed && (
-          <div className="w-9 h-9 rounded-lg bg-white p-1 shadow-sm flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-md flex-shrink-0">
             <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
           </div>
         )}
@@ -181,10 +183,9 @@ function Sidebar({ notificationCount = 0 }) {
           aria-label={collapsed ? 'הרחב סרגל צד' : 'כווץ סרגל צד'}
           className={clsx(
             'hidden md:flex items-center justify-center',
-            'w-7 h-7 rounded-md',
+            'w-7 h-7 rounded-md mt-2',
             'text-white/60 hover:text-white hover:bg-white/10',
-            'transition-colors duration-150 flex-shrink-0',
-            collapsed && 'mt-0'
+            'transition-colors duration-150 flex-shrink-0'
           )}
         >
           {collapsed ? (

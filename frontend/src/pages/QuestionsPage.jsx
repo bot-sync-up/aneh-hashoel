@@ -21,7 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { truncate } from '../lib/utils';
 
 const DEFAULT_FILTERS = {
-  status: 'pending',
+  status: '',
   category: '',
   search: '',
   is_urgent: '',
@@ -63,8 +63,7 @@ export default function QuestionsPage() {
 
   const buildParams = (f) => {
     const params = { page: f.page, limit: PAGE_SIZE };
-    // "שאלות פתוחות" = only unclaimed pending questions
-    params.status = f.status || 'pending';
+    if (f.status) params.status = f.status;
     if (f.category) params.category = f.category;
     if (f.search) params.search = f.search;
     if (f.is_urgent) params.is_urgent = true;

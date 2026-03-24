@@ -166,20 +166,20 @@ function QuestionCard({
             size="xs"
             className="mr-auto"
           />
+
+          {/* Attachment indicator inline with status badge */}
+          {attachment_url && (
+            <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] font-heebo">
+              <Paperclip size={11} />
+              קובץ מצורף
+            </span>
+          )}
         </div>
 
         {/* Title */}
         <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy transition-colors">
           {truncatedTitle}
         </h3>
-
-        {/* Attachment indicator — icon only, full image shown in detail page */}
-        {attachment_url && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo mb-2">
-            <Paperclip size={12} />
-            קובץ מצורף
-          </span>
-        )}
 
         {/* Private notes snippet (only shown when rabbi owns it) */}
         {private_notes && isMe && (

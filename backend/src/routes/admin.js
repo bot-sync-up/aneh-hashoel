@@ -75,6 +75,48 @@ router.get('/dashboard/stats', async (req, res) => {
   }
 });
 
+// ─── GET /admin/dashboard/activity ───────────────────────────────────────────
+router.get('/dashboard/activity', async (req, res) => {
+  try {
+    const { rows } = await dbQuery(`
+      SELECT
+        TO_CHAR(d::date, 'DD/MM') AS date,
+        COUNT(q.id) FILTER (WHERE q.status != 'pending') AS questions,
+        COUNT(q.id) FILTER (WHERE q.status = 'answered') AS answers
+      FROM generate_series(
+        NOW() - INTERVAL '6 days', NOW(), INTERVAL '1 day'
+      ) AS d
+      LEFT JOIN questions q ON q.created_at::date = d::date
+      GROUP BY d ORDER BY d
+    `);
+    return res.json({ data: rows });
+  } catch (err) {
+    console.error('[admin] /dashboard/activity error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /admin/dashboard/categories/breakdown ───────────────────────────────
+router.get('/dashboard/categories/breakdown', async (req, res) => {
+  try {
+    const { rows } = await dbQuery(`
+      SELECT
+        COALESCE(c.name, 'כללי') AS name,
+        COUNT(q.id)::int AS value
+      FROM questions q
+      LEFT JOIN categories c ON c.id = q.category_id
+      WHERE q.created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY c.name
+      ORDER BY value DESC
+      LIMIT 10
+    `);
+    return res.json({ data: rows });
+  } catch (err) {
+    console.error('[admin] /dashboard/categories/breakdown error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // =============================================================================
 // ANALYTICS
 // =============================================================================

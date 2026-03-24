@@ -71,6 +71,30 @@ async function _ownTemplate(templateId, rabbiId) {
   return rows[0];
 }
 
+// ─── GET / — search/list rabbis ──────────────────────────────────────────────
+
+router.get('/', async (req, res, next) => {
+  try {
+    const { search = '', limit = 20 } = req.query;
+    const lim = Math.min(parseInt(limit, 10) || 20, 100);
+    const params = [];
+    let where = 'WHERE r.is_active = true';
+    if (search.trim()) {
+      params.push(`%${search.trim()}%`);
+      where += ` AND (r.name ILIKE $1 OR r.email ILIKE $1)`;
+    }
+    const { rows } = await query(
+      `SELECT id, name, email, role, photo_url, vacation_mode
+       FROM rabbis r
+       ${where}
+       ORDER BY r.name
+       LIMIT ${lim}`,
+      params
+    );
+    return res.json({ rabbis: rows });
+  } catch (err) { return next(err); }
+});
+
 // ─── GET /profile ─────────────────────────────────────────────────────────────
 
 /**

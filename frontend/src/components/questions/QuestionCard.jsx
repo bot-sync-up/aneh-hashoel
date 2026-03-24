@@ -173,25 +173,12 @@ function QuestionCard({
           {truncatedTitle}
         </h3>
 
-        {/* Attachment indicator */}
+        {/* Attachment indicator — icon only, full image shown in detail page */}
         {attachment_url && (
-          <a
-            href={attachment_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="block mb-2"
-            title="פתח קובץ מצורף"
-          >
-            {/\.(jpe?g|png|gif|webp)(\?|$)/i.test(attachment_url) ? (
-              <img src={attachment_url} alt="קובץ מצורף" className="max-h-32 rounded border border-gray-200 object-contain" />
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs text-brand-navy/70 hover:text-brand-navy hover:underline font-heebo">
-                <Paperclip size={12} />
-                קובץ מצורף
-              </span>
-            )}
-          </a>
+          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo mb-2">
+            <Paperclip size={12} />
+            קובץ מצורף
+          </span>
         )}
 
         {/* Private notes snippet (only shown when rabbi owns it) */}

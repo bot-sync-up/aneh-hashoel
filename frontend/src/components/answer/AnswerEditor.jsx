@@ -24,6 +24,8 @@ import Button from '../ui/Button';
 import Card from '../ui/Card';
 import Spinner from '../ui/Spinner';
 import PublishConfirmModal from './PublishConfirmModal';
+import TemplatesPanel from './TemplatesPanel';
+import SaveTemplateModal from './SaveTemplateModal';
 import api from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -186,6 +188,8 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
   const [saveError, setSaveError] = useState(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [templatesPanelOpen, setTemplatesPanelOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const autoSaveRef = useRef(null);
 
   const editor = useEditor({
@@ -349,11 +353,14 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
           <TB title="בצע שוב (Ctrl+Y)" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}><Redo2 size={14} strokeWidth={2} /></TB>
 
           <div className="flex-1" />
-          {onOpenTemplates && (
-            <button type="button" onClick={onOpenTemplates} className="inline-flex items-center gap-1.5 px-2 h-7 rounded text-xs font-heebo text-[var(--text-secondary)] border border-[var(--border-default)] hover:bg-[var(--bg-muted)] transition-colors">
-              <FileText size={12} /> תבניות
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setTemplatesPanelOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2 h-7 rounded text-xs font-heebo text-[var(--text-secondary)] border border-[var(--border-default)] hover:bg-[var(--bg-muted)] transition-colors"
+            title="הכנס תבנית"
+          >
+            <FileText size={12} /> תבניות
+          </button>
         </div>
 
         {/* ── TOOLBAR ROW 2: structure ── */}
@@ -438,7 +445,33 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="md" loading={savingDraft} onClick={handleSaveDraft}>שמור טיוטה</Button>
         <Button variant="secondary" size="md" onClick={() => setPublishModalOpen(true)} disabled={savingDraft || !charCount}>פרסם תשובה</Button>
+        {charCount > 0 && (
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => setSaveTemplateOpen(true)}
+            leftIcon={<FileText size={14} />}
+          >
+            שמור כתבנית
+          </Button>
+        )}
       </div>
+
+      {/* Templates slide-in panel */}
+      <TemplatesPanel
+        isOpen={templatesPanelOpen}
+        onClose={() => setTemplatesPanelOpen(false)}
+        editor={editor}
+        editorHtml={editor?.getHTML()}
+      />
+
+      {/* Save-as-template modal — prefills current editor content */}
+      <SaveTemplateModal
+        isOpen={saveTemplateOpen}
+        onClose={() => setSaveTemplateOpen(false)}
+        onSuccess={() => setSaveTemplateOpen(false)}
+        prefillContent={editor?.getHTML()}
+      />
 
       <PublishConfirmModal
         isOpen={publishModalOpen}

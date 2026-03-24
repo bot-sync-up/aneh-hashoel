@@ -124,25 +124,12 @@ export default function QuestionCard({
           </p>
         )}
 
-        {/* Attachment indicator */}
+        {/* Attachment indicator — icon only, full image shown in detail page */}
         {hasAttachment && (
-          <a
-            href={attachment_url || attachmentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="block"
-            title="קובץ מצורף"
-          >
-            {/\.(jpe?g|png|gif|webp)(\?|$)/i.test(attachment_url || attachmentUrl) ? (
-              <img src={attachment_url || attachmentUrl} alt="קובץ מצורף" className="max-h-28 rounded border border-gray-200 object-contain mt-1" />
-            ) : (
-              <span className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline font-heebo">
-                <Paperclip className="w-3 h-3" />
-                קובץ מצורף
-              </span>
-            )}
-          </a>
+          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] font-heebo mt-1">
+            <Paperclip className="w-3 h-3" />
+            קובץ מצורף
+          </span>
         )}
 
         {/* Countdown (only for in_process / my-questions mode) */}

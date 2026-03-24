@@ -113,7 +113,7 @@ function QuestionCard({
   return (
     <div
       className={clsx(
-        'relative group',
+        'relative group h-full',
         flash && 'animate-pulse-once',
         className
       )}
@@ -129,12 +129,12 @@ function QuestionCard({
         hoverable
         onClick={handleCardClick}
         className={clsx(
-          'transition-all duration-200',
+          'h-full transition-all duration-200',
           'hover:border-brand-gold/60 hover:shadow-lg',
           flash && 'ring-2 ring-red-400 ring-offset-1',
           isInProcessByOther && 'opacity-75'
         )}
-        bodyClassName="p-5"
+        bodyClassName="p-5 flex flex-col h-full"
       >
         {/* Top row: category + status + urgent flag */}
         <div className="flex items-center gap-2 flex-wrap mb-3">
@@ -235,6 +235,9 @@ function QuestionCard({
             </span>
           )}
         </div>
+
+        {/* Spacer — pushes action buttons to bottom */}
+        <div className="flex-1" />
 
         {/* Action buttons */}
         {showActions && (

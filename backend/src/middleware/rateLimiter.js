@@ -84,13 +84,13 @@ const apiLimiter = rateLimit({
 // ─── authLimiter ──────────────────────────────────────────────────────────────
 
 /**
- * Strict limiter for authentication endpoints.
- * 5 requests per 15 minutes per IP.
+ * Limiter for authentication endpoints.
+ * 30 requests per 15 minutes per IP.
  * Covers: POST /auth/login, POST /auth/forgot-password, POST /auth/resend-otp.
  */
 const authLimiter = rateLimit({
   windowMs:        15 * 60 * 1000, // 15 minutes
-  max:             5,
+  max:             30,
   standardHeaders: true,
   legacyHeaders:   false,
   keyGenerator:    clientIp,

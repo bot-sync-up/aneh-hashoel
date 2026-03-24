@@ -9,6 +9,7 @@ const SettingsPage         = React.lazy(() => import('./SettingsPage'));
 const AuditLogPage         = React.lazy(() => import('./AuditLogPage'));
 const SystemHealthPage     = React.lazy(() => import('./SystemHealthPage'));
 const LeaderboardPage      = React.lazy(() => import('./LeaderboardPage'));
+const AdminLeadsPage       = React.lazy(() => import('./LeadsPage'));
 import { clsx } from 'clsx';
 import {
   Users,
@@ -18,16 +19,18 @@ import {
   ScrollText,
   Activity,
   Trophy,
+  UserCheck,
 } from 'lucide-react';
 
 const TABS = [
-  { to: 'rabbis',    label: 'רבנים',           icon: Users },
-  { to: 'questions', label: 'שאלות',           icon: HelpCircle },
-  { to: 'categories',label: 'קטגוריות',        icon: Tag },
-  { to: 'settings',  label: 'הגדרות',          icon: Settings },
-  { to: 'logs',      label: 'לוגים',           icon: ScrollText },
-  { to: 'health',    label: 'בריאות המערכת',   icon: Activity },
-  { to: 'leaderboard', label: 'לוח מצטיינים', icon: Trophy },
+  { to: 'rabbis',      label: 'רבנים',           icon: Users },
+  { to: 'questions',   label: 'שאלות',           icon: HelpCircle },
+  { to: 'categories',  label: 'קטגוריות',        icon: Tag },
+  { to: 'leads',       label: 'לידים',           icon: UserCheck },
+  { to: 'settings',    label: 'הגדרות',          icon: Settings },
+  { to: 'logs',        label: 'לוגים',           icon: ScrollText },
+  { to: 'health',      label: 'בריאות המערכת',   icon: Activity },
+  { to: 'leaderboard', label: 'לוח מצטיינים',   icon: Trophy },
 ];
 
 export default function AdminLayout() {
@@ -95,6 +98,7 @@ export default function AdminLayout() {
             <Route path="logs"       element={<AuditLogPage />} />
             <Route path="health"     element={<SystemHealthPage />} />
             <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route path="leads"       element={<AdminLeadsPage />} />
           </Routes>
         </Suspense>
       </div>

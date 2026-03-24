@@ -17,6 +17,7 @@ import {
   Moon,
   Sun,
   LogOut,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -70,10 +71,16 @@ const ADMIN_ITEM = {
   icon: ShieldCheck,
 };
 
+const LEADS_ITEM = {
+  to: '/leads',
+  label: 'לידים',
+  icon: Users,
+};
+
 const COLLAPSED_KEY = 'sidebar_collapsed';
 
 function Sidebar({ notificationCount = 0 }) {
-  const { rabbi, logout, isAdmin } = useAuth();
+  const { rabbi, logout, isAdmin, isCS } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { on } = useSocket();
   const location = useLocation();
@@ -122,7 +129,11 @@ function Sidebar({ notificationCount = 0 }) {
   }, [location.pathname]);
 
   // Build nav items list
-  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
+  const navItems = [
+    ...NAV_ITEMS,
+    ...(isCS   ? [LEADS_ITEM] : []),
+    ...(isAdmin ? [ADMIN_ITEM] : []),
+  ];
 
   const sidebarContent = (
     <aside
@@ -227,6 +238,8 @@ function Sidebar({ notificationCount = 0 }) {
               <p className="text-white/50 text-xs font-heebo truncate">
                 {rabbi.role === 'admin'
                   ? 'מנהל מערכת'
+                  : rabbi.role === 'customer_service'
+                  ? 'שירות לקוחות'
                   : rabbi.role === 'senior'
                   ? 'רב בכיר'
                   : 'רב'}

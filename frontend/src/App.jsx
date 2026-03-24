@@ -27,6 +27,7 @@ const StatsPage = React.lazy(() => import('./pages/StatsPage'));
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'));
 const AnswersPage = React.lazy(() => import('./pages/AnswersPage'));
+const LeadsPage   = React.lazy(() => import('./pages/admin/LeadsPage'));
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, initializing } = useAuth();
@@ -40,6 +41,14 @@ function AdminRoute({ children }) {
   if (initializing) return <FullPageSpinner label="טוען..." />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
+  return children;
+}
+
+function CSRoute({ children }) {
+  const { isAuthenticated, isCS, initializing } = useAuth();
+  if (initializing) return <FullPageSpinner label="טוען..." />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isCS) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -118,6 +127,14 @@ export default function App() {
                         <AdminRoute>
                           <AdminLayout />
                         </AdminRoute>
+                      }
+                    />
+                    <Route
+                      path="leads"
+                      element={
+                        <CSRoute>
+                          <LeadsPage />
+                        </CSRoute>
                       }
                     />
                     {/* Catch-all 404 */}

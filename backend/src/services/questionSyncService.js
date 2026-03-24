@@ -46,7 +46,8 @@ const {
   broadcastUrgentQuestion,
 } = require('../socket/questionEvents');
 
-const { notifyAll } = require('./notificationRouter');
+const { notifyAll }   = require('./notificationRouter');
+const { upsertLead }  = require('./leadsService');
 
 // ─── syncPendingQuestions ─────────────────────────────────────────────────────
 
@@ -212,6 +213,15 @@ async function syncPendingQuestions(io = null) {
         `(id=${question.id}):`,
         err.message
       );
+    });
+
+    // ── CRM: upsert lead for this asker (fire-and-forget) ─────────────────
+    upsertLead({
+      ...question,
+      asker_email: question.asker_email || null, // already decrypted in createFromWebhook
+      asker_phone: question.asker_phone || null,
+    }).catch((err) => {
+      console.error(`[questionSync] upsertLead error (questionId=${question.id}):`, err.message);
     });
   }
 

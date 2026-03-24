@@ -238,6 +238,7 @@ export function AuthProvider({ children }) {
 
   const isAdmin = rabbi?.role === 'admin' || rabbi?.isAdmin === true;
   const isSenior = rabbi?.role === 'senior' || rabbi?.isSenior === true;
+  const isCS = rabbi?.role === 'customer_service' || rabbi?.role === 'admin';
 
   return (
     <AuthContext.Provider
@@ -247,6 +248,7 @@ export function AuthProvider({ children }) {
         isAuthenticated,
         isAdmin,
         isSenior,
+        isCS,
         loading,
         initializing,
         login,

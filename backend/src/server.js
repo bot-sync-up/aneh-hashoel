@@ -46,6 +46,7 @@ const notificationRoutes      = require('./routes/notifications');
 const profileRoutes           = require('./routes/profile');
 const adminRoutes             = require('./routes/admin');
 const actionLinksRoute        = require('./routes/actionLinks');
+const leadsRoutes             = require('./routes/leads');
 
 // ─── Webhook routes (no JWT auth — validated by their own secrets) ────────────
 
@@ -129,6 +130,7 @@ app.use('/api/profile',       profileRoutes);
 app.use('/api/dashboard',  require('./routes/dashboard'));
 app.use('/api/admin',         adminRoutes);
 app.use('/api/action',        actionLinksRoute);
+app.use('/api/leads',         leadsRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 

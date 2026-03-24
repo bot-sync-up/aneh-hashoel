@@ -101,13 +101,14 @@ function AdminQuickLink({ to, icon: Icon, label, description }) {
 // ── Normalise API response shapes ─────────────────────────────────────────────
 
 function extractRabbiStats(data) {
-  const s = data?.rabbi || data?.myStats || data || {};
+  // Backend may wrap in { ok, data: {...} }
+  const s = data?.rabbi || data?.myStats || data?.data || data || {};
   return {
-    answeredThisMonth: s.answeredThisMonth ?? s.answeredThisWeek ?? 0,
+    answeredThisMonth: s.answeredThisMonth ?? s.answeredThisWeek ?? s.weekAnswers ?? s.totalAnswered ?? 0,
     avgResponseTimeLabel: s.avgResponseTimeLabel
       ?? (s.avgResponseTime ? `${s.avgResponseTime}ש'` : '—'),
-    thanksReceived: s.thanksReceived ?? s.thanksThisWeek ?? 0,
-    openQuestions: s.openQuestions ?? 0,
+    thanksReceived: s.thanksReceived ?? s.thanksThisWeek ?? s.totalThanks ?? 0,
+    openQuestions: s.openQuestions ?? s.inProcess ?? 0,
     answeredTrend: s.answeredTrend ?? null,
     responseTrend: s.responseTrend ?? null,
     thanksTrend: s.thanksTrend ?? null,
@@ -115,20 +116,21 @@ function extractRabbiStats(data) {
 }
 
 function extractAdminStats(data) {
-  const s = data?.system || data?.adminStats || data || {};
+  // Backend returns { ok: true, data: { pending, inProcess, thisWeekAnswers, ... } }
+  const s = data?.system || data?.adminStats || data?.data || data || {};
   return {
-    pendingCount: s.totalPending ?? s.pendingCount ?? 0,
-    inProcessCount: s.totalInProcess ?? s.inProcessCount ?? 0,
-    answeredThisWeek: s.answeredThisWeek ?? s.answeredToday ?? 0,
-    onlineRabbis: s.onlineRabbis ?? 0,
+    pendingCount:         s.totalPending    ?? s.pendingCount    ?? s.pending    ?? 0,
+    inProcessCount:       s.totalInProcess  ?? s.inProcessCount  ?? s.inProcess  ?? 0,
+    answeredThisWeek:     s.answeredThisWeek ?? s.thisWeekAnswers ?? s.answeredToday ?? 0,
+    onlineRabbis:         s.onlineRabbis ?? 0,
     avgResponseTimeLabel: s.avgResponseTimeLabel
       ?? (s.avgResponseTime ? `${s.avgResponseTime}ש'` : '—'),
-    totalThanks: s.totalThanks ?? 0,
-    pendingTrend: s.pendingTrend ?? null,
+    totalThanks:    s.totalThanks ?? 0,
+    pendingTrend:   s.pendingTrend   ?? null,
     inProcessTrend: s.inProcessTrend ?? null,
-    answeredTrend: s.answeredTrend ?? null,
-    responseTrend: s.responseTrend ?? null,
-    thanksTrend: s.thanksTrend ?? null,
+    answeredTrend:  s.answeredTrend  ?? null,
+    responseTrend:  s.responseTrend  ?? null,
+    thanksTrend:    s.thanksTrend    ?? null,
   };
 }
 
@@ -177,36 +179,51 @@ export default function DashboardPage() {
       // Try the admin endpoint first, fall back to general
       const endpoint = isAdmin ? '/admin/dashboard/stats' : '/dashboard/stats';
 
-      const [statsRes, myQRes, pendingRes, activityRes] = await Promise.allSettled([
+      const requests = [
         api.get(endpoint),
         api.get('/dashboard/my-questions'),
         api.get('/questions', { params: { status: 'pending', limit: 10 } }),
         api.get('/dashboard/activity', { params: { limit: 20 } }),
-      ]);
+      ];
+      if (isAdmin) {
+        requests.push(api.get('/admin/dashboard/activity'));
+        requests.push(api.get('/admin/dashboard/categories/breakdown'));
+      }
+
+      const [statsRes, myQRes, pendingRes, activityRes, adminActivityRes, catRes] =
+        await Promise.allSettled(requests);
 
       if (statsRes.status === 'fulfilled') {
         const d = statsRes.value.data;
 
         if (isAdmin) {
           setAdminStats(extractAdminStats(d));
-          // Admin endpoint may also carry rabbi's own stats
           setRabbiStats(extractRabbiStats(d));
         } else {
           setRabbiStats(extractRabbiStats(d));
+          // non-admin: chart data may be in stats response
+          const s = d?.data || d || {};
+          setWeeklyActivity(s.weeklyActivity ?? s.weeklyChart ?? s.questionsPerDay ?? []);
+          setCategoryBreakdown(s.categoryBreakdown ?? s.categories ?? []);
+          setRecentEvents(s.recentActivity ?? []);
         }
 
-        setWeeklyActivity(
-          d.weeklyActivity ?? d.weeklyChart ?? d.questionsPerDay ?? []
-        );
-        setCategoryBreakdown(d.categoryBreakdown ?? d.categories ?? []);
-        setRecentEvents(d.recentActivity ?? []);
-        setOnlineRabbisList(d.onlineRabbisList ?? []);
+        const base = d?.data || d || {};
+        setOnlineRabbisList(base.onlineRabbisList ?? []);
+        if (base.emergency) {
+          setEmergency({ message: base.emergency.message, id: base.emergency._id || base.emergency.id });
+        }
+      }
 
-        if (d.emergency) {
-          setEmergency({
-            message: d.emergency.message,
-            id: d.emergency._id || d.emergency.id,
-          });
+      // Admin chart data from dedicated endpoints
+      if (isAdmin) {
+        if (adminActivityRes?.status === 'fulfilled') {
+          const ad = adminActivityRes.value.data;
+          setWeeklyActivity(ad?.data ?? ad ?? []);
+        }
+        if (catRes?.status === 'fulfilled') {
+          const cd = catRes.value.data;
+          setCategoryBreakdown(cd?.data ?? cd ?? []);
         }
       }
 

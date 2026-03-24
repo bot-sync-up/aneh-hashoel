@@ -31,7 +31,6 @@ import api from '../lib/api';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import NotificationPreferences from '../components/profile/NotificationPreferences';
-import ActiveSessions from '../components/profile/ActiveSessions';
 import VacationMode from '../components/profile/VacationMode';
 
 // ── Categories ────────────────────────────────────────────────────────────────
@@ -435,9 +434,6 @@ function SecurityTab() {
         </form>
       </Card>
 
-      <Card header={<Card.Title>מכשירים מחוברים</Card.Title>}>
-        <ActiveSessions />
-      </Card>
     </div>
   );
 }

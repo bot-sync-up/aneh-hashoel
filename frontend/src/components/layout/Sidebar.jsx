@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import logoSrc from '../../assets/logo.png';
 import { clsx } from 'clsx';
 import {
   LayoutDashboard,
@@ -143,17 +144,8 @@ function Sidebar({ notificationCount = 0 }) {
       >
         {!collapsed && (
           <div className="flex items-center gap-2.5 overflow-hidden">
-            {/* לוגו על רקע לבן עגול */}
             <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-white p-1 shadow-sm">
-              <img
-                src="/logo.png"
-                alt="ענה את השואל"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.parentElement.style.background = 'transparent';
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col leading-tight overflow-hidden">
               <span className="text-white font-bold text-base font-heebo truncate">
@@ -168,18 +160,7 @@ function Sidebar({ notificationCount = 0 }) {
 
         {collapsed && (
           <div className="w-9 h-9 rounded-lg bg-white p-1 shadow-sm flex-shrink-0">
-            <img
-              src="/logo.png"
-              alt="ענה את השואל"
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                e.currentTarget.parentElement.className =
-                  'w-9 h-9 rounded-full flex items-center justify-center bg-brand-gold/20 flex-shrink-0';
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement.innerHTML =
-                  '<span class="text-brand-gold font-bold text-sm font-heebo">ע</span>';
-              }}
-            />
+            <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
           </div>
         )}
 

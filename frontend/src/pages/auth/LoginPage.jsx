@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import logoSrc from '../../assets/logo.png';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../lib/api';
@@ -173,15 +174,9 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-lg mb-4 p-2">
             <img
-              src="/logo.png"
+              src={logoSrc}
               alt="ענה את השואל"
               className="h-full w-full object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement.style.background = '#1B2B5E';
-                e.currentTarget.parentElement.innerHTML =
-                  '<span class="text-2xl text-white font-bold font-heebo">ע</span>';
-              }}
             />
           </div>
           <h1 className="text-2xl font-bold text-[#1B2B5E] dark:text-[var(--text-primary)] font-heebo tracking-tight">

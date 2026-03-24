@@ -21,6 +21,7 @@ const TwoFactorPage = React.lazy(() => import('./pages/TwoFactorPage'));
 const LinkExpiredPage = React.lazy(() => import('./pages/LinkExpiredPage'));
 // Additional spec pages
 const ForgotPasswordPage = React.lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const AuthCallbackPage = React.lazy(() => import('./pages/auth/AuthCallbackPage'));
 const SetupPasswordPage = React.lazy(() => import('./pages/SetupPasswordPage'));
 const StatsPage = React.lazy(() => import('./pages/StatsPage'));
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
@@ -77,6 +78,10 @@ export default function App() {
               <ForgotPasswordPage />
             </PublicRoute>
           }
+        />
+        <Route
+          path="/auth/callback"
+          element={<AuthCallbackPage />}
         />
         <Route
           path="/2fa"

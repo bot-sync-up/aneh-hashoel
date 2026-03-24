@@ -142,25 +142,36 @@ function Sidebar({ notificationCount = 0 }) {
         )}
       >
         {!collapsed && (
-          <div className="flex flex-col leading-tight overflow-hidden">
-            <span className="text-white font-bold text-base font-heebo truncate">
-              ענה את השואל
-            </span>
-            <span className="text-white/50 text-[11px] font-heebo truncate">
-              פלטפורמת שאלות ותשובות
-            </span>
+          <div className="flex items-center gap-2 overflow-hidden">
+            <img
+              src="/logo.png"
+              alt="ענה את השואל"
+              className="h-8 w-auto object-contain flex-shrink-0"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <div className="flex flex-col leading-tight overflow-hidden">
+              <span className="text-white font-bold text-base font-heebo truncate">
+                ענה את השואל
+              </span>
+              <span className="text-white/50 text-[11px] font-heebo truncate">
+                פלטפורמת שאלות ותשובות
+              </span>
+            </div>
           </div>
         )}
 
         {collapsed && (
-          <span
-            className={clsx(
-              'w-9 h-9 rounded-full flex items-center justify-center',
-              'bg-brand-gold/20 text-brand-gold font-bold text-sm font-heebo'
-            )}
-          >
-            ע
-          </span>
+          <img
+            src="/logo.png"
+            alt="ענה את השואל"
+            className="w-9 h-9 object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.insertAdjacentHTML('afterend',
+                '<span class="w-9 h-9 rounded-full flex items-center justify-center bg-brand-gold/20 text-brand-gold font-bold text-sm font-heebo">ע</span>'
+              );
+            }}
+          />
         )}
 
         {/* Collapse toggle — desktop only */}

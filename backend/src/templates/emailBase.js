@@ -135,14 +135,20 @@ function createEmailHTML(title, bodyContent, actionButtons = []) {
           <tr>
             <td style="
               background-color: ${BRAND_NAVY};
-              padding: 24px 32px;
+              padding: 20px 32px;
               text-align: center;
               border-radius: 8px 8px 0 0;
             ">
+              <img
+                src="${(process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '')}/logo.png"
+                alt="ענה את השואל"
+                width="120"
+                style="display:block; margin:0 auto 10px; max-width:120px; height:auto;"
+              />
               <h1 style="
                 margin: 0;
                 color: ${BRAND_GOLD};
-                font-size: 24px;
+                font-size: 22px;
                 font-weight: 700;
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.3;

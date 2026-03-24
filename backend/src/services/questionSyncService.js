@@ -46,6 +46,8 @@ const {
   broadcastUrgentQuestion,
 } = require('../socket/questionEvents');
 
+const { notifyAll } = require('./notificationRouter');
+
 // ─── syncPendingQuestions ─────────────────────────────────────────────────────
 
 /**
@@ -198,6 +200,19 @@ async function syncPendingQuestions(io = null) {
         broadcastUrgentQuestion(io, question);
       }
     }
+
+    // ── Email/WhatsApp notifications to all active rabbis ─────────────────
+    const notifType = ['critical', 'urgent'].includes(questionData.urgency)
+      ? 'urgent_question'
+      : 'question_broadcast';
+
+    notifyAll(notifType, { question, actionTokens: {} }).catch((err) => {
+      console.error(
+        `[questionSync] syncPendingQuestions: שגיאה בשליחת התראות לרבנים ` +
+        `(id=${question.id}):`,
+        err.message
+      );
+    });
   }
 
   const result = {

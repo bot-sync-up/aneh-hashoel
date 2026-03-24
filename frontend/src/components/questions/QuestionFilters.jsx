@@ -77,9 +77,8 @@ function QuestionFilters({
     onClear?.();
   };
 
-  // Count active filters (excluding page/sort)
+  // Count active filters (excluding page/sort/status — status is always pending)
   const activeCount = [
-    filters.status,
     filters.category,
     filters.is_urgent,
     filters.search,
@@ -132,14 +131,6 @@ function QuestionFilters({
                 onChange={(e) => setLocalSearch(e.target.value)}
               />
             </div>
-
-            {/* Status */}
-            <Select
-              label="סטטוס"
-              options={STATUS_OPTIONS}
-              value={filters.status || ''}
-              onChange={(e) => handleField('status', e.target.value)}
-            />
 
             {/* Category */}
             <Select
@@ -224,12 +215,6 @@ function QuestionFilters({
 
             {/* Active filter badges + clear */}
             <div className="flex items-center gap-2 flex-wrap">
-              {filters.status && (
-                <ActiveFilterPill
-                  label={STATUS_OPTIONS.find((o) => o.value === filters.status)?.label}
-                  onRemove={() => handleField('status', '')}
-                />
-              )}
               {filters.category && (
                 <ActiveFilterPill
                   label={CATEGORY_OPTIONS.find((o) => o.value === filters.category)?.label}

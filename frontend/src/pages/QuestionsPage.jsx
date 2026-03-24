@@ -20,8 +20,8 @@ import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
 import { truncate } from '../lib/utils';
 
+// Status is always 'pending' on this page — not part of user-controlled filters
 const DEFAULT_FILTERS = {
-  status: '',
   category: '',
   search: '',
   is_urgent: '',
@@ -62,8 +62,7 @@ export default function QuestionsPage() {
   // ── Fetch questions ──────────────────────────────────────────────────────
 
   const buildParams = (f) => {
-    const params = { page: f.page, limit: PAGE_SIZE };
-    if (f.status) params.status = f.status;
+    const params = { page: f.page, limit: PAGE_SIZE, status: 'pending' };
     if (f.category) params.category = f.category;
     if (f.search) params.search = f.search;
     if (f.is_urgent) params.is_urgent = true;

@@ -6,6 +6,7 @@ import Input from '../components/ui/Input';
 import Card from '../components/ui/Card';
 import { Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import logoSrc from '../assets/logo.png';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -91,10 +92,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-fade-in-up">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-navy mb-4 shadow-lg">
-            <span className="text-brand-gold font-bold text-2xl font-heebo">
-              ע
-            </span>
+          <div className="inline-flex items-center justify-center w-28 h-28 rounded-3xl bg-white shadow-lg mb-5 p-3">
+            <img
+              src={logoSrc}
+              alt="ענה את השואל"
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] font-heebo">
             ענה את השואל

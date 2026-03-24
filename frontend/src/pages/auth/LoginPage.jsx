@@ -171,13 +171,14 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#1B2B5E] shadow-lg mb-4">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-lg mb-4 p-2">
             <img
               src="/logo.png"
               alt="ענה את השואל"
-              className="h-10 w-auto object-contain"
+              className="h-full w-full object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement.style.background = '#1B2B5E';
                 e.currentTarget.parentElement.innerHTML =
                   '<span class="text-2xl text-white font-bold font-heebo">ע</span>';
               }}

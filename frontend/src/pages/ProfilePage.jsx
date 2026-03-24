@@ -1,5 +1,6 @@
 import React, {
   useState,
+  useEffect,
   useCallback,
 } from 'react';
 import { clsx } from 'clsx';
@@ -33,26 +34,7 @@ import Card from '../components/ui/Card';
 import NotificationPreferences from '../components/profile/NotificationPreferences';
 import VacationMode from '../components/profile/VacationMode';
 
-// ── Categories ────────────────────────────────────────────────────────────────
-
-const ALL_CATEGORIES = [
-  { key: 'shabbat',          label: 'שבת ומועדים' },
-  { key: 'kashrut',          label: 'כשרות' },
-  { key: 'family_purity',    label: 'טהרת המשפחה' },
-  { key: 'tefila',           label: 'תפילה' },
-  { key: 'business',         label: 'עסקים והלכה' },
-  { key: 'lifecycle',        label: 'מעגל החיים' },
-  { key: 'medical',          label: 'רפואה והלכה' },
-  { key: 'mourning',         label: 'אבלות' },
-  { key: 'relationships',    label: 'יחסים' },
-  { key: 'technology',       label: 'טכנולוגיה' },
-  { key: 'mezuza_teflin',    label: 'מזוזה ותפילין' },
-  { key: 'prayer_times',     label: 'זמני תפילה' },
-  { key: 'pesach',           label: 'פסח' },
-  { key: 'yomim_tovim',      label: 'ימים טובים' },
-  { key: 'general',          label: 'כללי' },
-  { key: 'children',         label: 'חינוך ילדים' },
-];
+// ── Categories (loaded from DB) ────────────────────────────────────────────
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
@@ -277,16 +259,31 @@ function PersonalTab({ rabbi }) {
 
 function CategoriesTab({ rabbi }) {
   const { updateRabbi } = useAuth();
+  const [categories, setCategories] = useState([]);
   const [selected, setSelected] = useState(
-    new Set(rabbi?.preferredCategories || rabbi?.categories || [])
+    new Set((rabbi?.preferred_categories || rabbi?.preferredCategories || []).map(Number))
   );
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
 
-  const toggle = (key) => {
+  useEffect(() => {
+    api.get('/categories')
+      .then(({ data }) => {
+        // flatten tree to flat list
+        const flatten = (items) => items.reduce((acc, c) => {
+          acc.push(c);
+          if (c.children?.length) acc.push(...flatten(c.children));
+          return acc;
+        }, []);
+        setCategories(flatten(data?.categories ?? []));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggle = (id) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
     setSaveStatus(null);
@@ -297,7 +294,7 @@ function CategoriesTab({ rabbi }) {
     setSaveStatus(null);
     try {
       await api.put('/rabbis/profile/categories', { categories: [...selected] });
-      updateRabbi({ preferredCategories: [...selected] });
+      updateRabbi({ preferred_categories: [...selected] });
       setSaveStatus('success');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch {
@@ -312,26 +309,30 @@ function CategoriesTab({ rabbi }) {
       <p className="text-sm text-[var(--text-muted)] font-heebo">
         הקטגוריות הנבחרות יסומנו בצבע בעת הצגת רשימת השאלות.
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-        {ALL_CATEGORIES.map(({ key, label }) => {
-          const isOn = selected.has(key);
-          return (
-            <label key={key} className={clsx(
-              'flex items-center gap-2 p-3 rounded-xl border cursor-pointer select-none transition-all duration-150',
-              isOn
-                ? 'bg-brand-navy/5 dark:bg-brand-gold/10 border-brand-navy/30 dark:border-brand-gold/30'
-                : 'bg-[var(--bg-surface)] border-[var(--border-default)] hover:bg-[var(--bg-muted)]'
-            )}>
-              <input type="checkbox" checked={isOn} onChange={() => toggle(key)}
-                className="rounded border-[var(--border-default)] text-brand-navy focus:ring-brand-gold"
-                aria-label={label} />
-              <span className={clsx('text-sm font-heebo', isOn ? 'text-brand-navy dark:text-brand-gold font-medium' : 'text-[var(--text-primary)]')}>
-                {label}
-              </span>
-            </label>
-          );
-        })}
-      </div>
+      {categories.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)] font-heebo">טוען קטגוריות...</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+          {categories.map(({ id, name }) => {
+            const isOn = selected.has(Number(id));
+            return (
+              <label key={id} className={clsx(
+                'flex items-center gap-2 p-3 rounded-xl border cursor-pointer select-none transition-all duration-150',
+                isOn
+                  ? 'bg-brand-navy/5 dark:bg-brand-gold/10 border-brand-navy/30 dark:border-brand-gold/30'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-default)] hover:bg-[var(--bg-muted)]'
+              )}>
+                <input type="checkbox" checked={isOn} onChange={() => toggle(Number(id))}
+                  className="rounded border-[var(--border-default)] text-brand-navy focus:ring-brand-gold"
+                  aria-label={name} />
+                <span className={clsx('text-sm font-heebo', isOn ? 'text-brand-navy dark:text-brand-gold font-medium' : 'text-[var(--text-primary)]')}>
+                  {name}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center gap-3 pt-1">
         <Button variant="primary" size="md" onClick={handleSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>
           שמור קטגוריות

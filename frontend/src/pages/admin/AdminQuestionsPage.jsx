@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Download,
@@ -10,6 +11,7 @@ import {
   MessageSquare,
   UserCheck,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -84,8 +86,58 @@ function RowActions({ question, onStatusChange, onAssign, onHide, onOpenDiscussi
   );
 }
 
+// ─── Status Modal ──────────────────────────────────────────────────────────
+function StatusModal({ question, onClose, onSave }) {
+  const [status, setStatus] = useState(question.status);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-heebo" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-xl w-72 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[var(--text-primary)]">שינוי סטטוס</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={16}/></button>
+        </div>
+        <select value={status} onChange={e => setStatus(e.target.value)}
+          className="w-full h-10 px-3 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)]">
+          {STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>ביטול</Button>
+          <Button variant="primary" size="sm" onClick={() => onSave(status)}>שמור</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Assign Modal ──────────────────────────────────────────────────────────
+function AssignModal({ question, rabbis, onClose, onSave }) {
+  const [rabbiId, setRabbiId] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-heebo" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-xl w-80 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-[var(--text-primary)]">הצמד לרב</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={16}/></button>
+        </div>
+        <select value={rabbiId} onChange={e => setRabbiId(e.target.value)}
+          className="w-full h-10 px-3 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)]">
+          <option value="">בחר רב...</option>
+          {rabbis.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>ביטול</Button>
+          <Button variant="primary" size="sm" disabled={!rabbiId} onClick={() => onSave(rabbiId)}>הצמד</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────
 export default function AdminQuestionsPage() {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -96,6 +148,9 @@ export default function AdminQuestionsPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [rabbis, setRabbis] = useState([]);
+  const [statusModal, setStatusModal] = useState(null);
+  const [assignModal, setAssignModal] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -105,12 +160,12 @@ export default function AdminQuestionsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [qData, catData] = await Promise.all([
+      const [qData, catData, rabbiData] = await Promise.all([
         get('/admin/questions'),
-        get('/admin/categories').catch(() => []),
+        get('/categories').catch(() => ({ categories: [] })),
+        get('/admin/rabbis').catch(() => ({ rabbis: [] })),
       ]);
       const rawQuestions = Array.isArray(qData) ? qData : qData.questions ?? DEMO_QUESTIONS;
-      // Normalise snake_case backend fields to camelCase expected by the table
       setQuestions(rawQuestions.map((q) => ({
         ...q,
         createdAt:      q.createdAt      ?? q.created_at,
@@ -120,6 +175,7 @@ export default function AdminQuestionsPage() {
         isUrgent:       q.isUrgent       ?? (q.urgency === 'urgent'),
       })));
       setCategories(Array.isArray(catData) ? catData : catData.categories ?? []);
+      setRabbis(Array.isArray(rabbiData) ? rabbiData : rabbiData.rabbis ?? []);
     } catch {
       setQuestions(DEMO_QUESTIONS);
     } finally {
@@ -164,6 +220,37 @@ export default function AdminQuestionsPage() {
     }
   };
 
+  const handleHide = async (question) => {
+    try {
+      await patch(`/admin/questions/${question.id}`, { status: 'hidden' });
+      setQuestions((prev) => prev.map((q) => q.id === question.id ? { ...q, status: 'hidden' } : q));
+      showToast('השאלה הוסתרה');
+    } catch { showToast('שגיאה בפעולה', 'error'); }
+  };
+
+  const handleStatusSave = async (status) => {
+    const question = statusModal;
+    setStatusModal(null);
+    try {
+      await patch(`/admin/questions/${question.id}`, { status });
+      setQuestions((prev) => prev.map((q) => q.id === question.id ? { ...q, status } : q));
+      showToast('הסטטוס עודכן');
+    } catch { showToast('שגיאה בפעולה', 'error'); }
+  };
+
+  const handleAssignSave = async (rabbiId) => {
+    const question = assignModal;
+    setAssignModal(null);
+    const rabbi = rabbis.find(r => String(r.id) === String(rabbiId));
+    try {
+      await patch(`/admin/questions/${question.id}`, { assigned_rabbi_id: rabbiId, status: 'in_process' });
+      setQuestions((prev) => prev.map((q) => q.id === question.id
+        ? { ...q, status: 'in_process', assignedRabbi: rabbi?.name ?? '—' }
+        : q));
+      showToast('השאלה הוצמדה לרב');
+    } catch { showToast('שגיאה בפעולה', 'error'); }
+  };
+
   const handleBulkRelease = async () => {
     try {
       await Promise.all([...selected].map((id) => patch(`/admin/questions/${id}`, { status: 'pending', assignedRabbiId: null })));
@@ -184,6 +271,14 @@ export default function AdminQuestionsPage() {
 
   return (
     <div className="space-y-5" dir="rtl">
+      {/* Modals */}
+      {statusModal && (
+        <StatusModal question={statusModal} onClose={() => setStatusModal(null)} onSave={handleStatusSave} />
+      )}
+      {assignModal && (
+        <AssignModal question={assignModal} rabbis={rabbis} onClose={() => setAssignModal(null)} onSave={handleAssignSave} />
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={clsx('fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-lg shadow-lg font-heebo text-sm text-white', toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600')}>
@@ -327,10 +422,10 @@ export default function AdminQuestionsPage() {
                     <td className="px-3 py-3">
                       <RowActions
                         question={q}
-                        onStatusChange={() => {}}
-                        onAssign={() => {}}
-                        onHide={() => {}}
-                        onOpenDiscussion={() => {}}
+                        onStatusChange={() => setStatusModal(q)}
+                        onAssign={() => setAssignModal(q)}
+                        onHide={() => handleHide(q)}
+                        onOpenDiscussion={() => navigate(`/questions/${q.id}`)}
                       />
                     </td>
                   </tr>

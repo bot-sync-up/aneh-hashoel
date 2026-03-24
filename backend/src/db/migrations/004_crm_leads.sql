@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS leads (
   is_hot                BOOLEAN     NOT NULL DEFAULT false,
   contacted             BOOLEAN     NOT NULL DEFAULT false,
   contact_notes         TEXT        NOT NULL DEFAULT '',
-  last_category_id      UUID        REFERENCES categories (id) ON DELETE SET NULL,
+  last_category_id      INTEGER     REFERENCES categories (id) ON DELETE SET NULL,
   first_question_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_question_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -97,7 +97,7 @@ async function upsertLead(question) {
         question_count || 1,
         score,
         is_hot,
-        category_id || null,
+        category_id ? parseInt(category_id, 10) || null : null,
         created_at || new Date().toISOString(),
       ]
     );

@@ -190,6 +190,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
   const [linkUrl, setLinkUrl] = useState('');
   const [templatesPanelOpen, setTemplatesPanelOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const autoSaveRef = useRef(null);
 
   const editor = useEditor({
@@ -255,19 +256,19 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
     const html = editor.getHTML();
     setSavingDraft(true); setSaveError(null);
     try {
-      await api.post(`/questions/answer/${questionId}`, { content: html, publishNow: false });
+      await api.post(`/questions/answer/${questionId}`, { content: html, publishNow: false, isPrivate });
       try { localStorage.setItem(draftKey(questionId), JSON.stringify({ html, savedAt: new Date().toISOString() })); } catch { /* ignore */ }
       onSave?.({ html, publishNow: false });
     } catch (err) {
       setSaveError(err?.response?.data?.message || 'שגיאה בשמירת הטיוטה.');
     } finally { setSavingDraft(false); }
-  }, [editor, questionId, onSave]);
+  }, [editor, questionId, onSave, isPrivate]);
 
   const handlePublishConfirm = useCallback(async ({ html }) => {
-    await api.post(`/questions/answer/${questionId}`, { content: html, publishNow: true });
+    await api.post(`/questions/answer/${questionId}`, { content: html, publishNow: true, isPrivate });
     try { localStorage.removeItem(draftKey(questionId)); } catch { /* ignore */ }
     onSave?.({ html, publishNow: true });
-  }, [questionId, onSave]);
+  }, [questionId, onSave, isPrivate]);
 
   const handleSetLink = useCallback(() => {
     if (!editor) return;
@@ -440,6 +441,24 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
       </div>
 
       {saveError && <p role="alert" className="text-sm text-red-600 font-heebo px-1">{saveError}</p>}
+
+      {/* Private answer toggle */}
+      <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit" dir="rtl">
+        <input
+          type="checkbox"
+          checked={isPrivate}
+          onChange={(e) => setIsPrivate(e.target.checked)}
+          className="w-4 h-4 rounded border-[var(--border-default)] text-brand-navy accent-brand-navy cursor-pointer"
+        />
+        <span className="text-sm font-heebo text-[var(--text-secondary)]">
+          תשובה פרטית
+        </span>
+        {isPrivate && (
+          <span className="text-xs font-heebo text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded px-2 py-0.5">
+            לא יישלח לשואל ולא יפורסם
+          </span>
+        )}
+      </label>
 
       {/* Actions */}
       <div className="flex items-center gap-3 flex-wrap">

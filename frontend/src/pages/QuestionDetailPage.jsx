@@ -162,6 +162,8 @@ export default function QuestionDetailPage() {
     answered_at,
     assigned_rabbi,
     answer,
+    answer_is_private,
+    answer_rabbi_id,
     view_count = 0,
     thank_count = 0,
     follow_up_question,
@@ -172,6 +174,8 @@ export default function QuestionDetailPage() {
     attachment_url,
     question_number,
   } = question;
+
+  const isMyAnswer = rabbi && answer_rabbi_id && String(answer_rabbi_id) === String(rabbi?.id);
 
   // assigned_rabbi may be an object {id,name} or the API may return assigned_rabbi_id + rabbi_name flat
   const assignedRabbiId = assigned_rabbi?.id ?? question?.assigned_rabbi_id;
@@ -446,7 +450,7 @@ export default function QuestionDetailPage() {
         )}
 
         {/* ANSWERED: full answer display */}
-        {isAnswered && answer && (
+        {isAnswered && (answer || answer_is_private) && (
           <Card header={
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -454,6 +458,11 @@ export default function QuestionDetailPage() {
                 <span className="font-semibold text-[var(--text-primary)] font-heebo">
                   תשובת הרב
                 </span>
+                {answer_is_private && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium font-heebo px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                    🔒 פרטי
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[var(--text-muted)] font-heebo">
@@ -473,11 +482,17 @@ export default function QuestionDetailPage() {
               </div>
             </div>
           }>
-            {/* Answer content — allow HTML from rich text editor */}
-            <div
-              className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: answer }}
-            />
+            {/* Answer content — hide from other rabbis when private */}
+            {answer_is_private && !isMyAnswer ? (
+              <p className="text-sm text-[var(--text-muted)] font-heebo italic py-4 text-center">
+                תשובה זו פרטית — גלויה לרב שענה בלבד.
+              </p>
+            ) : (
+              <div
+                className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: answer }}
+              />
+            )}
 
             {/* Rabbi signature */}
             {assigned_rabbi && (

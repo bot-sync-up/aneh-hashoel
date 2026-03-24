@@ -51,7 +51,7 @@ function getNotificationService() {
  * @param {string} content   Raw HTML from the editor
  * @returns {Promise<object>} The created answer row
  */
-async function submitAnswer(questionId, rabbiId, content) {
+async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
   if (!questionId || !rabbiId || !content) {
     const e = new Error('חסרים שדות חובה: שאלה, רב, ותוכן');
     e.status = 400;
@@ -140,9 +140,9 @@ async function submitAnswer(questionId, rabbiId, content) {
 
     const { rows: answerRows } = await client.query(
       `INSERT INTO answers
-         (question_id, rabbi_id, content, signature, content_versions, created_at)
+         (question_id, rabbi_id, content, signature, content_versions, is_private, created_at)
        VALUES
-         ($1, $2, $3, $4, $5, NOW())
+         ($1, $2, $3, $4, $5, $6, NOW())
        RETURNING *`,
       [
         questionId,
@@ -154,6 +154,7 @@ async function submitAnswer(questionId, rabbiId, content) {
           edited_at: new Date().toISOString(),
           version: 1,
         }]),
+        isPrivate === true,
       ]
     );
 
@@ -176,20 +177,24 @@ async function submitAnswer(questionId, rabbiId, content) {
     'answer',
     answer.id,
     null,
-    { questionId, contentLength: contentWithSignature.length },
+    { questionId, contentLength: contentWithSignature.length, isPrivate },
     null,
     null
   );
 
-  // 6. Trigger WP sync (fire-and-forget)
-  getWPService().syncAnswerToWP(questionId).catch((err) => {
-    console.error('[answers] שגיאה בסנכרון לוורדפרס:', err.message);
-  });
+  if (!isPrivate) {
+    // 6. Trigger WP sync (fire-and-forget) — skip for private answers
+    getWPService().syncAnswerToWP(questionId).catch((err) => {
+      console.error('[answers] שגיאה בסנכרון לוורדפרס:', err.message);
+    });
 
-  // 7. Trigger asker notification (fire-and-forget)
-  getNotificationService().notifyAskerNewAnswer(questionId).catch((err) => {
-    console.error('[answers] שגיאה בשליחת התראה לשואל:', err.message);
-  });
+    // 7. Trigger asker notification (fire-and-forget) — skip for private answers
+    getNotificationService().notifyAskerNewAnswer(questionId).catch((err) => {
+      console.error('[answers] שגיאה בשליחת התראה לשואל:', err.message);
+    });
+  } else {
+    console.info(`[answers] תשובה פרטית — WP sync ושליחת מייל לשואל דולגו (questionId: ${questionId})`);
+  }
 
   return answer;
 }

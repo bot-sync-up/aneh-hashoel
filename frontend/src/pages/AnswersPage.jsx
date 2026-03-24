@@ -41,9 +41,13 @@ function AnswerCard({ question, currentRabbiId }) {
     assigned_rabbi_id,
     rabbi_name,
     answer,
+    answer_is_private,
+    answer_rabbi_id,
     view_count = 0,
     thank_count = 0,
   } = question;
+
+  const isMyAnswer = currentRabbiId && answer_rabbi_id && String(answer_rabbi_id) === String(currentRabbiId);
 
   const resolvedRabbiId = assigned_rabbi?.id ?? assigned_rabbi_id;
   const isMe = currentRabbiId && resolvedRabbiId && String(resolvedRabbiId) === String(currentRabbiId);
@@ -68,6 +72,11 @@ function AnswerCard({ question, currentRabbiId }) {
             {getCategoryLabel(category)}
           </span>
         )}
+        {answer_is_private && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium font-heebo px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+            🔒 פרטי
+          </span>
+        )}
         <span className="mr-auto text-xs text-[var(--text-muted)] font-heebo flex items-center gap-1">
           <Calendar size={11} />
           {formatDate(answered_at)}
@@ -80,11 +89,15 @@ function AnswerCard({ question, currentRabbiId }) {
       </h3>
 
       {/* Answer snippet */}
-      {answer && (
+      {answer_is_private && !isMyAnswer ? (
+        <p className="text-sm text-[var(--text-muted)] font-heebo italic mb-3">
+          תשובה פרטית — גלויה לרב שענה בלבד.
+        </p>
+      ) : answer ? (
         <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-2 mb-3"
           dangerouslySetInnerHTML={{ __html: answer }}
         />
-      )}
+      ) : null}
 
       {/* Footer */}
       <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] font-heebo mt-3 pt-3 border-t border-[var(--border-default)] flex-wrap">

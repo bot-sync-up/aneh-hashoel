@@ -303,25 +303,27 @@ async function transferQuestion(questionId, fromRabbiId, toRabbiId) {
  * @param {boolean} [publishNow=true]
  * @returns {Promise<object>} – Created answer row
  */
-async function submitAnswer(questionId, rabbiId, content, publishNow = true) {
+async function submitAnswer(questionId, rabbiId, content, publishNow = true, isPrivate = false) {
   const answersService = getAnswersService();
-  const answer = await answersService.submitAnswer(questionId, rabbiId, content);
+  const answer = await answersService.submitAnswer(questionId, rabbiId, content, isPrivate);
 
-  // Mark notified_status=false so the notifier cron handles asker notification
-  dbQuery(
-    `UPDATE questions
-     SET    notified_status = false,
-            updated_at      = NOW()
-     WHERE  id = $1`,
-    [questionId]
-  ).catch((err) => {
-    console.error('[questionService] שגיאה בעדכון notified_status:', err.message);
-  });
+  if (!isPrivate) {
+    // Mark notified_status=false so the notifier cron handles asker notification
+    dbQuery(
+      `UPDATE questions
+       SET    notified_status = false,
+              updated_at      = NOW()
+       WHERE  id = $1`,
+      [questionId]
+    ).catch((err) => {
+      console.error('[questionService] שגיאה בעדכון notified_status:', err.message);
+    });
 
-  // Push to WordPress — fire-and-forget
-  getWPSyncService().syncAnswersToWP().catch((err) => {
-    console.error('[questionService] שגיאה בסנכרון תשובה ל-WordPress:', err.message);
-  });
+    // Push to WordPress — fire-and-forget
+    getWPSyncService().syncAnswersToWP().catch((err) => {
+      console.error('[questionService] שגיאה בסנכרון תשובה ל-WordPress:', err.message);
+    });
+  }
 
   // Notify all rabbis that the question is answered
   _emitSafe('question:answered', { questionId, answerId: answer.id, rabbiId }, null);

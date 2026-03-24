@@ -144,13 +144,15 @@ async function getQuestions(filters = {}) {
  * @param {string} id
  * @returns {Promise<object|null>}
  */
-async function getQuestionById(id) {
+async function getQuestionById(id, requestingRabbiId = null) {
   const result = await query(
     `SELECT q.*,
             r.name AS rabbi_name,
             c.name AS category_name,
             a.id         AS answer_id,
             a.content    AS answer_content,
+            a.is_private AS answer_is_private,
+            a.rabbi_id   AS answer_rabbi_id,
             a.created_at AS answer_created_at,
             a.updated_at AS answer_updated_at
      FROM   questions q
@@ -170,6 +172,15 @@ async function getQuestionById(id) {
   // Decrypt PII fields for the consumer
   row.asker_email = decryptField(row.asker_email);
   row.asker_phone = decryptField(row.asker_phone);
+
+  // Privacy filter: if answer is private and requester is not the answering rabbi,
+  // hide the content (but keep is_private flag so UI can show a badge).
+  if (row.answer_is_private && requestingRabbiId) {
+    const isAnsweringRabbi = String(row.answer_rabbi_id) === String(requestingRabbiId);
+    if (!isAnsweringRabbi) {
+      row.answer_content = null; // hide content
+    }
+  }
 
   return row;
 }

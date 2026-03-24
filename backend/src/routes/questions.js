@@ -221,7 +221,7 @@ router.get('/counts', authenticate, async (req, res, next) => {
  */
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
-    const question = await getQuestionById(req.params.id);
+    const question = await getQuestionById(req.params.id, req.rabbi.id);
 
     if (!question) {
       return res.status(404).json({
@@ -398,7 +398,7 @@ router.post(
   questionOwnership,
   async (req, res, next) => {
     try {
-      const { content, publishNow = true } = req.body;
+      const { content, publishNow = true, isPrivate = false } = req.body;
 
       if (!content || typeof content !== 'string' || !content.trim()) {
         return res.status(400).json({
@@ -418,7 +418,8 @@ router.post(
         req.params.id,
         req.rabbi.id,
         content,
-        publishNow
+        publishNow,
+        Boolean(isPrivate)
       );
 
       const io = _io(req);

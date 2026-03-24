@@ -414,6 +414,19 @@ router.post(
         });
       }
 
+      // Require category if publishing (not draft)
+      if (publishNow) {
+        const { rows: catCheck } = await dbQuery(
+          `SELECT category_id FROM questions WHERE id = $1`, [req.params.id]
+        );
+        if (!catCheck[0]?.category_id) {
+          return res.status(400).json({
+            error: 'לא ניתן לפרסם תשובה ללא קטגוריה. יש לשייך קטגוריה לשאלה תחילה.',
+            code: 'CATEGORY_REQUIRED',
+          });
+        }
+      }
+
       const answer = await questionService.submitAnswer(
         req.params.id,
         req.rabbi.id,
@@ -671,6 +684,46 @@ router.post('/hide/:id', authenticate, requireAdmin, async (req, res, next) => {
   } catch (err) {
     return next(err);
   }
+});
+
+// ─── PATCH /category/:id — set category on a question ────────────────────────
+router.patch('/category/:id', authenticate, async (req, res, next) => {
+  try {
+    const { category_id } = req.body;
+    const isAdmin = req.rabbi.role === 'admin';
+
+    // Validate category exists and is approved
+    if (category_id) {
+      const catId = parseInt(category_id, 10);
+      if (!Number.isFinite(catId))
+        return res.status(400).json({ error: 'מזהה קטגוריה אינו חוקי' });
+
+      const { rows: catRows } = await dbQuery(
+        `SELECT id FROM categories WHERE id = $1 AND status = 'approved'`, [catId]
+      );
+      if (!catRows[0])
+        return res.status(400).json({ error: 'קטגוריה לא נמצאה או לא מאושרת' });
+    }
+
+    // Only assigned rabbi or admin can set category
+    const { rows: qRows } = await dbQuery(
+      `SELECT id, assigned_rabbi_id, status FROM questions WHERE id = $1`, [req.params.id]
+    );
+    if (!qRows[0])
+      return res.status(404).json({ error: 'שאלה לא נמצאה' });
+
+    const q = qRows[0];
+    if (!isAdmin && String(q.assigned_rabbi_id) !== String(req.rabbi.id))
+      return res.status(403).json({ error: 'אין הרשאה לשנות קטגוריה לשאלה זו' });
+
+    const { rows } = await dbQuery(
+      `UPDATE questions SET category_id = $1 WHERE id = $2
+       RETURNING id, category_id`,
+      [category_id ? parseInt(category_id, 10) : null, req.params.id]
+    );
+
+    return res.json({ question: rows[0], message: 'הקטגוריה עודכנה' });
+  } catch (err) { return next(err); }
 });
 
 // ─── Exports ──────────────────────────────────────────────────────────────────

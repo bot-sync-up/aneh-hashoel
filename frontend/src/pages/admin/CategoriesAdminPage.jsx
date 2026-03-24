@@ -12,7 +12,7 @@ import {
   Tag,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import { get, post, patch, del } from '../../lib/api';
+import { get, post, put, patch, del } from '../../lib/api';
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 function Skeleton() {
@@ -220,6 +220,10 @@ export default function CategoriesAdminPage() {
   const [dragging, setDragging] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Pending suggestions
+  const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -238,6 +242,41 @@ export default function CategoriesAdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadPending = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const data = await get('/categories/pending');
+      setPendingSuggestions(data.suggestions ?? []);
+    } catch {
+      setPendingSuggestions([]);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  useEffect(() => { loadPending(); }, [loadPending]);
+
+  const handleApproveSuggestion = useCallback(async (id) => {
+    try {
+      await put(`/categories/${id}/approve`, {});
+      showToast('הקטגוריה אושרה');
+      loadPending();
+      load();
+    } catch {
+      showToast('שגיאה באישור', 'error');
+    }
+  }, [loadPending, load]);
+
+  const handleRejectSuggestion = useCallback(async (id) => {
+    try {
+      await put(`/categories/${id}/reject`, {});
+      showToast('הצעה נדחתה');
+      loadPending();
+    } catch {
+      showToast('שגיאה בדחיית הצעה', 'error');
+    }
+  }, [loadPending]);
 
   const handleAdd = useCallback(async (name, parentId = null) => {
     try {
@@ -306,6 +345,48 @@ export default function CategoriesAdminPage() {
       {toast && (
         <div className={clsx('fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-lg shadow-lg font-heebo text-sm text-white', toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600')}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* Pending suggestions section */}
+      {(loadingPending || pendingSuggestions.length > 0) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+          <h3 className="text-base font-bold text-amber-800 font-heebo">הצעות ממתינות לאישור</h3>
+          {loadingPending ? (
+            <p className="text-sm text-amber-700 font-heebo">טוען...</p>
+          ) : pendingSuggestions.length === 0 ? null : (
+            <div className="space-y-2">
+              {pendingSuggestions.map((s) => (
+                <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-200 bg-white">
+                  <Tag size={14} className="text-amber-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium font-heebo text-[var(--text-primary)]">{s.name}</span>
+                    {s.suggester_name && (
+                      <span className="text-xs text-[var(--text-muted)] font-heebo mr-2">
+                        — הוצע על ידי {s.suggester_name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 transition-colors"
+                      title="אשר"
+                      onClick={() => handleApproveSuggestion(s.id)}
+                    >
+                      <Check size={15} />
+                    </button>
+                    <button
+                      className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-600 transition-colors"
+                      title="דחה"
+                      onClick={() => handleRejectSuggestion(s.id)}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

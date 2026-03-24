@@ -28,7 +28,7 @@ import AnswerEditorAdvanced from '../components/answer/AnswerEditor';
 import EditAnswerEditor from '../components/answer/EditAnswerEditor';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
 import TransferModal from '../components/questions/TransferModal';
-import { get, post, put } from '../lib/api';
+import { get, post, put, patch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import {
@@ -59,6 +59,11 @@ export default function QuestionDetailPage() {
 
   // UI state
   const [notesOpen, setNotesOpen] = useState(false);
+
+  // Category picker state
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoryError, setCategoryError] = useState(null);
 
   // ── Fetch question ────────────────────────────────────────────────────────
 
@@ -121,6 +126,37 @@ export default function QuestionDetailPage() {
       offThank();
     };
   }, [on, id]);
+
+  // ── Load categories for picker ────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!editingCategory) return;
+    get('/categories').then((data) => {
+      const flattenTree = (nodes) => {
+        const result = [];
+        const walk = (list, depth) => {
+          for (const n of list) {
+            result.push({ ...n, depth });
+            if (n.children?.length) walk(n.children, depth + 1);
+          }
+        };
+        walk(nodes, 0);
+        return result;
+      };
+      setCategories(flattenTree(data.categories ?? []));
+    }).catch(() => setCategories([]));
+  }, [editingCategory]);
+
+  const handleSetCategory = useCallback(async (catId) => {
+    setCategoryError(null);
+    try {
+      await patch(`/questions/category/${id}`, { category_id: catId || null });
+      setEditingCategory(false);
+      fetchQuestion();
+    } catch (err) {
+      setCategoryError(err?.response?.data?.error || err.message || 'שגיאה בעדכון קטגוריה');
+    }
+  }, [id, fetchQuestion]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -250,15 +286,68 @@ export default function QuestionDetailPage() {
                 דחוף
               </span>
             )}
-            {category && (
+            {category && !editingCategory && (
               <span
                 className={clsx(
-                  'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium font-heebo',
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium font-heebo',
                   colorFromCategory(category)
                 )}
               >
                 {getCategoryLabel(category)}
+                {(isMe || rabbi?.role === 'admin') && (
+                  <button
+                    type="button"
+                    title="שנה קטגוריה"
+                    className="ml-1 opacity-60 hover:opacity-100"
+                    onClick={() => setEditingCategory(true)}
+                  >
+                    <Pencil size={10} />
+                  </button>
+                )}
               </span>
+            )}
+            {!category && (isMe || rabbi?.role === 'admin') && !editingCategory && (
+              <button
+                type="button"
+                className="text-xs text-brand-navy dark:text-dark-accent font-heebo underline hover:no-underline"
+                onClick={() => setEditingCategory(true)}
+              >
+                שייך קטגוריה
+              </button>
+            )}
+            {editingCategory && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  className="text-xs rounded border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-heebo px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)]"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__suggest__') {
+                      setEditingCategory(false);
+                    } else {
+                      handleSetCategory(val || null);
+                    }
+                  }}
+                >
+                  <option value="">-- בחר קטגוריה --</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {'  '.repeat(cat.depth)}{cat.name}
+                    </option>
+                  ))}
+                  <option value="__suggest__">+ הצע קטגוריה חדשה</option>
+                </select>
+                <button
+                  type="button"
+                  className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] font-heebo"
+                  onClick={() => { setEditingCategory(false); setCategoryError(null); }}
+                >
+                  ביטול
+                </button>
+                {categoryError && (
+                  <span className="text-xs text-red-600 font-heebo">{categoryError}</span>
+                )}
+              </div>
             )}
             <Badge status={status} withDot className="mr-auto" />
           </div>
@@ -419,6 +508,7 @@ export default function QuestionDetailPage() {
                   <AnswerEditorAdvanced
                     questionId={id}
                     existingAnswer={question.answer_draft || ''}
+                    hasCategory={!!question.category_id}
                     onSave={({ publishNow }) => {
                       if (publishNow) {
                         fetchQuestion();

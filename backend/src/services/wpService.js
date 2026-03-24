@@ -333,12 +333,17 @@ async function publishAnswer(wpPostId, answerData) {
 
   const payload = {
     meta: {
-      'ask-answ':      answerData.content,
-      'ask-rabbi':     answerData.rabbiName   || '',
-      'ask-signature': answerData.signature   || '',
+      'ask-answ':        answerData.content,
+      'ask-rabbi':       answerData.rabbiName   || '',
+      'ask-signature':   answerData.signature   || '',
       'ask-answered-at': answerData.publishedAt || new Date().toISOString(),
     },
   };
+
+  // If we have the WP category term ID, set it on the post
+  if (answerData.wpCategoryTermId) {
+    payload['ask-cat'] = [answerData.wpCategoryTermId];
+  }
 
   try {
     const client = buildClient();

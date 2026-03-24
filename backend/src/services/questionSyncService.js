@@ -277,10 +277,12 @@ async function syncAnswersToWP(options = {}) {
               a.content     AS answer_content,
               a.published_at,
               r.name        AS rabbi_name,
-              r.signature   AS rabbi_signature
+              r.signature   AS rabbi_signature,
+              c.wp_term_id  AS wp_category_term_id
        FROM   questions q
        JOIN   answers   a ON a.question_id = q.id
        JOIN   rabbis    r ON r.id          = a.rabbi_id
+       LEFT JOIN categories c ON c.id = q.category_id
        WHERE  q.status      = 'answered'
          AND  q.wp_synced_at IS NULL
          AND  q.wp_post_id  IS NOT NULL
@@ -308,12 +310,13 @@ async function syncAnswersToWP(options = {}) {
   // ── 2. Push each answer to WP ─────────────────────────────────────────────
   for (const row of rows) {
     const publishResult = await publishAnswer(row.wp_post_id, {
-      content:     row.answer_content,
-      rabbiName:   row.rabbi_name,
-      signature:   row.rabbi_signature || '',
-      publishedAt: row.published_at
+      content:           row.answer_content,
+      rabbiName:         row.rabbi_name,
+      signature:         row.rabbi_signature || '',
+      publishedAt:       row.published_at
         ? new Date(row.published_at).toISOString()
         : new Date().toISOString(),
+      wpCategoryTermId:  row.wp_category_term_id || null,
     });
 
     if (publishResult.success) {

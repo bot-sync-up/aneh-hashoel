@@ -178,7 +178,7 @@ function FontSizePicker({ editor }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpenTemplates }) {
+export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpenTemplates, hasCategory = true }) {
   const { rabbi } = useAuth();
   const [draftNotice, setDraftNotice] = useState(null);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -442,6 +442,13 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
 
       {saveError && <p role="alert" className="text-sm text-red-600 font-heebo px-1">{saveError}</p>}
 
+      {/* No-category warning */}
+      {!hasCategory && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-heebo">
+          <span>לא ניתן לפרסם ללא קטגוריה — שייך קטגוריה לשאלה תחילה.</span>
+        </div>
+      )}
+
       {/* Private answer toggle */}
       <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit" dir="rtl">
         <input
@@ -463,7 +470,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
       {/* Actions */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="md" loading={savingDraft} onClick={handleSaveDraft}>שמור טיוטה</Button>
-        <Button variant="secondary" size="md" onClick={() => setPublishModalOpen(true)} disabled={savingDraft || !charCount}>פרסם תשובה</Button>
+        <Button variant="secondary" size="md" onClick={() => setPublishModalOpen(true)} disabled={savingDraft || !charCount || !hasCategory}>פרסם תשובה</Button>
         {charCount > 0 && (
           <Button
             variant="outline"

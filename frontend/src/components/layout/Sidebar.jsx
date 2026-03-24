@@ -156,8 +156,8 @@ function Sidebar({ notificationCount = 0 }) {
         {/* Logo + text (expanded) */}
         {!collapsed && (
           <div className="flex flex-col items-center gap-2 w-full">
-            <div className="w-16 h-16 rounded-2xl bg-white p-1.5 shadow-md flex-shrink-0">
-              <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
+            <div className="w-full rounded-2xl bg-white p-2 shadow-md">
+              <img src={logoSrc} alt="ענה את השואל" className="w-full h-12 object-contain" />
             </div>
             <div className="text-center leading-tight">
               <span className="block text-white font-bold text-base font-heebo">

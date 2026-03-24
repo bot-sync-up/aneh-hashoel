@@ -66,10 +66,12 @@ async function syncAnswerToWP(questionId) {
             q.status     AS question_status,
             a.content    AS answer_content,
             a.signature  AS answer_signature,
-            r.name       AS rabbi_name
+            r.name       AS rabbi_name,
+            c.wp_term_id AS wp_category_term_id
      FROM   questions q
      JOIN   answers   a ON a.question_id = q.id
      JOIN   rabbis    r ON r.id = a.rabbi_id
+     LEFT JOIN categories c ON c.id = q.category_id
      WHERE  q.id = $1
      LIMIT  1`,
     [questionId]
@@ -90,12 +92,16 @@ async function syncAnswerToWP(questionId) {
   try {
     const client = wpClient();
 
-    await client.post(`/questions/${data.wp_post_id}`, {
+    const wpPayload = {
       answer_content:   data.answer_content,
       rabbi_name:       data.rabbi_name,
       rabbi_signature:  data.answer_signature || '',
       status:           'answered',
-    });
+    };
+    if (data.wp_category_term_id) {
+      wpPayload['ask-cat'] = [data.wp_category_term_id];
+    }
+    await client.post(`/questions/${data.wp_post_id}`, wpPayload);
 
     // Mark successful sync
     await dbQuery(

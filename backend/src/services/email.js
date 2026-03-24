@@ -420,7 +420,7 @@ async function sendNewDeviceAlert(email, deviceInfo) {
   `;
 
   const html = createEmailHTML('התחברות ממכשיר חדש', bodyContent, [
-    { label: 'שנה סיסמה', url: `${appUrl()}/settings/security`, color: '#cc4444' },
+    { label: 'שנה סיסמה', url: `${appUrl()}/profile?tab=security`, color: '#cc4444' },
   ]);
 
   return sendEmail(email, 'התחברות ממכשיר חדש — ענה את השואל', html);

@@ -767,7 +767,7 @@ async function _sendResetEmail(rabbi, resetUrl) {
  */
 async function _sendNewDeviceAlertEmail(rabbi, deviceInfo) {
   const timestamp  = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
-  const securityUrl = `${_appUrl()}/settings/security`;
+  const securityUrl = `${_appUrl()}/profile?tab=security`;
 
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${_esc(rabbi.name || 'רב')},</p>

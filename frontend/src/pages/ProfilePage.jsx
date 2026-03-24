@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   User,
@@ -447,7 +448,8 @@ function SecurityTab() {
 
 export default function ProfilePage() {
   const { rabbi } = useAuth();
-  const [activeTab, setActiveTab] = useState('personal');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'personal');
 
   const tabContent = {
     personal:      <PersonalTab rabbi={rabbi} />,

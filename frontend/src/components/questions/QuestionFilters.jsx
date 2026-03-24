@@ -8,10 +8,9 @@ import Badge from '../ui/Badge';
 import { useDebounce } from '../../hooks/useDebounce';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'כל הסטטוסים' },
+  { value: '', label: 'ממתין + בטיפול' },
   { value: 'pending', label: 'ממתין' },
   { value: 'in_process', label: 'בטיפול' },
-  { value: 'answered', label: 'נענה' },
   { value: 'hidden', label: 'מוסתר' },
 ];
 

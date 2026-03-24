@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Pencil,
   Send,
+  Paperclip,
 } from 'lucide-react';
 import PageHeader, { Breadcrumb } from '../components/layout/PageHeader';
 import Card from '../components/ui/Card';
@@ -167,6 +168,8 @@ export default function QuestionDetailPage() {
     follow_up_count = 0,
     private_notes,
     discussion_count = 0,
+    attachment_url,
+    question_number,
   } = question;
 
   // assigned_rabbi may be an object {id,name} or the API may return assigned_rabbi_id + rabbi_name flat
@@ -195,7 +198,7 @@ export default function QuestionDetailPage() {
           <Breadcrumb
             items={[
               { label: 'כל השאלות', href: '/questions' },
-              { label: `שאלה #${id}` },
+              { label: `שאלה #${question_number ?? id.slice(0,8)}` },
             ]}
           />
         }
@@ -265,6 +268,32 @@ export default function QuestionDetailPage() {
             className="prose prose-sm max-w-none text-[var(--text-secondary)] font-heebo leading-relaxed"
             dangerouslySetInnerHTML={{ __html: content }}
           />
+
+          {/* Attachment */}
+          {attachment_url && (
+            <div className="mt-4 pt-4 border-t border-[var(--border-default)]">
+              <p className="text-xs text-[var(--text-muted)] font-heebo mb-2">קובץ מצורף:</p>
+              {/\.(jpg|jpeg|png|gif|webp)$/i.test(attachment_url) ? (
+                <a href={attachment_url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={attachment_url}
+                    alt="קובץ מצורף"
+                    className="max-h-64 rounded-lg border border-[var(--border-default)] object-contain"
+                  />
+                </a>
+              ) : (
+                <a
+                  href={attachment_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-brand-navy dark:text-dark-accent font-heebo hover:underline"
+                >
+                  <Paperclip size={14} />
+                  פתח קובץ מצורף
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Footer meta */}
           <div className="flex items-center gap-4 text-xs text-[var(--text-muted)] font-heebo mt-5 pt-4 border-t border-[var(--border-default)] flex-wrap">

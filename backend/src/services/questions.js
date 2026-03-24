@@ -112,9 +112,9 @@ async function getQuestions(filters = {}) {
   // Fetch page
   const dataParams = [...params, limit, offset];
   const dataResult = await query(
-    `SELECT q.id, q.title, q.content, q.status, q.urgency, q.difficulty,
+    `SELECT q.id, q.question_number, q.title, q.content, q.status, q.urgency, q.difficulty,
             q.category_id, q.assigned_rabbi_id, q.flagged, q.flag_reason,
-            q.thank_count, q.created_at, q.updated_at,
+            q.thank_count, q.attachment_url, q.created_at, q.updated_at,
             r.name AS rabbi_name,
             c.name AS category_name
      FROM   questions q

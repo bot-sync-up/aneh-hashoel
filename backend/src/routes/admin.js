@@ -80,7 +80,7 @@ router.get('/dashboard/activity', async (req, res) => {
   try {
     const { rows } = await dbQuery(`
       SELECT
-        TO_CHAR(d::date, 'DD/MM') AS date,
+        TO_CHAR(d::date, 'YYYY-MM-DD') AS date,
         COUNT(q.id) FILTER (WHERE q.status != 'pending') AS questions,
         COUNT(q.id) FILTER (WHERE q.status = 'answered') AS answers
       FROM generate_series(

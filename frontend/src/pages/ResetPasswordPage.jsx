@@ -70,7 +70,7 @@ function RequestResetForm() {
     setLoading(true);
 
     try {
-      await api.post('/auth/reset-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', { email: email.trim() });
       setSent(true);
       toast.success('קישור לאיפוס סיסמה נשלח לאימייל שלך');
     } catch (err) {

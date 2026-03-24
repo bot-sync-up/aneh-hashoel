@@ -55,9 +55,21 @@ export default function QuestionDetailPage() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCreateDiscussion, setShowCreateDiscussion] = useState(false);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+
+  // Templates
+  const [templates, setTemplates] = useState([]);
+  const [templateInsert, setTemplateInsert] = useState(null);
 
   // UI state
   const [notesOpen, setNotesOpen] = useState(false);
+
+  // ── Fetch templates when answer modal opens ───────────────────────────────
+  useEffect(() => {
+    if (showAnswerModal) {
+      get('/rabbis/templates').then(d => setTemplates(d.templates || [])).catch(() => {});
+    }
+  }, [showAnswerModal]);
 
   // ── Fetch question ────────────────────────────────────────────────────────
 

@@ -57,12 +57,6 @@ const NAV_ITEMS = [
     icon: FileText,
   },
   {
-    to: '/notifications',
-    label: 'התראות',
-    icon: Bell,
-    badge: true,
-  },
-  {
     to: '/profile',
     label: 'פרופיל',
     icon: UserRound,

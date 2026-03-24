@@ -93,8 +93,9 @@ async function getQuestions(filters = {}) {
     params.push(filters.dateTo);
   }
 
-  // Non-admin rabbis: show only pending questions (never in_process / answered)
-  if (filters.rabbiViewerId) {
+  // Non-admin rabbis: hide in_process questions of other rabbis.
+  // Exception: 'answered' status is a public feed — all rabbis may see it.
+  if (filters.rabbiViewerId && filters.status !== 'answered') {
     conditions.push(`q.status = 'pending'`);
   }
 

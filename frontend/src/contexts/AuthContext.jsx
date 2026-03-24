@@ -200,7 +200,9 @@ export function AuthProvider({ children }) {
         return { success: true };
       } catch (error) {
         const message =
-          error.response?.data?.message || 'שגיאה בהתחברות. אנא נסה שוב.';
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'שגיאה בהתחברות. אנא נסה שוב.';
         return { success: false, message };
       } finally {
         setLoading(false);

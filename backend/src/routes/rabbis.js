@@ -205,6 +205,46 @@ router.put('/profile/categories', async (req, res, next) => {
   }
 });
 
+// ─── GET /profile/vacation ────────────────────────────────────────────────────
+
+router.get('/profile/vacation', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT is_vacation FROM rabbis WHERE id = $1`,
+      [req.rabbi.id]
+    );
+    return res.json({
+      is_vacation: rows[0]?.is_vacation ?? false,
+      return_date: null,
+    });
+  } catch (err) { return next(err); }
+});
+
+// ─── PUT /profile/vacation ────────────────────────────────────────────────────
+
+router.put('/profile/vacation', async (req, res, next) => {
+  try {
+    const { is_vacation } = req.body ?? {};
+    if (typeof is_vacation !== 'boolean') {
+      return res.status(400).json({ error: 'is_vacation חייב להיות true או false' });
+    }
+    const { rows } = await query(
+      `UPDATE rabbis SET is_vacation = $1, updated_at = NOW() WHERE id = $2 RETURNING is_vacation`,
+      [is_vacation, req.rabbi.id]
+    );
+    return res.json({ is_vacation: rows[0].is_vacation, return_date: null });
+  } catch (err) { return next(err); }
+});
+
+// ─── GET /profile/notifications ───────────────────────────────────────────────
+
+router.get('/profile/notifications', async (req, res, next) => {
+  try {
+    const prefs = await getNotificationPreferences(req.rabbi.id);
+    return res.json({ preferences: prefs });
+  } catch (err) { return next(err); }
+});
+
 // ─── PUT /profile/notifications ───────────────────────────────────────────────
 
 /**

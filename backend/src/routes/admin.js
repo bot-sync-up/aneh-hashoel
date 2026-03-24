@@ -206,7 +206,7 @@ router.post('/rabbis', async (req, res) => {
 router.patch('/rabbis/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, display_name, role, isActive } = req.body;
+    const { name, email, phone, role, isActive, signature, whatsapp_number } = req.body;
 
     const { rows } = await dbQuery('SELECT id FROM rabbis WHERE id = $1', [id]);
     if (!rows.length) return res.status(404).json({ error: 'רב לא נמצא' });
@@ -215,12 +215,13 @@ router.patch('/rabbis/:id', async (req, res) => {
     const vals = [];
     let idx = 1;
 
-    if (name !== undefined)         { fields.push(`name = $${idx++}`);         vals.push(name); }
-    if (email !== undefined)        { fields.push(`email = $${idx++}`);        vals.push(email); }
-    if (phone !== undefined)        { fields.push(`phone = $${idx++}`);        vals.push(phone); }
-    if (display_name !== undefined) { fields.push(`display_name = $${idx++}`); vals.push(display_name); }
-    if (role !== undefined)         { fields.push(`role = $${idx++}`);         vals.push(role); }
-    if (isActive !== undefined)     { fields.push(`is_active = $${idx++}`);    vals.push(Boolean(isActive)); }
+    if (name !== undefined)             { fields.push(`name = $${idx++}`);             vals.push(name); }
+    if (email !== undefined)            { fields.push(`email = $${idx++}`);            vals.push(email); }
+    if (phone !== undefined)            { fields.push(`phone = $${idx++}`);            vals.push(phone); }
+    if (role !== undefined)             { fields.push(`role = $${idx++}`);             vals.push(role); }
+    if (isActive !== undefined)         { fields.push(`is_active = $${idx++}`);        vals.push(Boolean(isActive)); }
+    if (signature !== undefined)        { fields.push(`signature = $${idx++}`);        vals.push(signature); }
+    if (whatsapp_number !== undefined)  { fields.push(`whatsapp_number = $${idx++}`);  vals.push(whatsapp_number); }
 
     if (!fields.length) return res.status(400).json({ error: 'אין שדות לעדכון' });
 
@@ -228,7 +229,7 @@ router.patch('/rabbis/:id', async (req, res) => {
     const { rows: updated } = await dbQuery(
       `UPDATE rabbis SET ${fields.join(', ')}, updated_at = NOW()
        WHERE id = $${idx}
-       RETURNING id, name, email, phone, display_name, role, is_active`,
+       RETURNING id, name, email, phone, role, is_active, signature, whatsapp_number`,
       vals
     );
 

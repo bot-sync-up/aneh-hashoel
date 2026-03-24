@@ -51,7 +51,7 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
     name: rabbi.name || '',
     email: rabbi.email || '',
     phone: rabbi.phone || '',
-    display_name: rabbi.display_name || '',
+    whatsapp_number: rabbi.whatsapp_number || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -84,8 +84,8 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
             <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div>
-            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">שם תצוגה</label>
-            <Input value={form.display_name} onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))} placeholder="שם לתצוגה ציבורית" />
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">וואטסאפ</label>
+            <Input value={form.whatsapp_number} onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value }))} placeholder="050-0000000" dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">אימייל *</label>

@@ -52,6 +52,7 @@ const {
 
 // Socket broadcast helpers
 const { emitToAll, emitToRabbi }      = require('../socket/helpers');
+const { query: dbQuery }              = require('../db/pool');
 
 const router = express.Router();
 
@@ -196,7 +197,7 @@ router.get('/stats/overview', authenticate, requireAdmin, async (req, res, next)
 router.get('/counts', authenticate, async (req, res, next) => {
   try {
     const rabbiId = req.rabbi.id;
-    const { rows } = await require('../db').query(
+    const { rows } = await dbQuery(
       `SELECT
          COUNT(*) FILTER (WHERE status = 'pending')                              AS pending_count,
          COUNT(*) FILTER (WHERE status = 'in_process' AND assigned_rabbi_id = $1) AS my_open_count

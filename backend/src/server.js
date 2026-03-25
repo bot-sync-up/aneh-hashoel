@@ -79,6 +79,9 @@ app.set('io', io);
 
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
+// Trust first proxy (nginx) so X-Forwarded-For is respected for rate limiting
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 

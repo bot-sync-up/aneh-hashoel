@@ -92,9 +92,13 @@ function normaliseWebhookPayload(body) {
   const src  = body.post || body;
   const meta = src.meta || src.acf || src.fields || {};
   // JetEngine booking-form sends form fields under body.values (not in meta)
-  const vals = body.values || src.values || {};
+  // May arrive as JSON string or parsed object
+  let vals = body.values || src.values || {};
+  if (typeof vals === 'string') {
+    try { vals = JSON.parse(vals); } catch { vals = {}; }
+  }
 
-  // Debug log to confirm payload structure (one-line, redacted)
+  // Debug log to confirm payload structure
   console.log(
     '[wp-webhook] payload keys:',
     JSON.stringify({
@@ -102,8 +106,10 @@ function normaliseWebhookPayload(body) {
       src_keys:  Object.keys(src).slice(0, 20),
       meta_keys: Object.keys(meta).slice(0, 20),
       vals_keys: Object.keys(vals).slice(0, 20),
+      vals_type: typeof (body.values || src.values),
       vals_email: vals.visitor_email || vals.asker_email || '(none)',
       meta_email: meta.visitor_email || meta.asker_email || '(none)',
+      resolved_email: meta.visitor_email || vals.visitor_email || meta.asker_email || src.visitor_email || src.asker_email || '(none)',
     })
   );
 

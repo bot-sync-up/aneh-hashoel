@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { ChevronDown, ChevronUp, X, Filter, Flame } from 'lucide-react';
 import Input from '../ui/Input';
@@ -6,26 +6,13 @@ import Select from '../ui/Select';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { useDebounce } from '../../hooks/useDebounce';
+import api from '../../lib/api';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'ממתין + בטיפול' },
   { value: 'pending', label: 'ממתין' },
   { value: 'in_process', label: 'בטיפול' },
   { value: 'hidden', label: 'מוסתר' },
-];
-
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'כל הקטגוריות' },
-  { value: 'shabbat', label: 'שבת ומועדים' },
-  { value: 'kashrut', label: 'כשרות' },
-  { value: 'family', label: 'דיני משפחה' },
-  { value: 'prayer', label: 'תפילה' },
-  { value: 'business', label: 'ממונות' },
-  { value: 'nidda', label: 'טהרת המשפחה' },
-  { value: 'mourning', label: 'אבלות' },
-  { value: 'blessings', label: 'ברכות' },
-  { value: 'general', label: 'כללי' },
-  { value: 'other', label: 'אחר' },
 ];
 
 const SORT_OPTIONS = [
@@ -52,6 +39,20 @@ function QuestionFilters({
   const [open, setOpen] = useState(defaultOpen);
   const [localSearch, setLocalSearch] = useState(filters.search || '');
   const debouncedSearch = useDebounce(localSearch, 400);
+  const [categoryOptions, setCategoryOptions] = useState([{ value: '', label: 'כל הקטגוריות' }]);
+
+  // Fetch categories from API
+  useEffect(() => {
+    api.get('/categories')
+      .then(res => {
+        const cats = res.data?.categories || res.data || [];
+        setCategoryOptions([
+          { value: '', label: 'כל הקטגוריות' },
+          ...cats.map(c => ({ value: String(c.id), label: c.name })),
+        ]);
+      })
+      .catch(() => {});
+  }, []);
 
   // Push debounced search up
   React.useEffect(() => {
@@ -135,7 +136,7 @@ function QuestionFilters({
             {/* Category */}
             <Select
               label="קטגוריה"
-              options={CATEGORY_OPTIONS}
+              options={categoryOptions}
               value={filters.category || ''}
               onChange={(e) => handleField('category', e.target.value)}
             />
@@ -217,7 +218,7 @@ function QuestionFilters({
             <div className="flex items-center gap-2 flex-wrap">
               {filters.category && (
                 <ActiveFilterPill
-                  label={CATEGORY_OPTIONS.find((o) => o.value === filters.category)?.label}
+                  label={categoryOptions.find((o) => o.value === filters.category)?.label}
                   onRemove={() => handleField('category', '')}
                 />
               )}

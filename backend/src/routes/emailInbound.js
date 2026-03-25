@@ -188,7 +188,7 @@ router.post('/inbound', async (req, res) => {
                   lock_timestamp = NULL, updated_at = NOW()
            WHERE  id = $1
              AND  assigned_rabbi_id = $2
-             AND  status IN ('in_process','claimed')
+             AND  status = 'in_process'
            RETURNING id`,
           [questionId, rabbi.id]
         );

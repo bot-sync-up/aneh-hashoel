@@ -567,7 +567,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
         </span>
         {isPrivate && (
           <span className="text-xs font-heebo text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded px-2 py-0.5">
-            לא יישלח לשואל ולא יפורסם
+            יישלח לשואל במייל בלבד — לא יפורסם באתר
           </span>
         )}
       </label>

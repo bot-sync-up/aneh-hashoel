@@ -218,10 +218,7 @@ async function notifyAskerNewAnswer(questionId) {
   <h2 style="color: #1B2B5E;">${greeting}</h2>
   <p>שמחים לבשר לך שהרב <strong>${data.rabbi_name}</strong> ענה על שאלתך:</p>
   ${data.title ? `<blockquote style="border-right: 4px solid #B8973A; padding-right: 16px; margin: 16px 0; color: #333;">${data.title}</blockquote>` : ''}
-  ${answerUrl
-    ? `<p><a href="${answerUrl}" style="background: #1B2B5E; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">לצפייה בתשובה באתר</a></p>`
-    : '<p>התשובה מחכה לך באתר.</p>'
-  }
+  <p>קיבלת תשובה לשאלתך.${answerUrl ? ` לצפייה בתשובה המלאה לחץ על הקישור: <a href="${answerUrl}" style="color: #2563eb;">${answerUrl}</a>` : ''}</p>
   <p>בברכה,<br>צוות ענה את השואל</p>
 </div>`;
 
@@ -375,7 +372,7 @@ async function notifyAskerPrivateAnswer(questionId) {
     try {
       await sendEmail(
         email,
-        'תשובה אישית לשאלתך — ענה את השואל',
+        `תשובה לשאלתך — ${data.title || 'ענה את השואל'}`,
         `<div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #1B2B5E;">${greeting}</h2>
           <p>הרב <strong>${data.rabbi_name}</strong> ענה על שאלתך בתשובה אישית:</p>

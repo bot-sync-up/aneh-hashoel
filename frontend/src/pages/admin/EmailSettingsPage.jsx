@@ -243,11 +243,6 @@ export default function EmailSettingsPage() {
         );
       })}
 
-      {/* Footer note about SyncUp */}
-      <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700 font-heebo">
-        הערה: הפוטר של SyncUp בתחתית כל אימייל אינו ניתן לעריכה.
-      </div>
-
       {/* Actions */}
       <div className="flex items-center justify-between">
         <Button

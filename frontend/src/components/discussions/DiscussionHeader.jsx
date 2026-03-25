@@ -27,11 +27,21 @@ export default function DiscussionHeader({
 
   const [showAddMember, setShowAddMember] = useState(false);
   const [addSearch, setAddSearch] = useState('');
-  const [addResults, setAddResults] = useState([]);
+  const [allRabbis, setAllRabbis] = useState([]);
   const [addLoading, setAddLoading] = useState(false);
   const [leavingDiscussion, setLeavingDiscussion] = useState(false);
   const [lockingDiscussion, setLockingDiscussion] = useState(false);
   const [deletingDiscussion, setDeletingDiscussion] = useState(false);
+
+  // Load all rabbis when add-member panel opens
+  React.useEffect(() => {
+    if (!showAddMember || allRabbis.length > 0) return;
+    setAddLoading(true);
+    api.get('/rabbis', { params: { limit: 200 } })
+      .then(({ data }) => setAllRabbis(data.rabbis || data.data || data || []))
+      .catch(() => {})
+      .finally(() => setAddLoading(false));
+  }, [showAddMember]);
 
   // Online member IDs tracked via socket presence
   const [onlineIds, setOnlineIds] = useState(() => new Set());
@@ -60,24 +70,15 @@ export default function DiscussionHeader({
 
   // ── Add member search ──────────────────────────────────────────────────────
 
-  const handleAddSearch = useCallback(async (query) => {
-    setAddSearch(query);
-    if (!query.trim()) {
-      setAddResults([]);
-      return;
-    }
-    setAddLoading(true);
-    try {
-      const { data } = await api.get('/rabbis', {
-        params: { search: query, limit: 8 },
-      });
-      setAddResults(data.rabbis || data.data || data || []);
-    } catch {
-      setAddResults([]);
-    } finally {
-      setAddLoading(false);
-    }
-  }, []);
+  // Filter rabbis locally by search term
+  const filteredRabbis = React.useMemo(() => {
+    const term = addSearch.trim().toLowerCase();
+    const list = allRabbis.filter(r => {
+      if (!term) return true;
+      return (r.name || r.full_name || '').toLowerCase().includes(term);
+    });
+    return list;
+  }, [allRabbis, addSearch]);
 
   const handleAddMember = useCallback(
     async (targetRabbi) => {
@@ -295,7 +296,7 @@ export default function DiscussionHeader({
                 <input
                   type="search"
                   value={addSearch}
-                  onChange={(e) => handleAddSearch(e.target.value)}
+                  onChange={(e) => setAddSearch(e.target.value)}
                   placeholder="חיפוש רב..."
                   autoFocus
                   dir="rtl"
@@ -314,9 +315,9 @@ export default function DiscussionHeader({
                 </div>
               )}
 
-              {!addLoading && addResults.length > 0 && (
-                <ul className="max-h-36 overflow-y-auto">
-                  {addResults.map((r) => {
+              {!addLoading && filteredRabbis.length > 0 && (
+                <ul className="max-h-52 overflow-y-auto">
+                  {filteredRabbis.map((r) => {
                     const alreadyMember = members.some((m) => m.id === r.id);
                     return (
                       <li key={r.id}>
@@ -350,7 +351,7 @@ export default function DiscussionHeader({
                 </ul>
               )}
 
-              {!addLoading && addSearch && addResults.length === 0 && (
+              {!addLoading && filteredRabbis.length === 0 && (
                 <p className="text-xs text-[var(--text-muted)] font-heebo px-3 py-2">
                   לא נמצאו רבנים
                 </p>

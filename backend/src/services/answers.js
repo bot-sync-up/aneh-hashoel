@@ -116,8 +116,10 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
   const signature = rabbi.signature || '';
 
   // Auto-append rabbi signature to content
-  const contentWithSignature = signature
-    ? `${sanitizedContent}<p dir="rtl">${sanitizeRichText(signature)}</p>`
+  // Use <div> not <p> — signature is already HTML with block elements
+  const sigHtml = signature ? sanitizeRichText(signature) : '';
+  const contentWithSignature = sigHtml
+    ? `${sanitizedContent}<div dir="rtl" style="margin-top:1em">${sigHtml}</div>`
     : sanitizedContent;
 
   // 4 + 5. Insert answer and update question in a transaction

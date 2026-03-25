@@ -248,6 +248,67 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
 
   await logSync(payload.wpPostId, 'webhook_new_question', 'success');
 
+  // ── Fire-and-forget: enrich from WP API (email, phone, image, link) ─────
+  // WP webhook fires before JetEngine saves form values to post meta,
+  // so email/phone may be empty. Fetch from WP API after a short delay.
+  setTimeout(async () => {
+    try {
+      const wpService = require('../services/wpService');
+      const result = await wpService.getQuestionById(payload.wpPostId);
+      if (result.success && result.data) {
+        const wpQ  = result.data;
+        const meta = wpQ.meta || {};
+        const imgUrl = meta['ask-visitor-img'] || null;
+        const wpLink = wpQ.link || null;
+        const email  = meta['visitor_email'] || meta['asker_email'] || meta['asker-email'] || null;
+        const phone  = meta['visitor_phone'] || meta['asker_phone'] || meta['asker-phone'] || null;
+        const name   = meta['visitor_name']  || meta['asker_name']  || null;
+
+        await query(
+          `UPDATE questions
+           SET    attachment_url = COALESCE(attachment_url, $1),
+                  wp_link        = COALESCE(wp_link, $2),
+                  asker_email    = COALESCE(NULLIF(asker_email,''), $3),
+                  asker_phone    = COALESCE(NULLIF(asker_phone,''), $4),
+                  asker_name     = COALESCE(NULLIF(asker_name,''), $5),
+                  updated_at     = NOW()
+           WHERE  id = $6`,
+          [imgUrl, wpLink, email, phone, name, question.id]
+        );
+        console.log(`[wpWebhook] enriched ${question.id} img=${!!imgUrl} email=${!!email} phone=${!!phone} link=${!!wpLink}`);
+
+        // Send asker confirmation email now that we have their email
+        if (email) {
+          try {
+            const { notifyAskerQuestionReceived } = require('../services/askerNotification');
+            await notifyAskerQuestionReceived({
+              asker_email: email,
+              asker_name: name || payload.askerName,
+              title: payload.title,
+            });
+            console.log(`[wpWebhook] asker confirmation sent to ${email}`);
+          } catch (notifErr) {
+            console.warn('[wpWebhook] asker confirmation failed:', notifErr.message);
+          }
+        }
+
+        // Upsert lead
+        try {
+          const { upsertLead } = require('../services/leadsService');
+          await upsertLead({
+            ...question,
+            asker_email: email,
+            asker_phone: phone,
+          });
+        } catch (leadErr) {
+          console.warn('[wpWebhook] upsertLead failed:', leadErr.message);
+        }
+      }
+    } catch (enrichErr) {
+      console.warn('[wpWebhook] enrich failed:', enrichErr.message);
+    }
+  }, 3000); // 3 second delay to let JetEngine save form values
+
   console.log(
     `[wpWebhook] new-question ✓ id=${question.id} wpPostId=${payload.wpPostId}`
   );

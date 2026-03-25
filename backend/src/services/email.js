@@ -143,7 +143,7 @@ async function sendQuestionNotification(rabbiEmail, question, actionTokens) {
       <p style="margin: 0 0 8px; color: #666; font-size: 13px;">
         קטגוריה: ${categoryLabel}
       </p>
-      ${preview ? `<p style="margin: 0; color: #555; font-size: 14px;">${preview}${question.content && question.content.length > 150 ? '...' : ''}</p>` : ''}
+      <p style="margin: 8px 0 0; color: #888; font-size: 13px; font-style: italic;">לצפייה בפרטי השאלה המלאים — לחץ על הכפתור למטה</p>
     </div>
   `;
 

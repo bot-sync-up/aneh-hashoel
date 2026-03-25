@@ -139,12 +139,14 @@ function createEmailHTML(title, bodyContent, actionButtons = []) {
               text-align: center;
               border-radius: 8px 8px 0 0;
             ">
-              <img
-                src="${(process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '')}/logo.png"
-                alt="ענה את השואל"
-                width="120"
-                style="display:block; margin:0 auto 10px; max-width:120px; height:auto;"
-              />
+              <div style="display:inline-block; background:#ffffff; border-radius:10px; padding:8px 16px; margin-bottom:10px;">
+                <img
+                  src="${(process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '')}/logo.png"
+                  alt="ענה את השואל"
+                  width="110"
+                  style="display:block; max-width:110px; height:auto;"
+                />
+              </div>
               <h1 style="
                 margin: 0;
                 color: ${BRAND_GOLD};
@@ -216,6 +218,15 @@ function createEmailHTML(title, bodyContent, actionButtons = []) {
                 line-height: 1.5;
               ">
                 לשינוי העדפות התראות, ניתן לפנות למנהל המערכת
+              </p>
+            </td>
+          </tr>
+
+          <!-- SyncUp branding -->
+          <tr>
+            <td style="padding:10px 32px; text-align:center; background:#f0f0f0; border-radius:0 0 8px 8px;">
+              <p style="margin:0; font-family:Arial,sans-serif; font-size:11px; color:#999; direction:rtl;">
+                פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
               </p>
             </td>
           </tr>

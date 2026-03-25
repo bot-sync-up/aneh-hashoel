@@ -376,6 +376,116 @@ async function syncAnswersToWP(options = {}) {
   return result;
 }
 
+// ─── backfillAttachmentUrls ───────────────────────────────────────────────────
+
+/**
+ * One-time (or periodic) backfill: for every question that has a wp_post_id but
+ * a NULL attachment_url, fetch the WP post meta to see if there is an attachment
+ * ID (ask-visitor-img), resolve it to a URL via getAttachmentUrl(), and write it
+ * back to the DB.
+ *
+ * Safe to call multiple times — only touches rows where attachment_url IS NULL.
+ *
+ * @param {{ limit?: number }} [options]
+ * @returns {Promise<{
+ *   success:  boolean,
+ *   checked:  number,
+ *   updated:  number,
+ *   noImage:  number,
+ *   failed:   number,
+ *   error?:   string
+ * }>}
+ */
+async function backfillAttachmentUrls(options = {}) {
+  const batchLimit = options.limit ?? 200;
+
+  console.log('[questionSync] backfillAttachmentUrls: מתחיל backfill של attachment_url');
+
+  // Find questions that have a WP post but no attachment URL yet
+  let rows;
+  try {
+    const result = await query(
+      `SELECT id, wp_post_id
+       FROM   questions
+       WHERE  wp_post_id IS NOT NULL
+         AND  attachment_url IS NULL
+       ORDER  BY created_at DESC
+       LIMIT  $1`,
+      [batchLimit]
+    );
+    rows = result.rows;
+  } catch (dbErr) {
+    console.error('[questionSync] backfillAttachmentUrls: שגיאת DB בשליפה:', dbErr.message);
+    return { success: false, checked: 0, updated: 0, noImage: 0, failed: 0, error: dbErr.message };
+  }
+
+  if (rows.length === 0) {
+    console.info('[questionSync] backfillAttachmentUrls: אין שאלות לעדכון');
+    return { success: true, checked: 0, updated: 0, noImage: 0, failed: 0 };
+  }
+
+  console.info(`[questionSync] backfillAttachmentUrls: בודק ${rows.length} שאלות`);
+
+  const { getQuestionById, getAttachmentUrl } = require('./wpService');
+
+  let updated = 0;
+  let noImage = 0;
+  let failed  = 0;
+
+  for (const row of rows) {
+    try {
+      // Fetch the WP post to get its meta
+      const wpResult = await getQuestionById(row.wp_post_id);
+      if (!wpResult.success || !wpResult.data) {
+        noImage++;
+        continue;
+      }
+
+      const meta          = wpResult.data.meta || {};
+      const attachmentId  = meta['ask-visitor-img'] || null;
+
+      if (!attachmentId) {
+        noImage++;
+        continue;
+      }
+
+      const url = await getAttachmentUrl(attachmentId);
+      if (!url) {
+        noImage++;
+        continue;
+      }
+
+      await query(
+        `UPDATE questions
+         SET    attachment_url = $1,
+                updated_at     = NOW()
+         WHERE  id = $2`,
+        [url, row.id]
+      );
+
+      updated++;
+      console.info(
+        `[questionSync] backfillAttachmentUrls: ✓ id=${row.id} ` +
+        `wpPostId=${row.wp_post_id} url=${url}`
+      );
+    } catch (err) {
+      failed++;
+      console.error(
+        `[questionSync] backfillAttachmentUrls: שגיאה ב-id=${row.id}:`,
+        err.message
+      );
+    }
+  }
+
+  console.info(
+    `[questionSync] backfillAttachmentUrls: הושלם — ` +
+    `עודכנו ${updated}, ללא תמונה ${noImage}, נכשלו ${failed} ` +
+    `מתוך ${rows.length} שנבדקו`
+  );
+
+  return { success: true, checked: rows.length, updated, noImage, failed };
+}
+
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -392,4 +502,5 @@ function _stripHtml(str) {
 module.exports = {
   syncPendingQuestions,
   syncAnswersToWP,
+  backfillAttachmentUrls,
 };

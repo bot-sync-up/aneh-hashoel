@@ -31,6 +31,7 @@ const { logAction, ACTIONS }         = require('../../middleware/auditLog');
 const { getAuditLog }                = require('../../services/auditService');
 const adminService                   = require('../../services/admin');
 const { retryFailedSyncs }           = require('../../services/wordpress');
+const { backfillAttachmentUrls }     = require('../../services/questionSyncService');
 const { query: dbQuery, healthCheck: dbHealthCheck } = require('../../db/pool');
 
 const router = express.Router();
@@ -348,6 +349,45 @@ router.post('/sync-retry', async (req, res) => {
     return res.json({ ok: true, ...result });
   } catch (err) {
     console.error('[system] POST /sync-retry error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// ─── POST /backfill-attachments ───────────────────────────────────────────────
+
+/**
+ * POST /admin/system/backfill-attachments
+ *
+ * One-time backfill: for every question that has a wp_post_id but NULL
+ * attachment_url, fetch the WP post meta and resolve the attachment URL.
+ *
+ * Query params:
+ *   limit – max questions to process in one call (default 200)
+ *
+ * Response: { ok, checked, updated, noImage, failed }
+ */
+router.post('/backfill-attachments', async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit || req.body?.limit, 10) || 200));
+
+    console.log(`[system] POST /backfill-attachments triggered by rabbi=${req.rabbi.id} limit=${limit}`);
+
+    const result = await backfillAttachmentUrls({ limit });
+
+    await logAction(
+      req.rabbi.id,
+      'admin.backfill_attachments',
+      'questions',
+      null,
+      null,
+      result,
+      getIp(req),
+      req.headers['user-agent'] || null
+    );
+
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[system] POST /backfill-attachments error:', err.message);
     return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
   }
 });

@@ -355,6 +355,29 @@ async function sendThankNotification(rabbiEmail, question) {
   return sendEmail(rabbiEmail, 'גולש הודה לך על תשובתך — ענה את השואל', html);
 }
 
+// ─── sendThankNotificationEmail ──────────────────────────────────────────────
+
+/**
+ * שליחת הודעת תודה לרב כאשר גולש לוחץ "תודה" על תשובתו.
+ * משתמש בתבנית המותג עם הנוסח המבוקש.
+ *
+ * @param {string} rabbiEmail  אימייל הרב
+ * @param {object} question    אובייקט עם id ו-title
+ */
+async function sendThankNotificationEmail(rabbiEmail, question) {
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">כבוד הרב,</p>
+    <p style="margin: 0 0 16px; font-size: 15px;">
+      גולש הודה לך על תשובתך לשאלה: <strong>${question.title || 'שאלה'}</strong>.
+    </p>
+    <p style="margin: 0; font-size: 15px;">המשך במלאכת הקודש!</p>
+  `;
+
+  const html = createEmailHTML('תודה מגולש', bodyContent);
+
+  return sendEmail(rabbiEmail, 'תודה מגולש — ענה את השואל', html);
+}
+
 // ─── sendWeeklyReport ────────────────────────────────────────────────────────
 
 /**
@@ -538,6 +561,7 @@ module.exports = {
   sendReleaseConfirmation,
   sendAnswerConfirmation,
   sendThankNotification,
+  sendThankNotificationEmail,
   sendWeeklyReport,
   sendPasswordReset,
   sendNewDeviceAlert,

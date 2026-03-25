@@ -60,6 +60,11 @@ export default function QuestionDetailPage() {
   // UI state
   const [notesOpen, setNotesOpen] = useState(false);
 
+  // Thank + Donation modal state
+  const [showDonation, setShowDonation] = useState(false);
+  const [thankLoading, setThankLoading] = useState(false);
+  const [thankDone, setThankDone] = useState(false);
+
   // Category picker state
   const [editingCategory, setEditingCategory] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -161,6 +166,26 @@ export default function QuestionDetailPage() {
       setCategoryError(err?.response?.data?.error || err.message || 'שגיאה בעדכון קטגוריה');
     }
   }, [id, fetchQuestion]);
+
+  // ── Thank handler ──────────────────────────────────────────────────────────
+
+  const handleThank = useCallback(async () => {
+    if (thankLoading || thankDone) return;
+    setThankLoading(true);
+    try {
+      const res = await post(`/questions/thank/${id}`);
+      setQuestion((prev) => prev ? { ...prev, thank_count: res.thankCount ?? (prev.thank_count + 1) } : prev);
+      setThankDone(true);
+      // Show donation modal on success
+      if (!res.alreadyThanked) {
+        setShowDonation(true);
+      }
+    } catch (err) {
+      console.error('Thank error:', err);
+    } finally {
+      setThankLoading(false);
+    }
+  }, [id, thankLoading, thankDone]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -657,12 +682,67 @@ export default function QuestionDetailPage() {
               </div>
             )}
 
-            {/* Thank count */}
-            <div className="mt-4 flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo">
-              <Heart size={12} />
-              {thank_count} אנשים הודו על התשובה
+            {/* Thank count + Thank button */}
+            <div className="mt-4 flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo">
+                <Heart size={12} />
+                {thank_count} אנשים הודו על התשובה
+              </div>
+              <button
+                type="button"
+                onClick={handleThank}
+                disabled={thankLoading || thankDone}
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium font-heebo transition-colors',
+                  thankDone
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 cursor-default'
+                    : 'bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/20 dark:bg-brand-gold/20 dark:hover:bg-brand-gold/30'
+                )}
+              >
+                <Heart size={13} className={thankDone ? 'fill-emerald-500 text-emerald-500' : ''} />
+                {thankDone ? 'תודה נשלחה!' : 'תודה לרב'}
+              </button>
             </div>
           </Card>
+        )}
+
+        {/* ── Donation suggestion modal ─────────────────────────────────── */}
+        {showDonation && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowDonation(false)}
+          >
+            <div
+              className="bg-[var(--bg-surface)] rounded-2xl shadow-xl max-w-sm w-full p-8 text-center"
+              dir="rtl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-4xl mb-4">🙏</div>
+              <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)] mb-3">
+                התשובה עזרה לך?
+              </h3>
+              <p className="text-sm text-[var(--text-secondary)] font-heebo mb-6">
+                הקדש תרומה להחזקת הפעילות
+              </p>
+              <div className="flex flex-col gap-3">
+                <a
+                  href="https://moreshet-maran.com/donate"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-brand-gold text-brand-navy font-bold font-heebo text-sm hover:bg-brand-gold-dark transition-colors shadow-md"
+                >
+                  לתרומה
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowDonation(false)}
+                  className="text-sm text-[var(--text-muted)] font-heebo hover:text-[var(--text-secondary)] transition-colors py-2"
+                >
+                  לא תודה
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── Follow-up section ──────────────────────────────────────────── */}

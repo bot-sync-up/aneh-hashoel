@@ -134,6 +134,7 @@ app.use('/api/dashboard',  require('./routes/dashboard'));
 app.use('/api/admin',         adminRoutes);
 app.use('/api/action',        actionLinksRoute);
 app.use('/api/leads',         leadsRoutes);
+app.use('/api/track',         require('./routes/track'));
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 

@@ -1071,37 +1071,16 @@ async function scheduleThankNotification(questionId, rabbiId) {
 
   if (!rows[0]) return;
 
-  const { email, name, title, wp_post_id, thank_count } = rows[0];
-  const siteUrl     = (process.env.WP_SITE_URL || process.env.WP_API_URL || '')
-    .replace(/\/wp-json.*$/, '').replace(/\/$/, '');
-  const questionUrl = wp_post_id ? `${siteUrl}/question/${wp_post_id}` : '';
-
-  let nodemailer;
-  try { nodemailer = require('nodemailer'); } catch { return; }
-
+  const { email, title } = rows[0];
   if (!email) return;
 
-  const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-
-  await transporter.sendMail({
-    from:    process.env.SMTP_FROM || '"ענה את השואל" <noreply@aneh-hashoel.co.il>',
-    to:      email,
-    subject: `קיבלת תודה על תשובתך — ${title}`,
-    html: `<div dir="rtl" style="font-family: Arial, sans-serif;">
-      <h2>שלום הרב ${name},</h2>
-      <p>שואל שלח לך תודה על תשובתך לשאלה: <strong>${title}</strong></p>
-      <p>סך הכל תודות לשאלה זו: <strong>${thank_count}</strong></p>
-      ${questionUrl ? `<p><a href="${questionUrl}" style="color:#2563eb;">לצפייה בשאלה</a></p>` : ''}
-      <p>בברכה,<br>צוות ענה את השואל</p>
-    </div>`,
-  }).catch((err) => {
+  // Use the centralised email service with branded template
+  try {
+    const { sendThankNotificationEmail } = require('./email');
+    await sendThankNotificationEmail(email, { id: questionId, title });
+  } catch (err) {
     console.error('[questionService.scheduleThankNotification] שגיאה בשליחת אימייל תודה:', err.message);
-  });
+  }
 }
 
 // ─── getRabbiStats ────────────────────────────────────────────────────────────

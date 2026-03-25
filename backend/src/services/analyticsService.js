@@ -949,6 +949,96 @@ async function getReturnedQuestionCount() {
   };
 }
 
+// ─── getROIStats ──────────────────────────────────────────────────────────────
+
+/**
+ * ROI dashboard stats for admin view.
+ * Returns engagement and conversion metrics.
+ *
+ * @returns {Promise<object>}
+ */
+async function getROIStats() {
+  const [
+    thanksResult,
+    thanksMonthResult,
+    leadsContactedResult,
+    hotLeadsResult,
+    topCategoriesResult,
+    avgResponseResult,
+  ] = await Promise.all([
+    // Total thanks (all time)
+    query(`
+      SELECT COALESCE(SUM(thank_count), 0)::int AS total_thanks
+      FROM   questions
+      WHERE  status = 'answered'
+    `),
+
+    // Thanks this month
+    query(`
+      SELECT COALESCE(SUM(thank_count), 0)::int AS thanks_this_month
+      FROM   questions
+      WHERE  status = 'answered'
+        AND  answered_at >= DATE_TRUNC('month',
+               NOW() AT TIME ZONE 'Asia/Jerusalem') AT TIME ZONE 'Asia/Jerusalem'
+    `),
+
+    // Leads where contacted = true
+    query(`
+      SELECT COUNT(*)::int AS leads_contacted
+      FROM   leads
+      WHERE  contacted = true
+    `),
+
+    // Hot leads count
+    query(`
+      SELECT COUNT(*)::int AS hot_leads_count
+      FROM   leads
+      WHERE  is_hot = true
+    `),
+
+    // Top 5 categories by question count
+    query(`
+      SELECT
+        COALESCE(c.name, 'כללי') AS category_name,
+        COUNT(q.id)::int          AS question_count
+      FROM      questions q
+      LEFT JOIN categories c ON c.id = q.category_id
+      WHERE     q.status != 'hidden'
+      GROUP BY  c.name
+      ORDER BY  question_count DESC
+      LIMIT 5
+    `),
+
+    // Average response time in hours
+    query(`
+      SELECT COALESCE(
+        ROUND(
+          AVG(
+            EXTRACT(EPOCH FROM (answered_at - created_at)) / 3600.0
+          )::numeric, 1
+        ),
+        0
+      ) AS avg_response_hours
+      FROM   questions
+      WHERE  status = 'answered'
+        AND  answered_at IS NOT NULL
+        AND  answered_at > created_at
+    `),
+  ]);
+
+  return {
+    total_thanks:              thanksResult.rows[0].total_thanks,
+    thanks_this_month:         thanksMonthResult.rows[0].thanks_this_month,
+    leads_converted_to_contacted: leadsContactedResult.rows[0].leads_contacted,
+    hot_leads_count:           hotLeadsResult.rows[0].hot_leads_count,
+    top_categories:            topCategoriesResult.rows.map((r) => ({
+      name:  r.category_name,
+      count: r.question_count,
+    })),
+    avg_response_hours:        parseFloat(avgResponseResult.rows[0].avg_response_hours),
+  };
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -966,4 +1056,5 @@ module.exports = {
   getDailyActivity,
   getResponseTimeHistogram,
   getReturnedQuestionCount,
+  getROIStats,
 };

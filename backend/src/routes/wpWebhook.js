@@ -303,6 +303,18 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
         } catch (leadErr) {
           console.warn('[wpWebhook] upsertLead failed:', leadErr.message);
         }
+
+        // Fire-and-forget: add subscriber to MailWizz
+        if (email) {
+          const mailwizzService = require('../services/mailwizzService');
+          const categoryName = payload.categorySlug || 'כללי';
+          mailwizzService.addSubscriber(email, name || payload.askerName, {
+            category_interest: categoryName,
+            question_count: '1',
+          }).catch((mwErr) => {
+            console.warn('[wpWebhook] mailwizz addSubscriber failed:', mwErr.message);
+          });
+        }
       }
     } catch (enrichErr) {
       console.warn('[wpWebhook] enrich failed:', enrichErr.message);
@@ -651,6 +663,30 @@ router.post('/thank-click', verifyWebhookSecret, async (req, res, next) => {
       question.id,
       payload.thankMessage || 'השואל הודה לך על תשובתך!'
     );
+  }
+
+  // ── Fire-and-forget: send thank email to rabbi ──────────────────────────
+  if (question.assigned_rabbi_id) {
+    (async () => {
+      try {
+        const { rows: rabbiRows } = await query(
+          `SELECT r.email, q.title
+           FROM   rabbis r
+           JOIN   questions q ON q.assigned_rabbi_id = r.id
+           WHERE  r.id = $1 AND q.id = $2`,
+          [question.assigned_rabbi_id, question.id]
+        );
+        if (rabbiRows[0] && rabbiRows[0].email) {
+          const { sendThankNotificationEmail } = require('../services/email');
+          await sendThankNotificationEmail(rabbiRows[0].email, {
+            id:    question.id,
+            title: rabbiRows[0].title,
+          });
+        }
+      } catch (emailErr) {
+        console.error('[wpWebhook] thank-click email error:', emailErr.message);
+      }
+    })();
   }
 
   await logSync(payload.wpPostId, 'webhook_thank_click', 'success');

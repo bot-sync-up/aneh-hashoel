@@ -11,6 +11,11 @@ import {
   ChevronLeft,
   Wifi,
   WifiOff,
+  Heart,
+  Flame,
+  PhoneCall,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 
 import { useAuth }   from '../contexts/AuthContext';
@@ -168,6 +173,9 @@ export default function DashboardPage() {
   // Emergency banner
   const [emergency, setEmergency] = useState({ message: null, id: null });
 
+  // ROI stats (admin only)
+  const [roiStats, setRoiStats] = useState(null);
+
   // Pulse tracking for live stat updates
   const pulseTimerRef = useRef(null);
 
@@ -188,9 +196,10 @@ export default function DashboardPage() {
       if (isAdmin) {
         requests.push(api.get('/admin/dashboard/activity'));
         requests.push(api.get('/admin/dashboard/categories/breakdown'));
+        requests.push(api.get('/admin/dashboard/roi'));
       }
 
-      const [statsRes, myQRes, pendingRes, activityRes, adminActivityRes, catRes] =
+      const [statsRes, myQRes, pendingRes, activityRes, adminActivityRes, catRes, roiRes] =
         await Promise.allSettled(requests);
 
       if (statsRes.status === 'fulfilled') {
@@ -224,6 +233,10 @@ export default function DashboardPage() {
         if (catRes?.status === 'fulfilled') {
           const cd = catRes.value.data;
           setCategoryBreakdown(cd?.data ?? cd ?? []);
+        }
+        if (roiRes?.status === 'fulfilled') {
+          const rd = roiRes.value.data;
+          setRoiStats(rd?.data ?? rd ?? null);
         }
       }
 
@@ -657,6 +670,112 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+
+        {/* ══ ROI Stats section (admin only) ══ */}
+        {isAdmin && roiStats && (
+          <section aria-labelledby="roi-heading">
+            <div className="divider-text mb-6">
+              <span>נתוני ROI</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {/* תודות החודש / סה"כ */}
+              <Card>
+                <div className="flex items-center gap-3 p-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-pink-50 dark:bg-pink-900/20 flex-shrink-0">
+                    <Heart className="w-5 h-5 text-pink-500" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">תודות החודש / סה"כ</p>
+                    <p className="text-lg font-bold font-heebo text-[var(--text-primary)]">
+                      {roiStats.thanks_this_month ?? 0}
+                      <span className="text-sm font-normal text-[var(--text-muted)] ms-1">
+                        / {roiStats.total_thanks ?? 0}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* לידים חמים */}
+              <Card>
+                <div className="flex items-center gap-3 p-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex-shrink-0">
+                    <Flame className="w-5 h-5 text-orange-500" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">לידים חמים</p>
+                    <p className="text-lg font-bold font-heebo text-[var(--text-primary)]">
+                      {roiStats.hot_leads_count ?? 0}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* לידים שנוצר קשר */}
+              <Card>
+                <div className="flex items-center gap-3 p-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex-shrink-0">
+                    <PhoneCall className="w-5 h-5 text-emerald-500" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">לידים שנוצר קשר</p>
+                    <p className="text-lg font-bold font-heebo text-[var(--text-primary)]">
+                      {roiStats.leads_converted_to_contacted ?? 0}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* זמן מענה ממוצע */}
+              <Card>
+                <div className="flex items-center gap-3 p-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex-shrink-0">
+                    <Clock className="w-5 h-5 text-blue-500" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">זמן מענה ממוצע</p>
+                    <p className="text-lg font-bold font-heebo text-[var(--text-primary)]">
+                      {roiStats.avg_response_hours != null
+                        ? (roiStats.avg_response_hours < 1
+                            ? `${Math.round(roiStats.avg_response_hours * 60)} דקות`
+                            : `${roiStats.avg_response_hours} שעות`)
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* קטגוריות מובילות */}
+              <Card className="sm:col-span-2">
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#B8973A]/10 flex-shrink-0">
+                      <TrendingUp className="w-5 h-5 text-[var(--accent)]" aria-hidden="true" />
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] font-heebo">קטגוריות מובילות (Top 5)</p>
+                  </div>
+                  {roiStats.top_categories && roiStats.top_categories.length > 0 ? (
+                    <ul className="space-y-2">
+                      {roiStats.top_categories.map((cat, idx) => (
+                        <li key={cat.name || idx} className="flex items-center justify-between">
+                          <span className="text-sm font-heebo text-[var(--text-primary)]">
+                            {idx + 1}. {cat.name}
+                          </span>
+                          <span className="text-sm font-bold font-heebo text-[var(--text-primary)] tabular-nums">
+                            {cat.count} שאלות
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[var(--text-muted)] font-heebo">אין נתונים</p>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </section>
+        )}
 
         {/* ══ Admin quick-links section ══ */}
         {isAdmin && (

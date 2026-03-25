@@ -172,7 +172,7 @@ async function fetchNotificationData(questionId) {
  * @param {object} data  Notification data object with wp_link and/or wp_post_id
  * @returns {string|null}
  */
-function buildAnswerUrl(data) {
+function buildDirectAnswerUrl(data) {
   // Use stored WP permalink if available
   if (data.wp_link) return data.wp_link;
 
@@ -182,6 +182,21 @@ function buildAnswerUrl(data) {
     .replace(/\/wp-json.*$/, '')
     .replace(/\/$/, '');
   return `${baseUrl}/ask-rabai/${data.wp_post_id}`;
+}
+
+/**
+ * Build the tracking URL that redirects to the WP answer page.
+ * Routes through /api/track/:questionId to record the click before redirecting.
+ *
+ * @param {object} data  Notification data object with question_id
+ * @returns {string|null}
+ */
+function buildAnswerUrl(data) {
+  if (!data.question_id) return buildDirectAnswerUrl(data);
+
+  const apiBaseUrl = (process.env.API_URL || process.env.APP_URL || 'http://localhost:4000')
+    .replace(/\/$/, '');
+  return `${apiBaseUrl}/api/track/${data.question_id}`;
 }
 
 // ─── notifyAskerNewAnswer ──────────────────────────────────────────────────────

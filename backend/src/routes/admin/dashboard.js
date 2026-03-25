@@ -156,4 +156,27 @@ router.get('/questions/returned', async (req, res) => {
   }
 });
 
+// ─── GET /roi ────────────────────────────────────────────────────────────────
+
+/**
+ * GET /admin/dashboard/roi
+ *
+ * Returns ROI stats for the admin dashboard:
+ * {
+ *   total_thanks, thanks_this_month,
+ *   leads_converted_to_contacted, hot_leads_count,
+ *   top_categories: [{ name, count }],
+ *   avg_response_hours
+ * }
+ */
+router.get('/roi', async (req, res) => {
+  try {
+    const data = await analyticsService.getROIStats();
+    return res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[dashboard] GET /roi error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
 module.exports = router;

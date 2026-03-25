@@ -24,6 +24,8 @@ const { runWeeklyReport: runWeeklyStatsReport } = require('./jobs/weeklyReport')
 const { runRabbiOfTheWeek }     = require('./jobs/rabbiOfTheWeek');
 const { runWpSyncRetry }        = require('./jobs/wpSyncRetry');
 const { runSheetsSyncLeads }    = require('./jobs/sheetsSyncLeads');
+const { runWeeklyNewsletter }   = require('./jobs/weeklyNewsletter');
+const { runHolidayGreetings }   = require('./jobs/holidayGreetings');
 const {
   syncPendingQuestions,
   syncAnswersToWP,
@@ -118,6 +120,16 @@ function startCronJobs(io = null) {
     timezone: TIMEZONE,
   });
 
+  // ─── Weekly Friday 10:00 — send שו"ת השבוע newsletter ─────────────────────
+  cron.schedule('0 10 * * 5', safeJob('sendWeeklyNewsletter', runWeeklyNewsletter), {
+    timezone: TIMEZONE,
+  });
+
+  // ─── Daily 08:00 — check for Jewish holiday and send greetings ────────────
+  cron.schedule('0 8 * * *', safeJob('sendHolidayGreetings', runHolidayGreetings), {
+    timezone: TIMEZONE,
+  });
+
   console.log('[cron] All jobs registered:');
   console.log('[cron]   checkQuestionTimeouts:      */30 * * * *');
   console.log('[cron]   sendTimeoutWarnings:        */30 * * * *');
@@ -126,6 +138,8 @@ function startCronJobs(io = null) {
   console.log('[cron]   postRabbiOfTheWeek:         %s', rabbiOfWeekCron);
   console.log('[cron]   retryFailedWordPressSyncs:  0 * * * *');
   console.log('[cron]   syncLeadsToGoogleSheets:    */15 * * * *');
+  console.log('[cron]   sendWeeklyNewsletter:       0 10 * * 5');
+  console.log('[cron]   sendHolidayGreetings:       0 8 * * *');
 }
 
 // ── Exports ──────────────────────────────────────────────────────────────────

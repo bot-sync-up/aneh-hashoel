@@ -701,6 +701,35 @@ async function sendEmergency(rabbis, message) {
   return results;
 }
 
+// ─── Holiday greeting (single recipient) ────────────────────────────────────
+
+/**
+ * שולח ברכת חג לנמען בודד דרך WhatsApp.
+ *
+ * @param {string} phoneNumber   – מספר טלפון (כל פורמט נתמך)
+ * @param {string} holidayName   – שם החג (למשל "פסח", "ראש השנה")
+ * @param {string} [donationLink] – קישור לתרומה (אופציונלי)
+ * @returns {Promise<{ success: boolean, messageId: string|null, error?: string }>}
+ */
+async function sendHolidayMessage(phoneNumber, holidayName, donationLink) {
+  if (!phoneNumber) {
+    return { success: false, messageId: null, error: 'אין מספר טלפון' };
+  }
+
+  const parts = [
+    `חג ${holidayName} שמח! 🕎`,
+    '',
+    'מהעמותה מורשת מרן.',
+  ];
+
+  if (donationLink) {
+    parts.push('');
+    parts.push(`לתרומה — ${donationLink}`);
+  }
+
+  return sendMessage(phoneNumber, parts.join('\n'));
+}
+
 // ─── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -717,6 +746,7 @@ module.exports = {
   sendNewDeviceAlert,
   sendWeeklyReport,
   sendDailyDigest,
+  sendHolidayMessage,
   formatPhoneNumber,
 
   // Legacy aliases kept for backwards compatibility

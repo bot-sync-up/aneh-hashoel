@@ -78,6 +78,49 @@ const TEMPLATE_FIELDS = [
     label: 'נושא — שחרור שאלה (RELEASE)',
     type: 'input',
   },
+  { type: 'divider', label: 'תבניות נוספות לרבנים' },
+  {
+    key: 'rabbi_already_claimed_subject',
+    label: 'נושא — שאלה כבר נתפסה',
+    type: 'input',
+  },
+  {
+    key: 'rabbi_already_claimed_body',
+    label: 'גוף — שאלה כבר נתפסה',
+    type: 'textarea',
+  },
+  {
+    key: 'rabbi_release_confirmation_body',
+    label: 'גוף — אישור שחרור שאלה',
+    type: 'textarea',
+  },
+  {
+    key: 'rabbi_answer_confirmation_body',
+    label: 'גוף — אישור קליטת תשובה ממייל',
+    type: 'textarea',
+  },
+  {
+    key: 'rabbi_weekly_report_subject',
+    label: 'נושא — דוח שבועי',
+    type: 'input',
+  },
+  {
+    key: 'rabbi_weekly_report_body',
+    label: 'גוף — דוח שבועי',
+    description: 'משתנים נוספים: {answered_count}, {avg_response_time}, {thank_count}',
+    type: 'textarea',
+  },
+  { type: 'divider', label: 'תבניות נוספות לשואלים' },
+  {
+    key: 'asker_follow_up_subject',
+    label: 'נושא — שאלת המשך',
+    type: 'input',
+  },
+  {
+    key: 'asker_follow_up_body',
+    label: 'גוף — שאלת המשך',
+    type: 'textarea',
+  },
 ];
 
 const DEFAULT_TEMPLATES = {
@@ -95,6 +138,14 @@ const DEFAULT_TEMPLATES = {
   rabbi_full_question_body: 'להלן השאלה המלאה.\nניתן להשיב ישירות למייל זה.',
   rabbi_claim_subject: '[CLAIM:{id}] קבלת שאלה — {system_name}',
   rabbi_release_subject: '[RELEASE:{id}] שחרור שאלה — {system_name}',
+  rabbi_already_claimed_subject: 'שאלה כבר נתפסה — {system_name}',
+  rabbi_already_claimed_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) כבר נתפסה על ידי רב אחר.\nניתן לבחור שאלה אחרת מהרשימה.',
+  rabbi_release_confirmation_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) שוחררה בהצלחה וזמינה כעת לרבנים אחרים.',
+  rabbi_answer_confirmation_body: 'כבוד הרב,\nתשובתך לשאלה "{title}" (ID: {id}) התקבלה ונקלטה בהצלחה במערכת.\nתודה על המענה!',
+  rabbi_weekly_report_subject: 'דוח שבועי — {system_name}',
+  rabbi_weekly_report_body: 'כבוד הרב,\nלהלן סיכום הפעילות שלך השבוע.\nשאלות שנענו: {answered_count}\nזמן תגובה ממוצע: {avg_response_time}\nתודות שהתקבלו: {thank_count}',
+  asker_follow_up_subject: 'שאלת המשך — {system_name}',
+  asker_follow_up_body: 'שלום {name},\nנרשמה שאלת המשך לשאלתך "{title}".\nהרב יענה בהקדם.',
 };
 
 export default function EmailSettingsPage() {

@@ -12,6 +12,8 @@ const LeaderboardPage      = React.lazy(() => import('./LeaderboardPage'));
 const AdminLeadsPage       = React.lazy(() => import('./LeadsPage'));
 const EmailSettingsPage    = React.lazy(() => import('./EmailSettingsPage'));
 const NewsletterPage       = React.lazy(() => import('./NewsletterPage'));
+const EmergencyPage        = React.lazy(() => import('./EmergencyPage'));
+const SupportAdminPage     = React.lazy(() => import('./SupportAdminPage'));
 import { clsx } from 'clsx';
 import {
   Users,
@@ -24,6 +26,8 @@ import {
   UserCheck,
   Mail,
   Newspaper,
+  AlertTriangle,
+  Headphones,
 } from 'lucide-react';
 
 const TABS = [
@@ -37,6 +41,8 @@ const TABS = [
   { to: 'leaderboard', label: 'לוח מצטיינים',   icon: Trophy },
   { to: 'email-templates', label: 'תבניות אימייל', icon: Mail },
   { to: 'newsletter',      label: 'ניוזלטר',       icon: Newspaper },
+  { to: 'emergency',       label: 'שידור חירום',   icon: AlertTriangle },
+  { to: 'support',         label: 'פניות',          icon: Headphones },
 ];
 
 export default function AdminLayout() {
@@ -107,6 +113,8 @@ export default function AdminLayout() {
             <Route path="leads"       element={<AdminLeadsPage />} />
             <Route path="email-templates" element={<EmailSettingsPage />} />
             <Route path="newsletter"      element={<NewsletterPage />} />
+            <Route path="emergency"       element={<EmergencyPage />} />
+            <Route path="support"         element={<SupportAdminPage />} />
           </Routes>
         </Suspense>
       </div>

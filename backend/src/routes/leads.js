@@ -11,6 +11,7 @@
  */
 
 const express = require('express');
+const { stringify: csvStringify } = require('csv-stringify/sync');
 const { authenticate } = require('../middleware/auth');
 const { getLeads, getLeadById, updateLead } = require('../services/leadsService');
 
@@ -42,6 +43,46 @@ router.get('/', async (req, res, next) => {
 
     const result = await getLeads({ page, limit, filter, search });
     return res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── GET /export — CSV export of all leads ───────────────────────────────────
+
+router.get('/export', async (req, res, next) => {
+  try {
+    // Fetch all leads (no pagination)
+    const result = await getLeads({ page: 1, limit: 10000, filter: 'all', search: '' });
+    const leads = result.leads || [];
+
+    const rows = leads.map((l) => ({
+      name:             l.asker_name || '',
+      email:            l.email || '',
+      phone:            l.phone || '',
+      question_count:   l.question_count || 0,
+      is_hot:           l.is_hot ? 'כן' : 'לא',
+      contacted:        l.contacted ? 'כן' : 'לא',
+      last_question_at: l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
+    }));
+
+    const csv = csvStringify(rows, {
+      header: true,
+      columns: [
+        { key: 'name', header: 'שם' },
+        { key: 'email', header: 'אימייל' },
+        { key: 'phone', header: 'טלפון' },
+        { key: 'question_count', header: 'מספר שאלות' },
+        { key: 'is_hot', header: 'חם' },
+        { key: 'contacted', header: 'טופל' },
+        { key: 'last_question_at', header: 'שאלה אחרונה' },
+      ],
+      bom: true, // UTF-8 BOM for Excel compatibility
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="leads-${new Date().toISOString().split('T')[0]}.csv"`);
+    return res.send(csv);
   } catch (err) {
     return next(err);
   }

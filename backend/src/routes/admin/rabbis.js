@@ -27,6 +27,7 @@ const {
   createRabbi,
   getRabbiById,
 }                                      = require('../../services/rabbiService');
+const { createWPRabbi, getWPRabbis }   = require('../../services/wpService');
 
 const router = express.Router();
 
@@ -299,6 +300,22 @@ router.post('/', async (req, res, next) => {
     } catch (emailErr) {
       console.error('[admin/rabbis] שגיאה בשליחת מייל ברוך הבא:', emailErr.message);
     }
+
+    // ── Create rabi-add term in WP — fire-and-forget ─────────────────────────
+    setImmediate(async () => {
+      try {
+        const wpResult = await createWPRabbi(rabbi.name);
+        if (wpResult.success && wpResult.data?.id) {
+          await query(
+            `UPDATE rabbis SET wp_term_id = $1 WHERE id = $2`,
+            [wpResult.data.id, rabbi.id]
+          );
+          console.log(`[admin/rabbis] WP rabbi term synced: rabbiId=${rabbi.id} wpTermId=${wpResult.data.id}`);
+        }
+      } catch (err) {
+        console.error('[admin/rabbis] WP rabbi term creation failed (non-fatal):', err.message);
+      }
+    });
 
     // ── Audit ────────────────────────────────────────────────────────────────
     setImmediate(() => {
@@ -720,6 +737,70 @@ router.get('/:id/audit', async (req, res, next) => {
       total:  parseInt(countRows[0].total, 10),
       limit,
       offset,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /sync-from-wp — pull rabi-add terms from WP ────────────────────────
+
+/**
+ * Pull all rabi-add terms from WP.
+ * Links existing local rabbis by name, reports unmatched WP terms.
+ */
+router.post('/sync-from-wp', async (req, res, next) => {
+  try {
+    const wpResult = await getWPRabbis();
+    if (!wpResult.success) {
+      return res.status(502).json({ error: `שגיאה בשליפת רבנים מ-WP: ${wpResult.error}` });
+    }
+
+    const wpTerms = wpResult.data || [];
+    if (wpTerms.length === 0) {
+      return res.json({ message: 'לא נמצאו רבנים ב-WP', total_wp: 0, matched: 0, unmatched: [] });
+    }
+
+    const { rows: localRabbis } = await query(
+      `SELECT id, name, wp_term_id FROM rabbis WHERE status != 'deleted'`
+    );
+
+    const existingWpIds = new Set(
+      localRabbis.filter(r => r.wp_term_id).map(r => r.wp_term_id)
+    );
+
+    let matched = 0;
+    let linked = 0;
+    const unmatched = [];
+
+    for (const wpTerm of wpTerms) {
+      if (existingWpIds.has(wpTerm.id)) {
+        matched++;
+        continue;
+      }
+
+      const localMatch = localRabbis.find(
+        r => r.name.trim().toLowerCase() === wpTerm.name.trim().toLowerCase() && !r.wp_term_id
+      );
+
+      if (localMatch) {
+        await query(
+          `UPDATE rabbis SET wp_term_id = $1 WHERE id = $2`,
+          [wpTerm.id, localMatch.id]
+        );
+        linked++;
+        matched++;
+      } else {
+        unmatched.push({ wp_term_id: wpTerm.id, name: wpTerm.name, slug: wpTerm.slug });
+      }
+    }
+
+    return res.json({
+      message: 'סנכרון רבנים מ-WP הושלם',
+      total_wp: wpTerms.length,
+      matched,
+      linked,
+      unmatched,
     });
   } catch (err) {
     return next(err);

@@ -3,6 +3,7 @@
 const express = require('express');
 const { query, withTransaction } = require('../db/pool');
 const { authenticate, requireAdmin } = require('../middleware/authenticate');
+const { getWPCategories, createWPCategory, deleteWPCategory } = require('../services/wpService');
 
 const router = express.Router();
 router.use(authenticate);
@@ -114,6 +115,25 @@ router.post('/', async (req, res, next) => {
        RETURNING id, name, parent_id, sort_order, status, suggested_by, created_at`,
       [trimmedName, parent_id || null, order, status, suggestedBy]
     );
+
+    // If admin creates (approved), also create in WP — fire-and-forget
+    if (isAdmin && rows[0]) {
+      setImmediate(async () => {
+        try {
+          const wpResult = await createWPCategory(trimmedName);
+          if (wpResult.success && wpResult.data?.id) {
+            await query(
+              `UPDATE categories SET wp_term_id = $1 WHERE id = $2`,
+              [wpResult.data.id, rows[0].id]
+            );
+            rows[0].wp_term_id = wpResult.data.id;
+            console.log(`[categories] WP category synced: localId=${rows[0].id} wpTermId=${wpResult.data.id}`);
+          }
+        } catch (err) {
+          console.error('[categories] WP category creation failed (non-fatal):', err.message);
+        }
+      });
+    }
 
     const statusCode = isAdmin ? 201 : 202; // 202 = accepted for review
     const message    = isAdmin
@@ -345,6 +365,80 @@ router.get('/:id/stats', async (req, res, next) => {
       answered_count:     parseInt(answerRows[0].answered_count, 10),
       avg_response_hours: answerRows[0].avg_response_hours != null
         ? parseFloat(answerRows[0].avg_response_hours) : null,
+    });
+  } catch (err) { return next(err); }
+});
+
+// POST /sync-from-wp — admin: pull all ask-cat terms from WP, create missing ones locally
+router.post('/sync-from-wp', requireAdmin, async (req, res, next) => {
+  try {
+    const wpResult = await getWPCategories();
+    if (!wpResult.success) {
+      return res.status(502).json({ error: `שגיאה בשליפת קטגוריות מ-WP: ${wpResult.error}` });
+    }
+
+    const wpTerms = wpResult.data || [];
+    if (wpTerms.length === 0) {
+      return res.json({ message: 'לא נמצאו קטגוריות ב-WP', created: 0, existing: 0 });
+    }
+
+    // Get all local categories with wp_term_id set
+    const { rows: localCats } = await query(
+      `SELECT id, name, wp_term_id FROM categories WHERE status != 'rejected'`
+    );
+
+    const existingWpIds = new Set(localCats.filter(c => c.wp_term_id).map(c => c.wp_term_id));
+    const existingNames = new Set(localCats.map(c => c.name.trim().toLowerCase()));
+
+    let created = 0;
+    let existing = 0;
+    let skipped = 0;
+
+    for (const wpTerm of wpTerms) {
+      if (existingWpIds.has(wpTerm.id)) {
+        existing++;
+        continue;
+      }
+
+      // Also check by name to avoid duplicates
+      if (existingNames.has(wpTerm.name.trim().toLowerCase())) {
+        // Link existing local category to WP term
+        const localMatch = localCats.find(
+          c => c.name.trim().toLowerCase() === wpTerm.name.trim().toLowerCase() && !c.wp_term_id
+        );
+        if (localMatch) {
+          await query(
+            `UPDATE categories SET wp_term_id = $1 WHERE id = $2`,
+            [wpTerm.id, localMatch.id]
+          );
+          console.log(`[categories/sync] linked local=${localMatch.id} to wpTermId=${wpTerm.id}`);
+        }
+        existing++;
+        continue;
+      }
+
+      // Create new local category
+      try {
+        await query(
+          `INSERT INTO categories (name, parent_id, sort_order, status, wp_term_id, created_at)
+           VALUES ($1, NULL, 0, 'approved', $2, NOW())`,
+          [wpTerm.name.trim(), wpTerm.id]
+        );
+        created++;
+        console.log(`[categories/sync] created local category: "${wpTerm.name}" wpTermId=${wpTerm.id}`);
+      } catch (insertErr) {
+        console.error(`[categories/sync] failed to create "${wpTerm.name}":`, insertErr.message);
+        skipped++;
+      }
+    }
+
+    console.log(`[categories/sync] סנכרון הושלם: ${created} נוצרו, ${existing} קיימות, ${skipped} דולגו`);
+    return res.json({
+      message: `סנכרון קטגוריות מ-WP הושלם`,
+      total_wp: wpTerms.length,
+      created,
+      existing,
+      skipped,
     });
   } catch (err) { return next(err); }
 });

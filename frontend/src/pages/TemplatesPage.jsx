@@ -142,6 +142,13 @@ export default function TemplatesPage() {
 
       <div className="p-6 space-y-4">
 
+        {/* Explanation banner */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800 px-5 py-3.5">
+          <p className="text-sm text-blue-800 dark:text-blue-300 font-heebo leading-relaxed">
+            תבניות הן טקסטים מוכנים מראש שניתן להכניס בתשובה בלחיצה אחת. צור תבניות לתשובות נפוצות כדי לחסוך זמן.
+          </p>
+        </div>
+
         {/* Search + filter bar — shown only when there are templates */}
         {!loading && !error && templates.length > 0 && (
           <div className="flex items-center gap-3 flex-wrap">

@@ -40,6 +40,19 @@ const EMAIL_TEMPLATE_DEFAULTS = {
   rabbi_full_question_body: 'להלן השאלה המלאה.\nניתן להשיב ישירות למייל זה.',
   rabbi_claim_subject: '[CLAIM:{id}] קבלת שאלה — {system_name}',
   rabbi_release_subject: '[RELEASE:{id}] שחרור שאלה — {system_name}',
+  // Already-claimed notification
+  rabbi_already_claimed_subject: 'שאלה כבר נתפסה — {system_name}',
+  rabbi_already_claimed_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) כבר נתפסה על ידי רב אחר.\nניתן לבחור שאלה אחרת מהרשימה.',
+  // Release confirmation
+  rabbi_release_confirmation_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) שוחררה בהצלחה וזמינה כעת לרבנים אחרים.',
+  // Answer confirmation from email
+  rabbi_answer_confirmation_body: 'כבוד הרב,\nתשובתך לשאלה "{title}" (ID: {id}) התקבלה ונקלטה בהצלחה במערכת.\nתודה על המענה!',
+  // Weekly report
+  rabbi_weekly_report_subject: 'דוח שבועי — {system_name}',
+  rabbi_weekly_report_body: 'כבוד הרב,\nלהלן סיכום הפעילות שלך השבוע.\nשאלות שנענו: {answered_count}\nזמן תגובה ממוצע: {avg_response_time}\nתודות שהתקבלו: {thank_count}',
+  // Asker follow-up
+  asker_follow_up_subject: 'שאלת המשך — {system_name}',
+  asker_follow_up_body: 'שלום {name},\nנרשמה שאלת המשך לשאלתך "{title}".\nהרב יענה בהקדם.',
 };
 
 /** Cache for loaded templates (refreshed every 5 minutes) */

@@ -40,9 +40,13 @@ function Toggle({
     lg: 'w-6 h-6',
   };
 
-  // Absolute positioning — independent of RTL flex direction.
-  // OFF: thumb at left-0.5 | ON: thumb at right-0.5
-  const thumbPos = checked ? 'right-0.5' : 'left-0.5';
+  // Use translate + RTL-aware inset so toggle direction is correct in RTL layouts.
+  // OFF: thumb sits at the start (inline-start).  ON: thumb slides to the end.
+  const thumbTranslate = {
+    sm: checked ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0',
+    md: checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0',
+    lg: checked ? 'translate-x-7 rtl:-translate-x-7' : 'translate-x-0',
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
@@ -75,14 +79,15 @@ function Toggle({
           : 'cursor-pointer'
       )}
     >
-      {/* Thumb — absolute so RTL flex direction doesn't affect position */}
+      {/* Thumb — uses translate for correct RTL/LTR behavior */}
       <span
         aria-hidden="true"
         className={clsx(
-          'absolute rounded-full bg-white shadow-sm',
-          'transition-all duration-200 ease-in-out',
+          'inline-block rounded-full bg-white shadow-sm',
+          'transition-transform duration-200 ease-in-out',
+          'mt-0.5 ms-0.5',
           thumbSize[size] || thumbSize.md,
-          thumbPos
+          thumbTranslate[size] || thumbTranslate.md
         )}
       />
     </span>

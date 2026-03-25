@@ -730,6 +730,95 @@ router.patch('/category/:id', authenticate, async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
+// ─── PUT /:id/notes — save private notes for a question ──────────────────────
+
+router.put('/:id/notes', authenticate, async (req, res, next) => {
+  try {
+    const questionId = req.params.id;
+    const rabbiId    = req.rabbi.id;
+    const { notes }  = req.body;
+
+    if (typeof notes !== 'string') {
+      return res.status(400).json({ error: 'notes חייב להיות טקסט' });
+    }
+
+    // Verify question exists
+    const { rows: qRows } = await dbQuery(
+      `SELECT id FROM questions WHERE id = $1`,
+      [questionId]
+    );
+    if (!qRows[0]) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה' });
+    }
+
+    // Upsert private note
+    const { rows } = await dbQuery(
+      `INSERT INTO private_notes (question_id, rabbi_id, content, created_at, updated_at)
+       VALUES ($1, $2, $3, NOW(), NOW())
+       ON CONFLICT (question_id, rabbi_id)
+       DO UPDATE SET content = $3, updated_at = NOW()
+       RETURNING id, content, updated_at`,
+      [questionId, rabbiId, notes]
+    );
+
+    return res.json({ ok: true, note: rows[0] });
+  } catch (err) {
+    // If unique constraint doesn't exist, try a different approach
+    if (err.code === '42P10' || err.message?.includes('ON CONFLICT')) {
+      try {
+        const questionId = req.params.id;
+        const rabbiId    = req.rabbi.id;
+        const { notes }  = req.body;
+
+        // Check if note exists
+        const { rows: existing } = await dbQuery(
+          `SELECT id FROM private_notes WHERE question_id = $1 AND rabbi_id = $2`,
+          [questionId, rabbiId]
+        );
+
+        let result;
+        if (existing[0]) {
+          result = await dbQuery(
+            `UPDATE private_notes SET content = $1, updated_at = NOW()
+             WHERE question_id = $2 AND rabbi_id = $3
+             RETURNING id, content, updated_at`,
+            [notes, questionId, rabbiId]
+          );
+        } else {
+          result = await dbQuery(
+            `INSERT INTO private_notes (question_id, rabbi_id, content, created_at, updated_at)
+             VALUES ($1, $2, $3, NOW(), NOW())
+             RETURNING id, content, updated_at`,
+            [questionId, rabbiId, notes]
+          );
+        }
+
+        return res.json({ ok: true, note: result.rows[0] });
+      } catch (innerErr) {
+        return next(innerErr);
+      }
+    }
+    return next(err);
+  }
+});
+
+// ─── GET /:id/notes — get private notes for a question ───────────────────────
+
+router.get('/:id/notes', authenticate, async (req, res, next) => {
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, content, updated_at FROM private_notes
+       WHERE question_id = $1 AND rabbi_id = $2
+       LIMIT 1`,
+      [req.params.id, req.rabbi.id]
+    );
+
+    return res.json({ note: rows[0] || null });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = router;

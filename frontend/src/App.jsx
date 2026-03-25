@@ -27,6 +27,7 @@ const StatsPage = React.lazy(() => import('./pages/StatsPage'));
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'));
 const AnswersPage = React.lazy(() => import('./pages/AnswersPage'));
+const SupportPage = React.lazy(() => import('./pages/SupportPage'));
 const LeadsPage   = React.lazy(() => import('./pages/admin/LeadsPage'));
 
 function PrivateRoute({ children }) {
@@ -118,6 +119,7 @@ export default function App() {
                     <Route path="discussions/:id" element={<DiscussionDetailPage />} />
                     <Route path="templates" element={<TemplatesPage />} />
                     <Route path="profile" element={<ProfilePage />} />
+                    <Route path="support" element={<SupportPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="stats" element={<StatsPage />} />
                     <Route path="setup-password" element={<SetupPasswordPage />} />

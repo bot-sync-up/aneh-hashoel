@@ -35,6 +35,8 @@ function AnswerCard({ question, currentRabbiId }) {
   const {
     id,
     title,
+    content: questionContent,
+    body: questionBody,
     category,
     answered_at,
     assigned_rabbi,
@@ -46,6 +48,10 @@ function AnswerCard({ question, currentRabbiId }) {
     view_count = 0,
     thank_count = 0,
   } = question;
+
+  // Question text (strip HTML for display)
+  const rawQuestionText = questionContent || questionBody || '';
+  const questionPlain = rawQuestionText.replace(/<[^>]*>/g, '').trim();
 
   const isMyAnswer = currentRabbiId && answer_rabbi_id && String(answer_rabbi_id) === String(currentRabbiId);
 
@@ -87,6 +93,13 @@ function AnswerCard({ question, currentRabbiId }) {
       <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy">
         {truncate(title || '', 80)}
       </h3>
+
+      {/* Question content (truncated) */}
+      {questionPlain && (
+        <p className="text-xs text-[var(--text-muted)] font-heebo leading-relaxed line-clamp-2 mb-2 bg-[var(--bg-muted)] rounded px-2.5 py-1.5 border-r-2 border-[var(--border-default)]">
+          {truncate(questionPlain, 120)}
+        </p>
+      )}
 
       {/* Answer snippet */}
       {answer_is_private && !isMyAnswer ? (

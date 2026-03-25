@@ -217,11 +217,14 @@ function PersonalTab({ rabbi }) {
 
       <div>
         <label htmlFor="rabbi-email" className={labelCls}>
-          כתובת מייל <span className="text-xs font-normal text-[var(--text-muted)] mr-1">(לא ניתן לשינוי)</span>
+          כתובת מייל
         </label>
         <input id="rabbi-email" type="email" value={form.email} readOnly
           className={clsx(inputCls('email'), 'opacity-60 cursor-not-allowed bg-[var(--bg-muted)]')}
           tabIndex={-1} aria-readonly="true" />
+        <p className="mt-1 text-xs text-[var(--text-muted)] font-heebo">
+          לשינוי כתובת אימייל יש לפנות למנהל המערכת
+        </p>
       </div>
 
       <div>
@@ -308,7 +311,7 @@ function CategoriesTab({ rabbi }) {
   return (
     <div className="space-y-5" dir="rtl">
       <p className="text-sm text-[var(--text-muted)] font-heebo">
-        הקטגוריות הנבחרות יסומנו בצבע בעת הצגת רשימת השאלות.
+        הקטגוריות שבהן תרצה לקבל שאלות בעדיפות
       </p>
       {categories.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)] font-heebo">טוען קטגוריות...</p>

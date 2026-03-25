@@ -60,7 +60,7 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
 
   // 1. Verify rabbi is assigned to this question
   const { rows: questionRows } = await dbQuery(
-    `SELECT id, assigned_rabbi_id, status, wp_post_id
+    `SELECT id, assigned_rabbi_id, status, wp_post_id, category_id
      FROM   questions
      WHERE  id = $1`,
     [questionId]
@@ -77,6 +77,13 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
   if (question.status === 'answered') {
     const e = new Error('השאלה כבר נענתה');
     e.status = 409;
+    throw e;
+  }
+
+  // Enforce category assignment before publishing (skip for private answers)
+  if (!isPrivate && !question.category_id) {
+    const e = new Error('יש לשייך קטגוריה לשאלה לפני פרסום תשובה');
+    e.status = 400;
     throw e;
   }
 

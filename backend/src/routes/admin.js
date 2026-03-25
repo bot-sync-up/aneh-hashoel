@@ -28,6 +28,7 @@ const analyticsService               = require('../services/analyticsService');
 const { retryFailedSyncs }           = require('../services/wordpress');
 const { query: dbQuery }             = require('../db/pool');
 const systemSettings                 = require('../config/systemSettings');
+const { getWPRabbis, createWPRabbi, getWPCategories } = require('../services/wpService');
 
 const router = express.Router();
 
@@ -234,6 +235,22 @@ router.post('/rabbis', async (req, res) => {
       ip:      getIp(req),
     });
 
+    // Also create rabi-add term in WP — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const wpResult = await createWPRabbi(name);
+        if (wpResult.success && wpResult.data?.id) {
+          await dbQuery(
+            `UPDATE rabbis SET wp_term_id = $1 WHERE id = $2`,
+            [wpResult.data.id, rabbi.id]
+          );
+          console.log(`[admin] WP rabbi term synced: rabbiId=${rabbi.id} wpTermId=${wpResult.data.id}`);
+        }
+      } catch (err) {
+        console.error('[admin] WP rabbi term creation failed (non-fatal):', err.message);
+      }
+    });
+
     return res.status(201).json({ ok: true, rabbi });
   } catch (err) {
     console.error('[admin] POST /rabbis error:', err.message);
@@ -341,6 +358,155 @@ router.put('/rabbis/:id/toggle-status', async (req, res) => {
     return res.json({ ok: true, rabbi: updated[0] });
   } catch (err) {
     console.error('[admin] PUT /rabbis/:id/toggle-status error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// ─── POST /rabbis/sync-from-wp — pull rabi-add terms from WP ─────────────────
+
+/**
+ * POST /admin/rabbis/sync-from-wp
+ * Pulls all rabi-add terms from WP and reports which exist locally and which don't.
+ * Does NOT auto-create local rabbis (they need email/password).
+ */
+router.post('/rabbis/sync-from-wp', async (req, res) => {
+  try {
+    const wpResult = await getWPRabbis();
+    if (!wpResult.success) {
+      return res.status(502).json({ error: `שגיאה בשליפת רבנים מ-WP: ${wpResult.error}` });
+    }
+
+    const wpTerms = wpResult.data || [];
+    if (wpTerms.length === 0) {
+      return res.json({ message: 'לא נמצאו רבנים ב-WP', total_wp: 0, matched: 0, unmatched: [] });
+    }
+
+    // Get all local rabbis
+    const { rows: localRabbis } = await dbQuery(
+      `SELECT id, name, wp_term_id FROM rabbis WHERE status != 'deleted'`
+    );
+
+    const existingWpIds = new Set(
+      localRabbis.filter(r => r.wp_term_id).map(r => r.wp_term_id)
+    );
+
+    let matched = 0;
+    let linked = 0;
+    const unmatched = [];
+
+    for (const wpTerm of wpTerms) {
+      if (existingWpIds.has(wpTerm.id)) {
+        matched++;
+        continue;
+      }
+
+      // Try to match by name
+      const localMatch = localRabbis.find(
+        r => r.name.trim().toLowerCase() === wpTerm.name.trim().toLowerCase() && !r.wp_term_id
+      );
+
+      if (localMatch) {
+        await dbQuery(
+          `UPDATE rabbis SET wp_term_id = $1 WHERE id = $2`,
+          [wpTerm.id, localMatch.id]
+        );
+        linked++;
+        matched++;
+        console.log(`[admin/rabbis/sync] linked rabbiId=${localMatch.id} to wpTermId=${wpTerm.id}`);
+      } else {
+        unmatched.push({ wp_term_id: wpTerm.id, name: wpTerm.name, slug: wpTerm.slug });
+      }
+    }
+
+    console.log(
+      `[admin/rabbis/sync] WP: ${wpTerms.length}, matched: ${matched}, linked: ${linked}, unmatched: ${unmatched.length}`
+    );
+
+    return res.json({
+      message: 'סנכרון רבנים מ-WP הושלם',
+      total_wp: wpTerms.length,
+      matched,
+      linked,
+      unmatched,
+    });
+  } catch (err) {
+    console.error('[admin] POST /rabbis/sync-from-wp error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// ─── POST /categories/sync-from-wp — alternative admin route for category sync
+
+/**
+ * POST /admin/categories/sync-from-wp
+ * Pulls all ask-cat terms from WP, creates missing ones in local DB.
+ * This is an alias for the same functionality in /api/categories/sync-from-wp.
+ */
+router.post('/categories/sync-from-wp', async (req, res) => {
+  try {
+    const wpResult = await getWPCategories();
+    if (!wpResult.success) {
+      return res.status(502).json({ error: `שגיאה בשליפת קטגוריות מ-WP: ${wpResult.error}` });
+    }
+
+    const wpTerms = wpResult.data || [];
+    if (wpTerms.length === 0) {
+      return res.json({ message: 'לא נמצאו קטגוריות ב-WP', created: 0, existing: 0 });
+    }
+
+    const { rows: localCats } = await dbQuery(
+      `SELECT id, name, wp_term_id FROM categories WHERE status != 'rejected'`
+    );
+
+    const existingWpIds = new Set(localCats.filter(c => c.wp_term_id).map(c => c.wp_term_id));
+    const existingNames = new Set(localCats.map(c => c.name.trim().toLowerCase()));
+
+    let created = 0;
+    let existing = 0;
+    let skipped = 0;
+
+    for (const wpTerm of wpTerms) {
+      if (existingWpIds.has(wpTerm.id)) {
+        existing++;
+        continue;
+      }
+
+      if (existingNames.has(wpTerm.name.trim().toLowerCase())) {
+        const localMatch = localCats.find(
+          c => c.name.trim().toLowerCase() === wpTerm.name.trim().toLowerCase() && !c.wp_term_id
+        );
+        if (localMatch) {
+          await dbQuery(
+            `UPDATE categories SET wp_term_id = $1 WHERE id = $2`,
+            [wpTerm.id, localMatch.id]
+          );
+        }
+        existing++;
+        continue;
+      }
+
+      try {
+        await dbQuery(
+          `INSERT INTO categories (name, parent_id, sort_order, status, wp_term_id, created_at)
+           VALUES ($1, NULL, 0, 'approved', $2, NOW())`,
+          [wpTerm.name.trim(), wpTerm.id]
+        );
+        created++;
+      } catch (insertErr) {
+        console.error(`[admin/categories/sync] failed to create "${wpTerm.name}":`, insertErr.message);
+        skipped++;
+      }
+    }
+
+    return res.json({
+      message: 'סנכרון קטגוריות מ-WP הושלם',
+      total_wp: wpTerms.length,
+      created,
+      existing,
+      skipped,
+    });
+  } catch (err) {
+    console.error('[admin] POST /categories/sync-from-wp error:', err.message);
     return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
   }
 });

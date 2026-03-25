@@ -484,9 +484,13 @@ export default function AdminQuestionsPage() {
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">{q.category ?? '—'}</td>
                     <td className="px-3 py-3">
-                      <Badge status={STATUS_BADGE[q.status] ?? 'default'} withDot />
+                      <Badge status={STATUS_BADGE[q.status] ?? 'default'} withDot>
+                        {STATUS_OPTIONS.find(o => o.value === q.status)?.label ?? q.status}
+                      </Badge>
                     </td>
-                    <td className="px-3 py-3 text-[var(--text-secondary)]">{q.assignedRabbi ?? '—'}</td>
+                    <td className="px-3 py-3 text-[var(--text-secondary)]">
+                      {q.assignedRabbi ?? <span className="text-[var(--text-muted)] italic">לא נתפסה</span>}
+                    </td>
                     <td className="px-3 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">
                       {q.createdAt ? new Date(q.createdAt).toLocaleDateString('he-IL') : '—'}
                     </td>

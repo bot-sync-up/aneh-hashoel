@@ -58,23 +58,31 @@ export default function CreateDiscussionModal({
     }
   }, [isOpen, questionId]);
 
-  // Search rabbis
+  // Load ALL active rabbis when "selected" mode is chosen
+  const [allRabbis, setAllRabbis] = useState([]);
+  const [loadingAllRabbis, setLoadingAllRabbis] = useState(false);
+
   useEffect(() => {
     if (membersMode !== 'selected') return;
-    if (!debouncedRabbiSearch.trim()) {
-      setRabbiResults([]);
-      return;
-    }
+    if (allRabbis.length > 0) return; // already loaded
 
-    setSearchingRabbis(true);
+    setLoadingAllRabbis(true);
     api
-      .get('/rabbis', { params: { search: debouncedRabbiSearch, limit: 10 } })
+      .get('/rabbis', { params: { limit: 200 } })
       .then(({ data }) => {
-        setRabbiResults(data.rabbis || data.data || data || []);
+        const list = data.rabbis || data.data || data || [];
+        setAllRabbis(list.filter(r => r.is_active !== false));
       })
-      .catch(() => setRabbiResults([]))
-      .finally(() => setSearchingRabbis(false));
-  }, [debouncedRabbiSearch, membersMode]);
+      .catch(() => setAllRabbis([]))
+      .finally(() => setLoadingAllRabbis(false));
+  }, [membersMode, allRabbis.length]);
+
+  // Filter rabbis by search
+  const filteredRabbis = allRabbis.filter((r) => {
+    if (!rabbiSearch.trim()) return true;
+    const q = rabbiSearch.trim().toLowerCase();
+    return (r.name || r.full_name || '').toLowerCase().includes(q);
+  });
 
   const toggleRabbi = useCallback((rabbi) => {
     setSelectedRabbis((prev) => {
@@ -290,40 +298,47 @@ export default function CreateDiscussionModal({
               />
             </div>
 
-            {/* Results dropdown */}
-            {(rabbiResults.length > 0 || searchingRabbis) && (
-              <div className="border border-[var(--border-default)] rounded-md overflow-hidden bg-[var(--bg-surface)] shadow-sm max-h-40 overflow-y-auto">
-                {searchingRabbis && (
-                  <div className="flex justify-center py-3">
-                    <Spinner size="sm" />
-                  </div>
-                )}
-                {!searchingRabbis &&
-                  rabbiResults.map((rabbi) => {
-                    const isSelected = selectedRabbis.some((r) => r.id === rabbi.id);
-                    return (
-                      <button
-                        key={rabbi.id}
-                        type="button"
-                        onClick={() => toggleRabbi(rabbi)}
-                        className={clsx(
-                          'w-full flex items-center justify-between px-3 py-2',
-                          'text-sm font-heebo text-right',
-                          'hover:bg-[var(--bg-muted)] transition-colors duration-100',
-                          isSelected && 'bg-[#1B2B5E]/5'
-                        )}
-                      >
-                        <span className="text-[var(--text-primary)]">
-                          {rabbi.name || rabbi.full_name}
-                        </span>
-                        {isSelected && (
-                          <Check size={14} className="text-[#1B2B5E] flex-shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-              </div>
-            )}
+            {/* Rabbi list with checkboxes */}
+            <div className="border border-[var(--border-default)] rounded-md overflow-hidden bg-[var(--bg-surface)] shadow-sm max-h-52 overflow-y-auto">
+              {loadingAllRabbis && (
+                <div className="flex justify-center py-3">
+                  <Spinner size="sm" />
+                </div>
+              )}
+              {!loadingAllRabbis && filteredRabbis.length === 0 && (
+                <div className="px-3 py-3 text-sm text-[var(--text-muted)] font-heebo text-center">
+                  {rabbiSearch.trim() ? 'לא נמצאו רבנים' : 'אין רבנים זמינים'}
+                </div>
+              )}
+              {!loadingAllRabbis &&
+                filteredRabbis.map((rabbi) => {
+                  const isSelected = selectedRabbis.some((r) => r.id === rabbi.id);
+                  return (
+                    <label
+                      key={rabbi.id}
+                      className={clsx(
+                        'w-full flex items-center gap-2.5 px-3 py-2 cursor-pointer',
+                        'text-sm font-heebo text-right',
+                        'hover:bg-[var(--bg-muted)] transition-colors duration-100',
+                        isSelected && 'bg-[#1B2B5E]/5'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleRabbi(rabbi)}
+                        className="rounded border-[var(--border-default)] text-[#1B2B5E] focus:ring-[#1B2B5E]/20 w-4 h-4"
+                      />
+                      <span className="text-[var(--text-primary)] flex-1">
+                        {rabbi.name || rabbi.full_name}
+                      </span>
+                      {isSelected && (
+                        <Check size={14} className="text-[#1B2B5E] flex-shrink-0" />
+                      )}
+                    </label>
+                  );
+                })}
+            </div>
           </div>
         )}
 

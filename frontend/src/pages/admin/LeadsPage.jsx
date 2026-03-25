@@ -3,9 +3,10 @@ import { clsx } from 'clsx';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
-  StickyNote, X,
+  StickyNote, X, Download,
 } from 'lucide-react';
 import { get, patch } from '../../lib/api';
+import api from '../../lib/api';
 import { formatDate } from '../../lib/utils';
 import Spinner, { BlockSpinner } from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
@@ -240,9 +241,31 @@ export default function LeadsPage() {
                 )}
               </p>
             </div>
-            <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={14} />} onClick={fetchLeads}>
-              רענן
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Download size={14} />}
+                onClick={async () => {
+                  try {
+                    const response = await api.get('/leads/export', { responseType: 'blob' });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `leads-${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  } catch { /* ignore */ }
+                }}
+              >
+                ייצוא CSV
+              </Button>
+              <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={14} />} onClick={fetchLeads}>
+                רענן
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -708,6 +708,206 @@ async function syncThankCount(wpPostId, thankCount) {
   }
 }
 
+// ─── Category taxonomy (ask-cat) functions ──────────────────────────────────
+
+/**
+ * Fetch all WP category terms from the ask-cat taxonomy.
+ *
+ * Endpoint: GET /ask-cat?per_page=100
+ *
+ * @returns {Promise<{ success: boolean, data?: Array<{id: number, name: string, slug: string}>, error?: string }>}
+ */
+async function getWPCategories() {
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.get('/ask-cat', {
+        params: {
+          per_page: 100,
+          _fields:  'id,name,slug',
+        },
+      }),
+      'getWPCategories'
+    );
+
+    const terms = response.data;
+
+    if (!Array.isArray(terms)) {
+      return { success: true, data: [] };
+    }
+
+    console.log(`[wpService] getWPCategories: ${terms.length} קטגוריות מ-WP`);
+    return { success: true, data: terms };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+
+    if (httpStatus === 401) {
+      alertAdmin('WP REST API החזיר 401 ב-getWPCategories');
+    }
+
+    console.error(`[wpService] getWPCategories שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Create a new term in the ask-cat taxonomy on WordPress.
+ *
+ * Endpoint: POST /ask-cat
+ *
+ * @param {string} name
+ * @returns {Promise<{ success: boolean, data?: {id: number, name: string, slug: string}, error?: string }>}
+ */
+async function createWPCategory(name) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return { success: false, error: 'שם קטגוריה נדרש' };
+  }
+
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.post('/ask-cat', { name: name.trim() }),
+      `createWPCategory(${name})`
+    );
+
+    await logSync(null, 'create_wp_category', 'success');
+    console.log(`[wpService] createWPCategory ✓ name=${name} wpTermId=${response.data?.id}`);
+    return { success: true, data: response.data };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+
+    if (httpStatus === 401) {
+      alertAdmin('WP REST API 401 ב-createWPCategory');
+    }
+    if (httpStatus >= 500 || httpStatus === null) {
+      await logSync(null, 'create_wp_category', 'failed', `${httpStatus ?? 'network'}: ${message}`);
+    }
+
+    console.error(`[wpService] createWPCategory(${name}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Delete a term from the ask-cat taxonomy on WordPress.
+ *
+ * Endpoint: DELETE /ask-cat/{id}?force=true
+ *
+ * @param {number} wpTermId
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function deleteWPCategory(wpTermId) {
+  if (!wpTermId) {
+    return { success: false, error: 'wpTermId נדרש' };
+  }
+
+  try {
+    const client = buildClient();
+
+    await withRateLimitRetry(
+      () => client.delete(`/ask-cat/${wpTermId}`, { params: { force: true } }),
+      `deleteWPCategory(${wpTermId})`
+    );
+
+    await logSync(null, 'delete_wp_category', 'success');
+    console.log(`[wpService] deleteWPCategory ✓ wpTermId=${wpTermId}`);
+    return { success: true };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+
+    if (httpStatus === 401) {
+      alertAdmin(`WP REST API 401 ב-deleteWPCategory(${wpTermId})`);
+    }
+
+    console.error(`[wpService] deleteWPCategory(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
+// ─── Rabbi taxonomy (rabi-add) functions ─────────────────────────────────────
+
+/**
+ * Fetch all WP rabbi terms from the rabi-add taxonomy.
+ *
+ * Endpoint: GET /rabi-add?per_page=100
+ *
+ * @returns {Promise<{ success: boolean, data?: Array<{id: number, name: string, slug: string}>, error?: string }>}
+ */
+async function getWPRabbis() {
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.get('/rabi-add', {
+        params: {
+          per_page: 100,
+          _fields:  'id,name,slug',
+        },
+      }),
+      'getWPRabbis'
+    );
+
+    const terms = response.data;
+
+    if (!Array.isArray(terms)) {
+      return { success: true, data: [] };
+    }
+
+    console.log(`[wpService] getWPRabbis: ${terms.length} רבנים מ-WP`);
+    return { success: true, data: terms };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+
+    if (httpStatus === 401) {
+      alertAdmin('WP REST API החזיר 401 ב-getWPRabbis');
+    }
+
+    console.error(`[wpService] getWPRabbis שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Create a new term in the rabi-add taxonomy on WordPress.
+ *
+ * Endpoint: POST /rabi-add
+ *
+ * @param {string} name
+ * @returns {Promise<{ success: boolean, data?: {id: number, name: string, slug: string}, error?: string }>}
+ */
+async function createWPRabbi(name) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return { success: false, error: 'שם הרב נדרש' };
+  }
+
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.post('/rabi-add', { name: name.trim() }),
+      `createWPRabbi(${name})`
+    );
+
+    await logSync(null, 'create_wp_rabbi', 'success');
+    console.log(`[wpService] createWPRabbi ✓ name=${name} wpTermId=${response.data?.id}`);
+    return { success: true, data: response.data };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+
+    if (httpStatus === 401) {
+      alertAdmin('WP REST API 401 ב-createWPRabbi');
+    }
+    if (httpStatus >= 500 || httpStatus === null) {
+      await logSync(null, 'create_wp_rabbi', 'failed', `${httpStatus ?? 'network'}: ${message}`);
+    }
+
+    console.error(`[wpService] createWPRabbi(${name}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -723,4 +923,11 @@ module.exports = {
   syncRetryFailed,
   syncThankCount,
   logSync,
+  // Category taxonomy (ask-cat)
+  getWPCategories,
+  createWPCategory,
+  deleteWPCategory,
+  // Rabbi taxonomy (rabi-add)
+  getWPRabbis,
+  createWPRabbi,
 };

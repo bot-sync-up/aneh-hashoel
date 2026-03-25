@@ -30,6 +30,8 @@ const {
   syncPendingQuestions,
   syncAnswersToWP,
 }                               = require('../services/questionSyncService');
+const { getWPCategories }       = require('../services/wpService');
+const { query: dbQuery }        = require('../db/pool');
 
 const TIMEZONE = 'Asia/Jerusalem';
 
@@ -129,6 +131,72 @@ function startCronJobs(io = null) {
   cron.schedule('0 8 * * *', safeJob('sendHolidayGreetings', runHolidayGreetings), {
     timezone: TIMEZONE,
   });
+
+  // ─── Startup: auto-sync categories from WP if local DB has fewer ─────────
+  if (process.env.DISABLE_WP_SYNC !== 'true') {
+    setImmediate(async () => {
+      try {
+        const { rows: localCount } = await dbQuery(
+          `SELECT COUNT(*) AS cnt FROM categories WHERE status != 'rejected'`
+        );
+        const localCnt = parseInt(localCount[0].cnt, 10);
+
+        const wpResult = await getWPCategories();
+        if (!wpResult.success || !wpResult.data) {
+          console.log('[cron/startup] Could not fetch WP categories for auto-sync');
+          return;
+        }
+
+        const wpCnt = wpResult.data.length;
+        console.log(`[cron/startup] Categories: local=${localCnt}, WP=${wpCnt}`);
+
+        if (localCnt < wpCnt) {
+          console.log('[cron/startup] Local DB has fewer categories — running auto-sync from WP...');
+
+          const { rows: localCats } = await dbQuery(
+            `SELECT id, name, wp_term_id FROM categories WHERE status != 'rejected'`
+          );
+          const existingWpIds = new Set(localCats.filter(c => c.wp_term_id).map(c => c.wp_term_id));
+          const existingNames = new Set(localCats.map(c => c.name.trim().toLowerCase()));
+
+          let created = 0;
+          for (const wpTerm of wpResult.data) {
+            if (existingWpIds.has(wpTerm.id)) continue;
+
+            if (existingNames.has(wpTerm.name.trim().toLowerCase())) {
+              const localMatch = localCats.find(
+                c => c.name.trim().toLowerCase() === wpTerm.name.trim().toLowerCase() && !c.wp_term_id
+              );
+              if (localMatch) {
+                await dbQuery(
+                  `UPDATE categories SET wp_term_id = $1 WHERE id = $2`,
+                  [wpTerm.id, localMatch.id]
+                );
+              }
+              continue;
+            }
+
+            try {
+              await dbQuery(
+                `INSERT INTO categories (name, parent_id, sort_order, status, wp_term_id, created_at)
+                 VALUES ($1, NULL, 0, 'approved', $2, NOW())`,
+                [wpTerm.name.trim(), wpTerm.id]
+              );
+              created++;
+            } catch (_) { /* duplicate or other — skip */ }
+          }
+
+          if (created > 0) {
+            console.log(`[cron/startup] Auto-synced ${created} new categories from WP`);
+          }
+        } else {
+          console.log('[cron/startup] Categories are in sync (local >= WP count)');
+        }
+      } catch (err) {
+        console.error('[cron/startup] Category auto-sync error:', err.message);
+      }
+    });
+  }
 
   console.log('[cron] All jobs registered:');
   console.log('[cron]   checkQuestionTimeouts:      */30 * * * *');

@@ -18,6 +18,7 @@ import {
   Sun,
   LogOut,
   Users,
+  Headphones,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -62,6 +63,11 @@ const NAV_ITEMS = [
     to: '/profile',
     label: 'פרופיל',
     icon: UserRound,
+  },
+  {
+    to: '/support',
+    label: 'פניה לניהול',
+    icon: Headphones,
   },
 ];
 

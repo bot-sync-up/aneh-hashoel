@@ -35,9 +35,9 @@ function SkeletonRow() {
 
 // ─── Role badge ────────────────────────────────────────────────────────────
 const ROLE_CONFIG = {
-  admin:   { label: 'מנהל',  status: 'info' },
-  rabbi:   { label: 'רב',    status: 'default' },
-  senior:  { label: 'בכיר',  status: 'warning' },
+  admin:            { label: 'מנהל',           status: 'info' },
+  rabbi:            { label: 'רב',             status: 'default' },
+  customer_service: { label: 'שירות לקוחות',  status: 'warning' },
 };
 
 function RoleBadge({ role }) {
@@ -136,9 +136,9 @@ function ChangeRoleModal({ rabbi, onClose, onSave }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             {[
-              { value: 'rabbi',  label: 'רב — יכול לראות ולענות שאלות' },
-              { value: 'senior', label: 'בכיר — עדיפות גבוהה בשאלות' },
-              { value: 'admin',  label: 'מנהל — גישה מלאה למערכת' },
+              { value: 'rabbi',            label: 'רב — יכול לראות ולענות שאלות' },
+              { value: 'admin',            label: 'מנהל — גישה מלאה למערכת' },
+              { value: 'customer_service', label: 'שירות לקוחות — ניהול לידים ופניות' },
             ].map(opt => (
               <label key={opt.value} className={clsx(
                 'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
@@ -432,8 +432,8 @@ export default function RabbisAdminPage() {
         >
           <option value="all">כל התפקידים</option>
           <option value="rabbi">רב</option>
-          <option value="senior">בכיר</option>
           <option value="admin">מנהל</option>
+          <option value="customer_service">שירות לקוחות</option>
         </select>
       </div>
 

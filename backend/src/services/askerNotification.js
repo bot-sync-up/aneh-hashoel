@@ -403,10 +403,38 @@ async function notifyAskerPrivateAnswer(questionId) {
   }
 }
 
+// ─── notifyAskerQuestionReceived ───────────────────────────────────────────────
+
+/**
+ * Send a confirmation email to the asker when their question is received.
+ *
+ * @param {object} question  Object with asker_email, asker_name, title/content
+ */
+async function notifyAskerQuestionReceived(question) {
+  const email = question.asker_email;
+  if (!email) return;
+
+  const subject = 'קיבלנו את שאלתך — ענה את השואל';
+  const html = `
+    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #1e3a5f;">שלום ${question.asker_name || 'שואל יקר'},</h2>
+      <p>קיבלנו את שאלתך ונענה בהקדם האפשרי.</p>
+      <div style="background: #f8f9fa; border-right: 4px solid #1e3a5f; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <strong>שאלתך:</strong><br/>
+        <p>${question.title || question.content || ''}</p>
+      </div>
+      <p style="color: #666; font-size: 14px;">המרכז למורשת מרן</p>
+    </div>
+  `;
+
+  await sendEmail(email, subject, html);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   notifyAskerNewAnswer,
   notifyAskerFollowUp,
   notifyAskerPrivateAnswer,
+  notifyAskerQuestionReceived,
 };

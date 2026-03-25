@@ -38,7 +38,7 @@ router.use(authenticate, requireAdmin);
 const PAGE_SIZE_DEFAULT = 20;
 const PAGE_SIZE_MAX     = 100;
 
-const VALID_ROLES       = new Set(['rabbi', 'admin']);
+const VALID_ROLES       = new Set(['rabbi', 'admin', 'customer_service']);
 const VALID_STATUSES    = new Set(['active', 'inactive']);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ router.get('/', async (req, res, next) => {
 
     if (role) {
       if (!VALID_ROLES.has(role)) {
-        return res.status(400).json({ error: 'ערך role לא חוקי — rabbi | admin' });
+        return res.status(400).json({ error: 'ערך role לא חוקי — rabbi | admin | customer_service' });
       }
       params.push(role);
       filters.push(`r.role = $${idx++}`);
@@ -262,7 +262,7 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'כתובת אימייל אינה תקינה' });
     }
     if (!VALID_ROLES.has(role)) {
-      return res.status(400).json({ error: 'תפקיד לא חוקי — rabbi | admin' });
+      return res.status(400).json({ error: 'תפקיד לא חוקי — rabbi | admin | customer_service' });
     }
     if (phone && !/^\+?[\d\s\-()]{7,20}$/.test(phone)) {
       return res.status(400).json({ error: 'מספר טלפון אינו תקין' });
@@ -560,7 +560,7 @@ router.put('/:id/role', async (req, res, next) => {
     const { role }  = req.body ?? {};
 
     if (!VALID_ROLES.has(role)) {
-      return res.status(400).json({ error: 'תפקיד לא חוקי — rabbi | admin' });
+      return res.status(400).json({ error: 'תפקיד לא חוקי — rabbi | admin | customer_service' });
     }
 
     // Prevent admin from demoting themselves (would lock them out)

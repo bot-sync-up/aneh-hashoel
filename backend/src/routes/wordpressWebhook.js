@@ -205,6 +205,34 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
     }
   }
 
+  // Upsert lead immediately (fire-and-forget)
+  setImmediate(async () => {
+    try {
+      const { upsertLead } = require('../services/leadsService');
+      await upsertLead({
+        ...question,
+        asker_email: payload.askerEmail,
+        asker_phone: payload.askerPhone,
+      });
+    } catch (leadErr) {
+      console.warn('[wp-webhook] upsertLead failed:', leadErr.message);
+    }
+  });
+
+  // Confirmation email to asker (fire-and-forget)
+  setImmediate(async () => {
+    try {
+      const { notifyAskerQuestionReceived } = require('../services/askerNotification');
+      await notifyAskerQuestionReceived({
+        asker_email: payload.askerEmail,
+        asker_name: payload.askerName,
+        title: payload.title,
+      });
+    } catch(e) {
+      console.warn('[wp-webhook] confirmation email failed:', e.message);
+    }
+  });
+
   // Fire-and-forget: fetch full WP data to get attachment_url and wp_link
   if (!question.attachment_url || !question.wp_link) {
     setImmediate(async () => {

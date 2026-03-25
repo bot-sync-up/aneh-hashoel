@@ -119,8 +119,8 @@ export default function AddRabbiModal({ isOpen, onClose, onSuccess }) {
               className="h-10 w-full px-3 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[#B8973A]"
             >
               <option value="rabbi">רב</option>
-              <option value="senior">בכיר</option>
               <option value="admin">מנהל</option>
+              <option value="customer_service">שירות לקוחות</option>
             </select>
           </div>
 

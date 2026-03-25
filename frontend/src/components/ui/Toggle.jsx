@@ -2,15 +2,7 @@ import React, { useId } from 'react';
 import { clsx } from 'clsx';
 
 /**
- * Accessible toggle switch component.
- *
- * @param {boolean} checked         — controlled value
- * @param {(checked: boolean) => void} onChange — change handler
- * @param {string} label            — visible label text
- * @param {string} description      — optional helper text below the label
- * @param {'sm'|'md'|'lg'} size     — toggle size (default: 'md')
- * @param {boolean} disabled        — disables interaction
- * @param {'right'|'left'} labelPlacement — where the label sits (RTL: 'right' = visually after)
+ * Accessible toggle switch component — works correctly in RTL layouts.
  */
 function Toggle({
   checked = false,
@@ -40,14 +32,6 @@ function Toggle({
     lg: 'w-6 h-6',
   };
 
-  // Use translate + RTL-aware inset so toggle direction is correct in RTL layouts.
-  // OFF: thumb sits at the start (inline-start).  ON: thumb slides to the end.
-  const thumbTranslate = {
-    sm: checked ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0',
-    md: checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0',
-    lg: checked ? 'translate-x-7 rtl:-translate-x-7' : 'translate-x-0',
-  };
-
   const handleKeyDown = (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
@@ -55,8 +39,10 @@ function Toggle({
     }
   };
 
+  // Force LTR on the track so translate always works left→right
   const track = (
     <span
+      dir="ltr"
       id={id}
       role="switch"
       aria-checked={checked}
@@ -79,15 +65,15 @@ function Toggle({
           : 'cursor-pointer'
       )}
     >
-      {/* Thumb — uses translate for correct RTL/LTR behavior */}
       <span
         aria-hidden="true"
         className={clsx(
-          'inline-block rounded-full bg-white shadow-sm',
+          'absolute top-0.5 left-0.5 rounded-full bg-white shadow-sm',
           'transition-transform duration-200 ease-in-out',
-          'mt-0.5 ms-0.5',
           thumbSize[size] || thumbSize.md,
-          thumbTranslate[size] || thumbTranslate.md
+          checked && size === 'sm' && 'translate-x-4',
+          checked && (size === 'md' || !size) && 'translate-x-5',
+          checked && size === 'lg' && 'translate-x-7',
         )}
       />
     </span>

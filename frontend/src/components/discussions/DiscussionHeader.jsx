@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { ChevronRight, UserPlus, LogOut, ExternalLink, Users } from 'lucide-react';
+import { ChevronRight, UserPlus, LogOut, ExternalLink, Users, Lock, Unlock, Trash2 } from 'lucide-react';
 import api from '../../lib/api';
 import Avatar, { AvatarGroup } from '../ui/Avatar';
 import Tooltip from '../ui/Tooltip';
@@ -30,6 +30,8 @@ export default function DiscussionHeader({
   const [addResults, setAddResults] = useState([]);
   const [addLoading, setAddLoading] = useState(false);
   const [leavingDiscussion, setLeavingDiscussion] = useState(false);
+  const [lockingDiscussion, setLockingDiscussion] = useState(false);
+  const [deletingDiscussion, setDeletingDiscussion] = useState(false);
 
   // Online member IDs tracked via socket presence
   const [onlineIds, setOnlineIds] = useState(() => new Set());
@@ -109,6 +111,36 @@ export default function DiscussionHeader({
       onBack?.();
     } catch {
       setLeavingDiscussion(false);
+    }
+  }, [discussionId, onBack]);
+
+  // ── Lock discussion ──────────────────────────────────────────────────────
+
+  const handleToggleLock = useCallback(async () => {
+    const isLocked = discussion?.locked;
+    const msg = isLocked ? 'האם לפתוח את הדיון?' : 'האם לנעול את הדיון? לא ניתן יהיה לשלוח הודעות.';
+    if (!window.confirm(msg)) return;
+    setLockingDiscussion(true);
+    try {
+      await api.patch(`/discussions/${discussionId}/lock`, { locked: !isLocked });
+      onDiscussionUpdate?.((prev) => ({ ...prev, locked: !isLocked }));
+    } catch {
+      // ignore
+    } finally {
+      setLockingDiscussion(false);
+    }
+  }, [discussionId, discussion?.locked, onDiscussionUpdate]);
+
+  // ── Delete discussion (admin only) ──────────────────────────────────────
+
+  const handleDelete = useCallback(async () => {
+    if (!window.confirm('האם אתה בטוח שברצונך למחוק את הדיון לצמיתות? פעולה זו בלתי הפיכה.')) return;
+    setDeletingDiscussion(true);
+    try {
+      await api.delete(`/discussions/${discussionId}/permanent`);
+      onBack?.();
+    } catch {
+      setDeletingDiscussion(false);
     }
   }, [discussionId, onBack]);
 
@@ -326,6 +358,46 @@ export default function DiscussionHeader({
             </div>
           )}
         </div>
+
+        {/* Lock discussion (creator or admin) */}
+        {(String(discussion?.created_by) === String(rabbi?.id) || rabbi?.role === 'admin') && (
+          <Tooltip content={discussion?.locked ? 'בטל נעילה' : 'נעל דיון'} placement="bottom">
+            <button
+              onClick={handleToggleLock}
+              disabled={lockingDiscussion}
+              aria-label={discussion?.locked ? 'בטל נעילה' : 'נעל דיון'}
+              className="
+                p-2 rounded-md text-[var(--text-muted)]
+                hover:text-[#1B2B5E] hover:bg-[var(--bg-muted)]
+                transition-colors duration-150
+                focus-visible:ring-2 focus-visible:ring-[#B8973A]
+                disabled:opacity-50
+              "
+            >
+              {discussion?.locked ? <Unlock size={17} /> : <Lock size={17} />}
+            </button>
+          </Tooltip>
+        )}
+
+        {/* Delete discussion (admin only) */}
+        {rabbi?.role === 'admin' && (
+          <Tooltip content="מחק דיון" placement="bottom">
+            <button
+              onClick={handleDelete}
+              disabled={deletingDiscussion}
+              aria-label="מחק דיון"
+              className="
+                p-2 rounded-md text-[var(--text-muted)]
+                hover:text-red-500 hover:bg-red-50
+                transition-colors duration-150
+                focus-visible:ring-2 focus-visible:ring-red-400
+                disabled:opacity-50
+              "
+            >
+              <Trash2 size={17} />
+            </button>
+          </Tooltip>
+        )}
 
         {/* Leave discussion */}
         <Tooltip content="צא מהדיון" placement="bottom">

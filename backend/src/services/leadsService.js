@@ -23,6 +23,12 @@ function _emailHash(plainEmail) {
   return crypto.createHash('sha256').update(plainEmail.toLowerCase().trim()).digest('hex');
 }
 
+function _nameHash(name) {
+  if (!name) return null;
+  // Prefix with 'name:' to avoid collisions with email hashes
+  return crypto.createHash('sha256').update('name:' + name.trim()).digest('hex');
+}
+
 function _hotScore(questionCount, thankCount, hasUrgent) {
   let score = questionCount;
   if (thankCount > 0)  score += 3;
@@ -57,20 +63,46 @@ async function upsertLead(question) {
   } = question;
 
   const emailHash = _emailHash(plainEmail);
-  if (!emailHash) return; // no email — skip
+
+  // If no email AND no name, skip entirely — we can't identify this lead
+  if (!emailHash && !asker_name) return;
+
+  // Generate a fallback hash from name when email is not available
+  const resolvedHash = emailHash || _nameHash(asker_name);
 
   try {
     // Aggregate stats for this asker across all questions
-    const { rows: stats } = await query(
-      `SELECT COUNT(*)::int          AS question_count,
-              COALESCE(SUM(thank_count), 0)::int AS total_thanks,
-              bool_or(is_urgent)     AS has_urgent
-       FROM   questions
-       WHERE  asker_email_encrypted = $1`,
-      [asker_email_encrypted]
-    );
+    let question_count = 1;
+    let total_thanks = 0;
+    let has_urgent = is_urgent || false;
 
-    const { question_count, total_thanks, has_urgent } = stats[0] || {};
+    if (asker_email_encrypted) {
+      const { rows: stats } = await query(
+        `SELECT COUNT(*)::int          AS question_count,
+                COALESCE(SUM(thank_count), 0)::int AS total_thanks,
+                bool_or(is_urgent)     AS has_urgent
+         FROM   questions
+         WHERE  asker_email_encrypted = $1`,
+        [asker_email_encrypted]
+      );
+      question_count = stats[0]?.question_count || 1;
+      total_thanks   = stats[0]?.total_thanks || 0;
+      has_urgent     = stats[0]?.has_urgent || false;
+    } else if (asker_name) {
+      // Fallback: count by name (less accurate but better than nothing)
+      const { rows: stats } = await query(
+        `SELECT COUNT(*)::int          AS question_count,
+                COALESCE(SUM(thank_count), 0)::int AS total_thanks,
+                bool_or(is_urgent)     AS has_urgent
+         FROM   questions
+         WHERE  asker_name = $1 AND asker_email_encrypted IS NULL`,
+        [asker_name]
+      );
+      question_count = stats[0]?.question_count || 1;
+      total_thanks   = stats[0]?.total_thanks || 0;
+      has_urgent     = stats[0]?.has_urgent || false;
+    }
+
     const score  = _hotScore(question_count, total_thanks, has_urgent);
     const is_hot = _isHot(question_count, total_thanks, has_urgent);
 
@@ -90,7 +122,7 @@ async function upsertLead(question) {
          last_question_at      = GREATEST(leads.last_question_at, $9),
          updated_at            = NOW()`,
       [
-        emailHash,
+        resolvedHash,
         asker_name || null,
         asker_email_encrypted || null,
         asker_phone_encrypted || null,
@@ -105,6 +137,48 @@ async function upsertLead(question) {
     console.error('[leadsService] upsertLead error:', err.message);
     // Non-critical — do not propagate
   }
+}
+
+/**
+ * Sync all questions into leads — scans all questions and calls upsertLead for each.
+ * Intended for admin use to backfill leads.
+ *
+ * @returns {Promise<{ synced: number, skipped: number }>}
+ */
+async function syncLeadsFromQuestions() {
+  const { rows } = await query(
+    `SELECT id, asker_name, asker_email_encrypted, asker_phone_encrypted,
+            category_id, is_urgent, thank_count, created_at
+     FROM questions
+     ORDER BY created_at ASC`
+  );
+
+  let synced = 0;
+  let skipped = 0;
+
+  for (const q of rows) {
+    // Try to decrypt email for hash
+    let plainEmail = null;
+    try {
+      plainEmail = decryptField(q.asker_email_encrypted) || null;
+    } catch { /* ignore */ }
+
+    const lead = {
+      ...q,
+      asker_email: plainEmail,
+    };
+
+    // Skip if no email AND no name
+    if (!plainEmail && !q.asker_name) {
+      skipped++;
+      continue;
+    }
+
+    await upsertLead(lead);
+    synced++;
+  }
+
+  return { synced, skipped };
 }
 
 // ─── getLeads ─────────────────────────────────────────────────────────────────
@@ -247,4 +321,4 @@ async function updateLead(id, updates) {
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { upsertLead, getLeads, getLeadById, updateLead };
+module.exports = { upsertLead, getLeads, getLeadById, updateLead, syncLeadsFromQuestions };

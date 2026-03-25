@@ -20,8 +20,10 @@ export default function AddRabbiModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const set = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    const value = field === 'phone' ? e.target.value.replace(/[^0-9]/g, '') : e.target.value;
+    setForm((f) => ({ ...f, [field]: value }));
+  };
 
   const validate = () => {
     const e = {};
@@ -103,10 +105,12 @@ export default function AddRabbiModal({ isOpen, onClose, onSuccess }) {
           <Input
             label="טלפון"
             type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={form.phone}
             onChange={set('phone')}
             error={errors.phone}
-            placeholder="050-0000000"
+            placeholder="0500000000"
           />
 
           <div className="flex flex-col gap-1.5">

@@ -43,6 +43,8 @@ const {
   getAllDiscussions,
   getDiscussionDetail,
   closeDiscussion,
+  deleteDiscussion,
+  lockDiscussion,
   joinDiscussion,
   leaveDiscussion,
   addMembers,
@@ -519,6 +521,64 @@ router.post(
     );
 
     return res.json({ reactions: result.reactions, action: result.action });
+  })
+);
+
+// ─── PATCH /:id/lock — lock/unlock discussion ────────────────────────────────
+
+/**
+ * Lock or unlock a discussion.
+ * When locked, no new messages can be sent.
+ * Only the creator or an admin may call this.
+ * Emits `discussion:locked` to the discussion room.
+ *
+ * Body:
+ *   locked {boolean} optional — defaults to true (lock)
+ */
+router.patch(
+  '/:id/lock',
+  [validateDiscussionId],
+  asyncHandler(async (req, res) => {
+    if (hasValidationErrors(req, res)) return;
+
+    const locked = req.body.locked !== false; // default to true
+    const discussion = await lockDiscussion(
+      req.params.id,
+      req.rabbi.id,
+      locked,
+      req.app.get('io')
+    );
+
+    return res.json({
+      discussion,
+      message: locked ? 'הדיון ננעל' : 'הדיון שוחרר',
+    });
+  })
+);
+
+// ─── DELETE /:id/permanent — permanently delete discussion (admin only) ──────
+
+/**
+ * Permanently delete a discussion and all its data.
+ * Admin only. Cascades to members, messages, reactions.
+ */
+router.delete(
+  '/:id/permanent',
+  [validateDiscussionId],
+  asyncHandler(async (req, res) => {
+    if (hasValidationErrors(req, res)) return;
+
+    if (req.rabbi.role !== 'admin') {
+      return res.status(403).json({ error: 'רק מנהל מערכת יכול למחוק דיון לצמיתות' });
+    }
+
+    const discussion = await deleteDiscussion(
+      req.params.id,
+      req.rabbi.id,
+      req.app.get('io')
+    );
+
+    return res.json({ discussion, message: 'הדיון נמחק לצמיתות' });
   })
 );
 

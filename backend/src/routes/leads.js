@@ -13,7 +13,7 @@
 const express = require('express');
 const { stringify: csvStringify } = require('csv-stringify/sync');
 const { authenticate } = require('../middleware/auth');
-const { getLeads, getLeadById, updateLead } = require('../services/leadsService');
+const { getLeads, getLeadById, updateLead, syncLeadsFromQuestions } = require('../services/leadsService');
 
 const router = express.Router();
 
@@ -83,6 +83,25 @@ router.get('/export', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="leads-${new Date().toISOString().split('T')[0]}.csv"`);
     return res.send(csv);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /sync — Admin: sync leads from all questions ───────────────────────
+
+router.post('/sync', async (req, res, next) => {
+  try {
+    // Only admin can trigger sync
+    if (req.rabbi.role !== 'admin') {
+      return res.status(403).json({ error: 'רק מנהל מערכת יכול להפעיל סנכרון לידים' });
+    }
+
+    const result = await syncLeadsFromQuestions();
+    return res.json({
+      message: `סנכרון הושלם: ${result.synced} לידים עודכנו, ${result.skipped} דולגו`,
+      ...result,
+    });
   } catch (err) {
     return next(err);
   }

@@ -758,6 +758,17 @@ async function sendMessage(discussionId, rabbiId, rawContent, parentId, io) {
 
   await assertMember(discussionId, rabbiId);
 
+  // Check if discussion is locked
+  const { rows: lockCheck } = await dbQuery(
+    `SELECT locked FROM discussions WHERE id = $1`,
+    [discussionId]
+  );
+  if (lockCheck[0]?.locked) {
+    const e = new Error('הדיון נעול — לא ניתן לשלוח הודעות');
+    e.status = 403;
+    throw e;
+  }
+
   // Validate parentId belongs to the same discussion
   if (parentId) {
     const { rows: pRows } = await dbQuery(
@@ -1324,6 +1335,91 @@ async function notifyOfflineMembers(discussionId, newMessage) {
   }
 }
 
+// ─── deleteDiscussion ─────────────────────────────────────────────────────────
+
+/**
+ * Permanently delete a discussion (admin only).
+ * Cascades to members, messages, and reactions via FK ON DELETE CASCADE.
+ *
+ * @param {string|number} discussionId
+ * @param {string|number} rabbiId     — must be admin
+ * @param {import('socket.io').Server} [io]
+ * @returns {Promise<object>}
+ */
+async function deleteDiscussion(discussionId, rabbiId, io) {
+  // Verify admin role
+  const { rows: rabbiRows } = await dbQuery(
+    `SELECT role FROM rabbis WHERE id = $1`,
+    [rabbiId]
+  );
+
+  if (!rabbiRows[0] || rabbiRows[0].role !== 'admin') {
+    const e = new Error('רק מנהל מערכת יכול למחוק דיון');
+    e.status = 403;
+    throw e;
+  }
+
+  const { rows } = await dbQuery(
+    `DELETE FROM discussions WHERE id = $1 RETURNING *`,
+    [discussionId]
+  );
+
+  if (rows.length === 0) {
+    const e = new Error('דיון לא נמצא');
+    e.status = 404;
+    throw e;
+  }
+
+  if (io) {
+    emitToDiscussion(io, String(discussionId), 'discussion:deleted', {
+      discussionId: String(discussionId),
+      deletedBy: rabbiId,
+    });
+  }
+
+  return rows[0];
+}
+
+// ─── lockDiscussion ──────────────────────────────────────────────────────────
+
+/**
+ * Lock a discussion — no more messages can be sent.
+ * Only creator or admin may lock/unlock.
+ *
+ * @param {string|number} discussionId
+ * @param {string|number} rabbiId
+ * @param {boolean}       locked  — true to lock, false to unlock
+ * @param {import('socket.io').Server} [io]
+ * @returns {Promise<object>}
+ */
+async function lockDiscussion(discussionId, rabbiId, locked, io) {
+  await assertCreatorOrAdmin(discussionId, rabbiId);
+
+  const { rows } = await dbQuery(
+    `UPDATE discussions
+     SET    locked = $2
+     WHERE  id = $1
+     RETURNING *`,
+    [discussionId, locked]
+  );
+
+  if (rows.length === 0) {
+    const e = new Error('דיון לא נמצא');
+    e.status = 404;
+    throw e;
+  }
+
+  if (io) {
+    emitToDiscussion(io, String(discussionId), 'discussion:locked', {
+      discussionId: String(discussionId),
+      locked,
+      lockedBy: rabbiId,
+    });
+  }
+
+  return rows[0];
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1336,6 +1432,8 @@ module.exports = {
   getAllDiscussions,
   getDiscussionDetail,
   closeDiscussion,
+  deleteDiscussion,
+  lockDiscussion,
 
   // Membership
   joinDiscussion,

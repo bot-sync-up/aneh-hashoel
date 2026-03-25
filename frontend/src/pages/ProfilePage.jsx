@@ -164,7 +164,9 @@ function PersonalTab({ rabbi }) {
   };
 
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    // Strip non-numeric characters for phone fields
+    const sanitized = field === 'phone' ? value.replace(/[^0-9]/g, '') : value;
+    setForm((prev) => ({ ...prev, [field]: sanitized }));
     setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
     setSaveStatus(null);
   };
@@ -229,8 +231,8 @@ function PersonalTab({ rabbi }) {
 
       <div>
         <label htmlFor="rabbi-phone" className={labelCls}>טלפון</label>
-        <input id="rabbi-phone" type="tel" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
-          className={inputCls('phone')} autoComplete="tel" dir="ltr" placeholder="050-0000000" />
+        <input id="rabbi-phone" type="tel" inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
+          className={inputCls('phone')} autoComplete="tel" dir="ltr" placeholder="0500000000" />
         {errors.phone && <p className="mt-1 text-xs text-red-500 font-heebo" role="alert">{errors.phone}</p>}
       </div>
 

@@ -6,7 +6,7 @@ import React, {
   useMemo,
 } from 'react';
 import { clsx } from 'clsx';
-import { ArrowDown, ChevronRight, Pin } from 'lucide-react';
+import { ArrowDown, ChevronRight, Lock, Pin } from 'lucide-react';
 import api from '../../lib/api';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -501,12 +501,19 @@ export default function DiscussionChat({
       )}
 
       {/* Input area */}
-      <MessageInput
-        discussionId={discussionId}
-        onSend={handleSend}
-        replyTo={replyTo}
-        onCancelReply={() => setReplyTo(null)}
-      />
+      {discussion?.locked ? (
+        <div className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--bg-muted)] border-t border-[var(--border-default)] text-sm text-[var(--text-muted)] font-heebo">
+          <Lock size={14} />
+          <span>הדיון נעול — לא ניתן לשלוח הודעות</span>
+        </div>
+      ) : (
+        <MessageInput
+          discussionId={discussionId}
+          onSend={handleSend}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+        />
+      )}
     </div>
   );
 }

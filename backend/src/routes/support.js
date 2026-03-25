@@ -4,8 +4,15 @@
  * Support Routes — /api/support
  *
  * POST   /contact          — Rabbi submits a support request
- * GET    /admin/support     — Admin lists all support requests (mounted via server.js)
- * PATCH  /admin/support/:id — Admin marks as handled
+ * GET    /my               — Rabbi: list my support requests
+ * GET    /:id/messages     — Get messages for a support request
+ * POST   /:id/messages     — Add a message to a support request (rabbi or admin)
+ *
+ * Admin routes (mounted at /api/admin/support via server.js):
+ * GET    /                 — Admin lists all support requests
+ * PATCH  /:id              — Admin marks as handled
+ * GET    /:id/messages     — Get messages (also accessible here)
+ * POST   /:id/messages     — Add a message (also accessible here)
  */
 
 const express = require('express');
@@ -36,6 +43,15 @@ router.post('/contact', authenticate, async (req, res, next) => {
        VALUES ($1, $2, $3, 'open', NOW(), NOW())
        RETURNING id, subject, message, status, created_at`,
       [rabbiId, subject.trim(), message.trim()]
+    );
+
+    const requestId = rows[0].id;
+
+    // Also insert the initial message into support_messages for conversation thread
+    await dbQuery(
+      `INSERT INTO support_messages (request_id, sender_id, sender_role, message, created_at)
+       VALUES ($1, $2, 'rabbi', $3, NOW())`,
+      [requestId, rabbiId, message.trim()]
     );
 
     // Fire-and-forget: send email to admin
@@ -71,6 +87,125 @@ router.post('/contact', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── GET /my — Rabbi: list my support requests ────────────────────────────
+
+router.get('/my', authenticate, async (req, res, next) => {
+  try {
+    const { rows } = await dbQuery(
+      `SELECT sr.*,
+              (SELECT COUNT(*) FROM support_messages sm WHERE sm.request_id = sr.id)::int AS message_count
+       FROM support_requests sr
+       WHERE sr.rabbi_id = $1
+       ORDER BY sr.updated_at DESC
+       LIMIT 50`,
+      [req.rabbi.id]
+    );
+
+    return res.json({ requests: rows });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── GET /:id/messages — Get messages for a support request ─────────────
+
+router.get('/:id/messages', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const isAdmin = req.rabbi.role === 'admin';
+
+    // Verify access: admin can see all, rabbi can only see own
+    if (!isAdmin) {
+      const { rows: reqRows } = await dbQuery(
+        `SELECT rabbi_id FROM support_requests WHERE id = $1`,
+        [id]
+      );
+      if (!reqRows[0]) {
+        return res.status(404).json({ error: 'פנייה לא נמצאה' });
+      }
+      if (String(reqRows[0].rabbi_id) !== String(req.rabbi.id)) {
+        return res.status(403).json({ error: 'אין הרשאה לצפות בפנייה זו' });
+      }
+    }
+
+    const { rows } = await dbQuery(
+      `SELECT sm.*, r.name AS sender_name
+       FROM support_messages sm
+       JOIN rabbis r ON r.id = sm.sender_id
+       WHERE sm.request_id = $1
+       ORDER BY sm.created_at ASC`,
+      [id]
+    );
+
+    return res.json({ messages: rows });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /:id/messages — Add message to support request ────────────────
+
+router.post('/:id/messages', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+    const isAdmin = req.rabbi.role === 'admin';
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'תוכן ההודעה נדרש' });
+    }
+
+    // Verify access
+    const { rows: reqRows } = await dbQuery(
+      `SELECT id, rabbi_id, status FROM support_requests WHERE id = $1`,
+      [id]
+    );
+    if (!reqRows[0]) {
+      return res.status(404).json({ error: 'פנייה לא נמצאה' });
+    }
+
+    if (!isAdmin && String(reqRows[0].rabbi_id) !== String(req.rabbi.id)) {
+      return res.status(403).json({ error: 'אין הרשאה להוסיף הודעה לפנייה זו' });
+    }
+
+    const senderRole = isAdmin ? 'admin' : 'rabbi';
+
+    const { rows } = await dbQuery(
+      `INSERT INTO support_messages (request_id, sender_id, sender_role, message, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING *`,
+      [id, req.rabbi.id, senderRole, message.trim()]
+    );
+
+    // Reopen request if it was handled and rabbi is posting
+    if (!isAdmin && reqRows[0].status === 'handled') {
+      await dbQuery(
+        `UPDATE support_requests SET status = 'open', updated_at = NOW() WHERE id = $1`,
+        [id]
+      );
+    }
+
+    // Update the updated_at timestamp on the request
+    await dbQuery(
+      `UPDATE support_requests SET updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // Get sender name
+    const { rows: rabbiRows } = await dbQuery(
+      `SELECT name FROM rabbis WHERE id = $1`,
+      [req.rabbi.id]
+    );
+
+    return res.status(201).json({
+      ok: true,
+      message: { ...rows[0], sender_name: rabbiRows[0]?.name || 'רב' },
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── GET / — Admin: list all support requests ──────────────────────────────
 
 router.get('/', authenticate, requireAdmin, async (req, res, next) => {
@@ -78,7 +213,6 @@ router.get('/', authenticate, requireAdmin, async (req, res, next) => {
     const status = req.query.status || 'all';
     const conditions = [];
     const params = [];
-    let idx = 1;
 
     if (status === 'open') {
       conditions.push(`sr.status = 'open'`);
@@ -89,7 +223,8 @@ router.get('/', authenticate, requireAdmin, async (req, res, next) => {
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const { rows } = await dbQuery(
-      `SELECT sr.*, r.name AS rabbi_name, r.email AS rabbi_email
+      `SELECT sr.*, r.name AS rabbi_name, r.email AS rabbi_email,
+              (SELECT COUNT(*) FROM support_messages sm WHERE sm.request_id = sr.id)::int AS message_count
        FROM support_requests sr
        JOIN rabbis r ON r.id = sr.rabbi_id
        ${where}

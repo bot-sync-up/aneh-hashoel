@@ -87,7 +87,7 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">וואטסאפ</label>
-            <Input value={form.whatsapp_number} onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value }))} placeholder="050-0000000" dir="ltr" />
+            <Input type="tel" inputMode="numeric" pattern="[0-9]*" value={form.whatsapp_number} onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="0500000000" dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">אימייל *</label>
@@ -95,7 +95,7 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">טלפון</label>
-            <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="050-0000000" />
+            <Input type="tel" inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="0500000000" />
           </div>
           {error && <p className="text-sm text-red-500 font-heebo">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">

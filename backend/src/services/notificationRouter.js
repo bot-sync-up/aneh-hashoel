@@ -30,6 +30,17 @@
 
 const { query } = require('../db/pool');
 
+// ─── Per-rabbi action token builder ───────────────────────────────────────────
+
+function _generateClaimToken(questionId, rabbiId) {
+  try {
+    const { generateActionToken } = require('../utils/crypto');
+    return generateActionToken({ action: 'claim', questionId: String(questionId), rabbiId: String(rabbiId) });
+  } catch {
+    return null;
+  }
+}
+
 // ─── Lazy service loaders (avoid circular dep and gracefully handle missing modules)
 
 function _emailService() {
@@ -391,13 +402,18 @@ async function notifyAll(type, data) {
       return [];
     });
 
-    // שלח אימייל לכל רב שבחר email
+    // שלח אימייל לכל רב שבחר email — עם token ייחודי לכל רב
     for (const rabbi of rabbis) {
       const pref     = _parsePreferences(rabbi.notification_pref);
       const channels = [];
 
       if (pref.email && rabbi.email) {
-        await _dispatchEmail(rabbi, type, data).catch(() => {});
+        // Generate per-rabbi claim token so backend can claim directly without login
+        const perRabbiClaimToken = _generateClaimToken(data.question.id, rabbi.id);
+        const rabbiData = perRabbiClaimToken
+          ? { ...data, actionTokens: { ...(data.actionTokens || {}), claimToken: perRabbiClaimToken } }
+          : data;
+        await _dispatchEmail(rabbi, type, rabbiData).catch(() => {});
         channels.push('email');
       }
 
@@ -420,7 +436,11 @@ async function notifyAll(type, data) {
       const channels = [];
 
       if (pref.email && rabbi.email) {
-        await _dispatchEmail(rabbi, type, data).catch(() => {});
+        const perRabbiClaimToken = _generateClaimToken(data.question.id, rabbi.id);
+        const rabbiData = perRabbiClaimToken
+          ? { ...data, actionTokens: { ...(data.actionTokens || {}), claimToken: perRabbiClaimToken } }
+          : data;
+        await _dispatchEmail(rabbi, type, rabbiData).catch(() => {});
         channels.push('email');
       }
 

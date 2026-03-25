@@ -20,7 +20,12 @@
  */
 
 const express = require('express');
-const { verifyActionToken } = require('../utils/actionTokens');
+const {
+  verifyActionToken,
+  createAnswerToken,
+  createReleaseToken,
+  createDiscussionToken,
+} = require('../utils/actionTokens');
 const { query } = require('../db/pool');
 
 const router = express.Router();
@@ -84,17 +89,71 @@ function getVerifiedPayload(req, res) {
 // ─── GET /api/action/claim ────────────────────────────────────────────────────
 
 /**
- * Verify claim token and redirect to the frontend claim page.
- * The actual claim mutation happens on the frontend after the rabbi authenticates.
+ * Verify claim token.
+ *
+ * If the token contains a rabbiId (per-rabbi token from email broadcast):
+ *   - Claim the question directly in the backend (no frontend login needed)
+ *   - Send the full question email to the rabbi
+ *   - Redirect to a simple "question claimed" confirmation page
+ *
+ * If no rabbiId in token (legacy shared token):
+ *   - Redirect to the frontend claim flow (requires login)
  */
 router.get('/claim', async (req, res) => {
   try {
     const payload = getVerifiedPayload(req, res);
     if (!payload) return;
 
-    const { action, questionId } = payload;
+    const { action, questionId, rabbiId } = payload;
     if (action !== 'claim' || !questionId) {
       return redirectExpired(res);
+    }
+
+    // Per-rabbi token: claim directly without login
+    if (rabbiId) {
+      try {
+        const { claimQuestion } = require('../services/questions');
+        const result = await claimQuestion(questionId, rabbiId);
+
+        if (!result.success) {
+          // Already claimed by someone else
+          console.log(`[actionLinks] /claim: שאלה ${questionId} כבר נתפסה (rabbi=${rabbiId})`);
+          return res.redirect(`${frontendUrl()}/link-expired?reason=already_claimed`);
+        }
+
+        // Send full question email to rabbi
+        setImmediate(async () => {
+          try {
+            const { rows } = await query(
+              'SELECT id, name, email FROM rabbis WHERE id = $1 LIMIT 1',
+              [rabbiId]
+            );
+            const rabbi = rows[0];
+            if (rabbi && rabbi.email) {
+              const answerToken     = createAnswerToken(questionId, rabbiId);
+              const releaseToken    = createReleaseToken(questionId, rabbiId);
+              const discussionToken = createDiscussionToken(questionId);
+              const emailSvc        = require('../services/email');
+              await emailSvc.sendFullQuestion(rabbi.email, result.question, {
+                answerToken,
+                releaseToken,
+                discussionToken,
+              });
+              console.log(`[actionLinks] /claim: מייל שאלה מלאה נשלח לרב ${rabbiId}`);
+            }
+          } catch (e) {
+            console.error('[actionLinks] /claim: שגיאה בשליחת מייל מלא:', e.message);
+          }
+        });
+
+        // Redirect to simple claimed confirmation page
+        return res.redirect(
+          `${frontendUrl()}/questions/${encodeURIComponent(questionId)}?action=claimed`
+        );
+      } catch (claimErr) {
+        console.error('[actionLinks] /claim direct error:', claimErr.message);
+        // Fall through to frontend redirect
+      }
     }
 
     return redirectToQuestion(res, questionId, 'claim', req.query.token);

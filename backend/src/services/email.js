@@ -91,14 +91,20 @@ function appUrl() {
  * @param {string} htmlContent תוכן HTML
  * @returns {Promise<object>}  תוצאת השליחה
  */
-async function sendEmail(to, subject, htmlContent) {
+async function sendEmail(to, subject, htmlContent, options = {}) {
   try {
-    const result = await getTransporter().sendMail({
+    const mailOptions = {
       from:    fromAddress(),
       to,
       subject,
       html:    htmlContent,
-    });
+    };
+
+    if (options.replyTo) {
+      mailOptions.replyTo = options.replyTo;
+    }
+
+    const result = await getTransporter().sendMail(mailOptions);
 
     console.info(`[email] נשלח אימייל אל ${to} — נושא: ${subject}`);
     return result;
@@ -204,7 +210,10 @@ async function sendFullQuestion(rabbiEmail, question, actionTokens) {
     { label: 'פתח דיון פנימי', url: discussionUrl, color: BRAND_NAVY },
   ]);
 
-  return sendEmail(rabbiEmail, subject, html);
+  // Reply-To: set to inbound email address so rabbi replies go to the right place
+  const inboundAddress = process.env.EMAIL_INBOUND_ADDRESS || process.env.EMAIL_FROM_ADDRESS;
+
+  return sendEmail(rabbiEmail, subject, html, { replyTo: inboundAddress });
 }
 
 // ─── sendThankNotification ───────────────────────────────────────────────────

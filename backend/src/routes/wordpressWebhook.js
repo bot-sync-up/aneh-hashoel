@@ -91,6 +91,21 @@ function normaliseWebhookPayload(body) {
   // WP may nest everything under `post` or send it flat
   const src  = body.post || body;
   const meta = src.meta || src.acf || src.fields || {};
+  // JetEngine booking-form sends form fields under body.values (not in meta)
+  const vals = body.values || src.values || {};
+
+  // Debug log to confirm payload structure (one-line, redacted)
+  console.log(
+    '[wp-webhook] payload keys:',
+    JSON.stringify({
+      body_keys: Object.keys(body),
+      src_keys:  Object.keys(src).slice(0, 20),
+      meta_keys: Object.keys(meta).slice(0, 20),
+      vals_keys: Object.keys(vals).slice(0, 20),
+      vals_email: vals.visitor_email || vals.asker_email || '(none)',
+      meta_email: meta.visitor_email || meta.asker_email || '(none)',
+    })
+  );
 
   return {
     wpPostId:      parseInt(src.ID || src.id || src.post_id || 0, 10) || null,
@@ -100,15 +115,15 @@ function normaliseWebhookPayload(body) {
     modifiedGmt:   src.post_modified_gmt || src.modified_gmt || null,
     createdGmt:    src.post_date_gmt     || src.date_gmt     || null,
     slug:          src.post_name         || src.slug          || null,
-    // ACF / meta fields — WP JetEngine uses visitor_* prefix
-    askerName:     meta.visitor_name      || meta.asker_name  || src.visitor_name  || src.asker_name  || null,
-    askerEmail:    meta.visitor_email     || meta.asker_email || src.visitor_email || src.asker_email || null,
-    askerPhone:    meta.visitor_phone     || meta.asker_phone || src.visitor_phone || src.asker_phone || null,
-    categorySlug:  meta.question_category || src.category     || null,
-    urgency:       meta.urgency           || src.urgency       || 'normal',
-    questionStatus:meta.status            || null,              // WP custom status field
+    // ACF / meta / JetEngine form values — try all known locations
+    askerName:     meta.visitor_name  || vals.visitor_name  || meta.asker_name  || src.visitor_name  || src.asker_name  || null,
+    askerEmail:    meta.visitor_email || vals.visitor_email || meta.asker_email || src.visitor_email || src.asker_email || null,
+    askerPhone:    meta.visitor_phone || vals.visitor_phone || meta.asker_phone || src.visitor_phone || src.asker_phone || null,
+    categorySlug:  meta.question_category || vals.question_category || src.category || null,
+    urgency:       meta.urgency           || vals.urgency            || src.urgency  || 'normal',
+    questionStatus:meta.status            || null,
     assignedRabbi: meta.assigned_rabbi_name || null,
-    attachmentUrl: meta['ask-visitor-img'] || meta['visitor_image'] || meta.attachment_url || src.attachment_url || null,
+    attachmentUrl: meta['ask-visitor-img'] || vals['ask-visitor-img'] || meta['visitor_image'] || meta.attachment_url || src.attachment_url || null,
     wpLink:        src.link || src.guid?.rendered || null,
   };
 }

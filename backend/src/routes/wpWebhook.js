@@ -109,21 +109,37 @@ function normalisePayload(body) {
   const src  = body.post || body;
   const meta = src.meta || src.acf || src.fields || {};
 
+  // JetEngine booking-form sends form fields under body.values (not in meta)
+  let vals = body.values || src.values || {};
+  if (typeof vals === 'string') {
+    try { vals = JSON.parse(vals); } catch { vals = {}; }
+  }
+
+  // Debug log to trace where email comes from
+  console.log('[wpWebhook] normalise:', JSON.stringify({
+    body_keys: Object.keys(body),
+    meta_keys: Object.keys(meta).slice(0, 15),
+    vals_keys: Object.keys(vals).slice(0, 15),
+    vals_type: typeof (body.values || src.values),
+    resolved_email: meta.visitor_email || vals.visitor_email || meta.asker_email || vals.asker_email || src.visitor_email || src.asker_email || '(none)',
+    resolved_name:  meta.visitor_name  || vals.visitor_name  || meta.asker_name  || src.asker_name  || '(none)',
+  }));
+
   return {
     wpPostId:       parseInt(src.ID || src.id || src.post_id || 0, 10) || null,
     title:          (src.post_title   || src.title   || '').trim(),
     content:        src.post_content  || src.content || '',
     wpStatus:       src.post_status   || src.status  || 'publish',
     modifiedGmt:    src.post_modified_gmt || src.modified_gmt || null,
-    // ACF / meta
-    askerName:      meta.asker_name        || src.asker_name  || null,
-    askerEmail:     meta.asker_email       || src.asker_email || null,
-    askerPhone:     meta.asker_phone       || src.asker_phone || null,
-    categorySlug:   meta.question_category || src.category    || null,
-    urgency:        meta.urgency           || src.urgency     || 'normal',
+    // ACF / meta / JetEngine form values — try all known field names
+    askerName:      meta.visitor_name  || vals.visitor_name  || meta.asker_name  || src.asker_name  || null,
+    askerEmail:     meta.visitor_email || vals.visitor_email || meta.asker_email || vals.asker_email || src.visitor_email || src.asker_email || null,
+    askerPhone:     meta.visitor_phone || vals.visitor_phone || meta.asker_phone || vals.asker_phone || src.visitor_phone || src.asker_phone || null,
+    categorySlug:   meta.question_category || vals.question_category || src.category    || null,
+    urgency:        meta.urgency           || vals.urgency            || src.urgency     || 'normal',
     questionStatus: meta.status            || null,
     // file attachment from asker
-    attachmentUrl:  src.attachment_url     || src.attachmentUrl || null,
+    attachmentUrl:  meta['ask-visitor-img'] || vals['ask-visitor-img'] || src.attachment_url || src.attachmentUrl || null,
     // thank-click specific
     sessionToken:   src.session_token      || src.sessionToken || null,
     thankMessage:   src.message            || meta.message     || null,

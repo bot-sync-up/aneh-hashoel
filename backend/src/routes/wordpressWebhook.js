@@ -205,6 +205,34 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
     }
   }
 
+  // Fire-and-forget: fetch full WP data to get attachment_url and wp_link
+  if (!question.attachment_url || !question.wp_link) {
+    setImmediate(async () => {
+      try {
+        const wpService = require('../services/wpService');
+        const result = await wpService.getQuestionById(payload.wpPostId);
+        if (result.success && result.data) {
+          const wpQ = result.data;
+          const imgUrl   = wpQ.meta?.['ask-visitor-img'] || null;
+          const wpLink   = wpQ.link || null;
+          if (imgUrl || wpLink) {
+            await query(
+              `UPDATE questions
+               SET    attachment_url = COALESCE(attachment_url, $1),
+                      wp_link        = COALESCE(wp_link, $2),
+                      updated_at     = NOW()
+               WHERE  id = $3`,
+              [imgUrl, wpLink, question.id]
+            );
+            console.log(`[wp-webhook] enriched question ${question.id} with img=${!!imgUrl} link=${!!wpLink}`);
+          }
+        }
+      } catch (enrichErr) {
+        console.warn('[wp-webhook] failed to enrich question with WP data:', enrichErr.message);
+      }
+    });
+  }
+
   console.log(
     `[wp-webhook] new-question ✓ created id=${question.id} ` +
     `wpPostId=${payload.wpPostId}`

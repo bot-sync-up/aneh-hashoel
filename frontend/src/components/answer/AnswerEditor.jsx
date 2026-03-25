@@ -178,7 +178,7 @@ function FontSizePicker({ editor }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpenTemplates, hasCategory = true }) {
+export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpenTemplates, hasCategory = true, categoryId = null, onCategorySet = null }) {
   const { rabbi } = useAuth();
   const [draftNotice, setDraftNotice] = useState(null);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -192,6 +192,12 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const autoSaveRef = useRef(null);
+  const [categories, setCategories] = useState([]);
+  const [loadingCats, setLoadingCats] = useState(false);
+  const [localHasCategory, setLocalHasCategory] = useState(hasCategory);
+  const [showSuggestInEditor, setShowSuggestInEditor] = useState(false);
+  const [suggestName, setSuggestName] = useState('');
+  const [suggestingCat, setSuggestingCat] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -239,6 +245,20 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
   }, [questionId]);
 
   useEffect(() => () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); }, []);
+
+  useEffect(() => {
+    if (hasCategory) return;
+    setLoadingCats(true);
+    api.get('/categories').then(({ data }) => {
+      const flat = [];
+      const walk = (nodes, depth = 0) => nodes?.forEach(n => {
+        flat.push({ ...n, depth });
+        if (n.children?.length) walk(n.children, depth + 1);
+      });
+      walk(data.categories ?? []);
+      setCategories(flat);
+    }).catch(() => {}).finally(() => setLoadingCats(false));
+  }, [hasCategory]);
 
   const handleRestoreDraft = useCallback(() => {
     if (!editor || !draftNotice) return;
@@ -442,10 +462,95 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
 
       {saveError && <p role="alert" className="text-sm text-red-600 font-heebo px-1">{saveError}</p>}
 
-      {/* No-category warning */}
-      {!hasCategory && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-heebo">
-          <span>לא ניתן לפרסם ללא קטגוריה — שייך קטגוריה לשאלה תחילה.</span>
+      {/* No-category warning / inline category selector */}
+      {!localHasCategory && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 space-y-2">
+          <p className="text-sm font-heebo text-amber-800 dark:text-amber-300 font-medium">
+            יש לשייך קטגוריה לפני פרסום
+          </p>
+          {!showSuggestInEditor ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="flex-1 min-w-[160px] text-sm rounded border border-amber-300 bg-white dark:bg-gray-800 text-[var(--text-primary)] font-heebo px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                defaultValue=""
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  if (val === '__suggest__') {
+                    setShowSuggestInEditor(true);
+                    return;
+                  }
+                  if (!val) return;
+                  try {
+                    await api.patch(`/questions/category/${questionId}`, { category_id: parseInt(val, 10) });
+                    setLocalHasCategory(true);
+                    onCategorySet?.();
+                  } catch(err) {
+                    console.error('Error setting category', err);
+                  }
+                }}
+              >
+                <option value="">-- בחר קטגוריה --</option>
+                {loadingCats ? (
+                  <option disabled>טוען...</option>
+                ) : (
+                  categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {'　'.repeat(cat.depth)}{cat.name}
+                    </option>
+                  ))
+                )}
+                <option value="__suggest__">+ הצע קטגוריה חדשה</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={suggestName}
+                onChange={e => setSuggestName(e.target.value)}
+                placeholder="שם הקטגוריה החדשה..."
+                className="flex-1 min-w-[160px] text-sm rounded border border-amber-300 bg-white dark:bg-gray-800 text-[var(--text-primary)] font-heebo px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                dir="rtl"
+                autoFocus
+              />
+              <button
+                type="button"
+                disabled={!suggestName.trim() || suggestingCat}
+                className="px-3 py-1.5 text-sm font-heebo bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                onClick={async () => {
+                  if (!suggestName.trim()) return;
+                  setSuggestingCat(true);
+                  try {
+                    await api.post('/categories', { name: suggestName.trim() });
+                    setSuggestName('');
+                    setShowSuggestInEditor(false);
+                    // reload cats
+                    const { data } = await api.get('/categories');
+                    const flat = [];
+                    const walk = (nodes, depth = 0) => nodes?.forEach(n => {
+                      flat.push({ ...n, depth });
+                      if (n.children?.length) walk(n.children, depth + 1);
+                    });
+                    walk(data.categories ?? []);
+                    setCategories(flat);
+                  } catch(err) {
+                    console.error(err);
+                  } finally {
+                    setSuggestingCat(false);
+                  }
+                }}
+              >
+                {suggestingCat ? 'שולח...' : 'שלח הצעה'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSuggestInEditor(false); setSuggestName(''); }}
+                className="px-2 py-1.5 text-sm font-heebo text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                ביטול
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -470,7 +575,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
       {/* Actions */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="md" loading={savingDraft} onClick={handleSaveDraft}>שמור טיוטה</Button>
-        <Button variant="secondary" size="md" onClick={() => setPublishModalOpen(true)} disabled={savingDraft || !charCount || !hasCategory}>פרסם תשובה</Button>
+        <Button variant="secondary" size="md" onClick={() => setPublishModalOpen(true)} disabled={savingDraft || !charCount || !localHasCategory}>פרסם תשובה</Button>
         {charCount > 0 && (
           <Button
             variant="outline"

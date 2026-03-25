@@ -64,6 +64,10 @@ export default function QuestionDetailPage() {
   const [editingCategory, setEditingCategory] = useState(false);
   const [categories, setCategories] = useState([]);
   const [categoryError, setCategoryError] = useState(null);
+  const [showSuggestForm, setShowSuggestForm] = useState(false);
+  const [suggestCatName, setSuggestCatName] = useState('');
+  const [suggestingCat, setSuggestingCat] = useState(false);
+  const [suggestMsg, setSuggestMsg] = useState('');
 
   // ── Fetch question ────────────────────────────────────────────────────────
 
@@ -323,7 +327,8 @@ export default function QuestionDetailPage() {
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val === '__suggest__') {
-                      setEditingCategory(false);
+                      setShowSuggestForm(true);
+                      return;
                     } else {
                       handleSetCategory(val || null);
                     }
@@ -347,6 +352,50 @@ export default function QuestionDetailPage() {
                 {categoryError && (
                   <span className="text-xs text-red-600 font-heebo">{categoryError}</span>
                 )}
+              </div>
+            )}
+            {showSuggestForm && (
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                <input
+                  type="text"
+                  value={suggestCatName}
+                  onChange={e => setSuggestCatName(e.target.value)}
+                  placeholder="שם הקטגוריה המוצעת..."
+                  className="text-xs rounded border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-heebo px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring)]"
+                  dir="rtl"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Escape') { setShowSuggestForm(false); setSuggestCatName(''); } }}
+                />
+                <button
+                  type="button"
+                  disabled={!suggestCatName.trim() || suggestingCat}
+                  className="text-xs px-2 py-1 rounded bg-brand-navy text-white font-heebo hover:bg-brand-navy/90 disabled:opacity-50 transition-colors"
+                  onClick={async () => {
+                    if (!suggestCatName.trim()) return;
+                    setSuggestingCat(true);
+                    try {
+                      await post('/categories', { name: suggestCatName.trim() });
+                      setSuggestMsg('ההצעה נשלחה לאישור מנהל');
+                      setSuggestCatName('');
+                      setShowSuggestForm(false);
+                      setTimeout(() => setSuggestMsg(''), 3000);
+                    } catch(err) {
+                      setSuggestMsg(err?.response?.data?.error || 'שגיאה בשליחת ההצעה');
+                    } finally {
+                      setSuggestingCat(false);
+                    }
+                  }}
+                >
+                  {suggestingCat ? 'שולח...' : 'שלח הצעה'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSuggestForm(false); setSuggestCatName(''); }}
+                  className="text-xs text-[var(--text-muted)] font-heebo hover:text-[var(--text-primary)]"
+                >
+                  ביטול
+                </button>
+                {suggestMsg && <span className="text-xs font-heebo text-emerald-600">{suggestMsg}</span>}
               </div>
             )}
             <Badge status={status} withDot className="mr-auto" />
@@ -509,6 +558,7 @@ export default function QuestionDetailPage() {
                     questionId={id}
                     existingAnswer={question.answer_draft || ''}
                     hasCategory={!!question.category_id}
+                    onCategorySet={fetchQuestion}
                     onSave={({ publishNow }) => {
                       if (publishNow) {
                         fetchQuestion();

@@ -558,7 +558,11 @@ export default function QuestionDetailPage() {
                     questionId={id}
                     existingAnswer={question.answer_draft || ''}
                     hasCategory={!!question.category_id}
-                    onCategorySet={fetchQuestion}
+                    onCategorySet={() => {
+                      // Lightweight update — don't refetch; just mark category as set
+                      // so the header badge shows and localHasCategory stays true in editor.
+                      setQuestion(prev => prev ? { ...prev, category: prev.category || '__set__' } : prev);
+                    }}
                     onSave={({ publishNow }) => {
                       if (publishNow) {
                         fetchQuestion();

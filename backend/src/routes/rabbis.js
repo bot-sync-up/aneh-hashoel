@@ -635,6 +635,27 @@ router.get('/leaderboard', async (req, res, next) => {
   }
 });
 
+// ─── PUT /profile/fcm-token ───────────────────────────────────────────────────
+
+/**
+ * Register or update the FCM device token for the authenticated rabbi.
+ *
+ * Body: { fcm_token: string | null }
+ */
+router.put('/profile/fcm-token', async (req, res, next) => {
+  try {
+    const { fcm_token } = req.body ?? {};
+    const token = fcm_token ? String(fcm_token).trim() : null;
+
+    const fcm = require('../services/fcmService');
+    await fcm.registerToken(req.rabbi.id, token);
+
+    return res.json({ message: 'FCM token עודכן בהצלחה' });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── GET /online ──────────────────────────────────────────────────────────────
 
 /**

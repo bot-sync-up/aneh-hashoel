@@ -205,6 +205,16 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
     }
   }
 
+  // FCM push notification to all registered rabbis (fire-and-forget)
+  setImmediate(async () => {
+    try {
+      const fcm = require('../services/fcmService');
+      await fcm.notifyNewQuestion(question);
+    } catch (e) {
+      console.warn('[wp-webhook] FCM failed:', e.message);
+    }
+  });
+
   // Upsert lead immediately (fire-and-forget)
   setImmediate(async () => {
     try {

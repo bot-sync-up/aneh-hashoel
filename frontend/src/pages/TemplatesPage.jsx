@@ -9,6 +9,7 @@ import {
   Clock,
   Hash,
   BarChart2,
+  Tag,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import Button from '../components/ui/Button';
@@ -24,6 +25,8 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState('');
+  const [categories, setCategories] = useState([]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,16 +58,30 @@ export default function TemplatesPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  // Fetch categories for filter dropdown
+  useEffect(() => {
+    get('/categories').then((data) => {
+      const flat = [];
+      const walk = (nodes, depth = 0) => nodes?.forEach(n => {
+        flat.push({ ...n, depth });
+        if (n.children?.length) walk(n.children, depth + 1);
+      });
+      walk(data.categories ?? []);
+      setCategories(flat);
+    }).catch(() => {});
+  }, []);
+
   // ── Filtered list ──────────────────────────────────────────────────────────
 
   const filtered = templates.filter((t) => {
     const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
+    if (q && !(
       t.title?.toLowerCase().includes(q) ||
       t.shortcut?.toLowerCase().includes(q) ||
       t.content?.toLowerCase().includes(q)
-    );
+    )) return false;
+    if (filterCategoryId && String(t.category_id) !== String(filterCategoryId)) return false;
+    return true;
   });
 
   // ── Modal handlers ─────────────────────────────────────────────────────────
@@ -125,29 +142,52 @@ export default function TemplatesPage() {
 
       <div className="p-6 space-y-4">
 
-        {/* Search bar — shown only when there are templates */}
+        {/* Search + filter bar — shown only when there are templates */}
         {!loading && !error && templates.length > 0 && (
-          <div className="relative max-w-sm">
-            <Search
-              size={15}
-              className="absolute top-1/2 -translate-y-1/2 end-3 text-[var(--text-muted)] pointer-events-none"
-            />
-            <input
-              id={searchId}
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="חיפוש לפי כותרת, קיצור, תוכן..."
-              dir="rtl"
-              className={clsx(
-                'w-full pe-9 ps-3 py-2',
-                'text-sm font-heebo text-[var(--text-primary)]',
-                'bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg',
-                'placeholder:text-[var(--text-muted)]',
-                'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent',
-                'transition-colors duration-150'
-              )}
-            />
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative max-w-sm flex-1">
+              <Search
+                size={15}
+                className="absolute top-1/2 -translate-y-1/2 end-3 text-[var(--text-muted)] pointer-events-none"
+              />
+              <input
+                id={searchId}
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="חיפוש לפי כותרת, קיצור, תוכן..."
+                dir="rtl"
+                className={clsx(
+                  'w-full pe-9 ps-3 py-2',
+                  'text-sm font-heebo text-[var(--text-primary)]',
+                  'bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg',
+                  'placeholder:text-[var(--text-muted)]',
+                  'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent',
+                  'transition-colors duration-150'
+                )}
+              />
+            </div>
+            {categories.length > 0 && (
+              <select
+                value={filterCategoryId}
+                onChange={(e) => setFilterCategoryId(e.target.value)}
+                dir="rtl"
+                className={clsx(
+                  'pe-3 ps-3 py-2',
+                  'text-sm font-heebo text-[var(--text-primary)]',
+                  'bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg',
+                  'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent',
+                  'transition-colors duration-150'
+                )}
+              >
+                <option value="">כל הקטגוריות</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {'　'.repeat(cat.depth)}{cat.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
@@ -237,7 +277,7 @@ function TemplateCard({
   onDeleteConfirm,
   deleteError,
 }) {
-  const { title, content, shortcut, usage_count, created_at } = template;
+  const { title, content, shortcut, usage_count, created_at, category_name } = template;
 
   // Strip HTML tags for preview
   const plainContent = content
@@ -275,6 +315,17 @@ function TemplateCard({
               )}>
                 <Hash size={9} strokeWidth={2.5} />
                 {shortcut}
+              </span>
+            )}
+            {category_name && (
+              <span className={clsx(
+                'inline-flex items-center gap-1',
+                'text-xs font-heebo font-medium',
+                'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
+                'px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-700'
+              )}>
+                <Tag size={9} strokeWidth={2.5} />
+                {category_name}
               </span>
             )}
             {typeof usage_count === 'number' && (
@@ -386,12 +437,29 @@ function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
   const titleId = useId();
   const contentId = useId();
   const shortcutId = useId();
+  const categoryFormId = useId();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [shortcut, setShortcut] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Fetch categories for selector
+  useEffect(() => {
+    if (!isOpen) return;
+    get('/categories').then((data) => {
+      const flat = [];
+      const walk = (nodes, depth = 0) => nodes?.forEach(n => {
+        flat.push({ ...n, depth });
+        if (n.children?.length) walk(n.children, depth + 1);
+      });
+      walk(data.categories ?? []);
+      setCategories(flat);
+    }).catch(() => {});
+  }, [isOpen]);
 
   // Populate fields when modal opens
   useEffect(() => {
@@ -399,6 +467,7 @@ function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
     if (isEdit && existingTemplate) {
       setTitle(existingTemplate.title ?? '');
       setShortcut(existingTemplate.shortcut ?? '');
+      setCategoryId(existingTemplate.category_id ? String(existingTemplate.category_id) : '');
       // Strip HTML tags for plain-text display
       const plain = existingTemplate.content
         ? existingTemplate.content.replace(/<[^>]*>/g, '').trim()
@@ -408,6 +477,7 @@ function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
       setTitle('');
       setContent('');
       setShortcut('');
+      setCategoryId('');
     }
     setError(null);
   }, [isOpen, isEdit, existingTemplate]);
@@ -431,6 +501,7 @@ function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
       title: title.trim(),
       content: content.trim(),
       ...(shortcut.trim() ? { shortcut: shortcut.trim().replace(/^\//, '') } : {}),
+      category_id: categoryId ? parseInt(categoryId, 10) : null,
     };
 
     try {
@@ -572,6 +643,33 @@ function TemplateFormModal({ isOpen, onClose, onSuccess, existingTemplate }) {
             קיצור דרך מאפשר הכנסת התבנית מהיר בעורך התשובה.
           </p>
         </div>
+
+        {/* Category */}
+        {categories.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor={categoryFormId}
+              className="text-sm font-medium font-heebo text-[var(--text-primary)]"
+            >
+              קטגוריה{' '}
+              <span className="text-xs font-normal text-[var(--text-muted)]">(אופציונלי)</span>
+            </label>
+            <select
+              id={categoryFormId}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              dir="rtl"
+              className={inputClass}
+            >
+              <option value="">-- ללא קטגוריה --</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {'　'.repeat(cat.depth)}{cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

@@ -13,11 +13,13 @@ import {
   Users,
   X,
   Save,
+  Info,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
-import { get, patch } from '../../lib/api';
+import { get, patch, del } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import AddRabbiModal from '../../components/admin/AddRabbiModal';
 
 // ─── Skeleton row ──────────────────────────────────────────────────────────
@@ -210,8 +212,29 @@ function AuditLogModal({ rabbi, onClose }) {
   );
 }
 
+// ─── Confirm Modal ──────────────────────────────────────────────────────────
+function ConfirmModal({ title, message, confirmLabel, confirmVariant = 'danger', onClose, onConfirm, loading }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
+        </div>
+        <p className="text-sm text-[var(--text-primary)] font-heebo mb-5">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-heebo border border-[var(--border-default)] hover:bg-[var(--bg-muted)]">ביטול</button>
+          <Button variant={confirmVariant} loading={loading} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Row actions dropdown ──────────────────────────────────────────────────
-function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onAuditLog }) {
+function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onDelete, onAuditLog, isSelf }) {
   const [open, setOpen] = useState(false);
 
   const action = (fn) => () => { setOpen(false); fn(); };
@@ -261,6 +284,14 @@ function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onAuditLog })
             >
               <ScrollText size={14} /> יומן פעילות
             </button>
+            {!isSelf && (
+              <button
+                className="flex w-full items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 transition-colors"
+                onClick={action(onDelete)}
+              >
+                <Trash2 size={14} /> מחק לצמיתות
+              </button>
+            )}
           </div>
         </>
       )}
@@ -270,6 +301,7 @@ function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onAuditLog })
 
 // ─── Main page ─────────────────────────────────────────────────────────────
 export default function RabbisAdminPage() {
+  const { rabbi: currentUser } = useAuth();
   const [rabbis, setRabbis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -280,6 +312,9 @@ export default function RabbisAdminPage() {
   const [editRabbi, setEditRabbi] = useState(null);
   const [changeRoleRabbi, setChangeRoleRabbi] = useState(null);
   const [auditRabbi, setAuditRabbi] = useState(null);
+  const [deleteRabbi, setDeleteRabbi] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deactivateConfirm, setDeactivateConfirm] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -292,7 +327,14 @@ export default function RabbisAdminPage() {
     setLoading(true);
     try {
       const data = await get('/admin/rabbis');
-      setRabbis(Array.isArray(data) ? data : data.rabbis ?? []);
+      const raw = Array.isArray(data) ? data : data.rabbis ?? [];
+      setRabbis(raw.map((r) => ({
+        ...r,
+        isActive:          r.isActive ?? (r.status === 'active'),
+        answersThisMonth:  r.answersThisMonth ?? r.answers_count ?? 0,
+        assignedQuestions:  r.assignedQuestions ?? r.assigned_questions ?? 0,
+        lastLogin:         r.lastLogin ?? r.last_login_at,
+      })));
     } catch {
       setRabbis([]);
     } finally {
@@ -327,12 +369,40 @@ export default function RabbisAdminPage() {
     setSelected((s) => { const ns = new Set(s); ns.has(id) ? ns.delete(id) : ns.add(id); return ns; });
 
   const handleToggleActive = async (rabbi) => {
+    // When deactivating, show confirmation first
+    if (rabbi.isActive) {
+      setDeactivateConfirm(rabbi);
+      return;
+    }
+    await doToggleActive(rabbi);
+  };
+
+  const doToggleActive = async (rabbi) => {
     try {
       await patch(`/admin/rabbis/${rabbi.id}`, { isActive: !rabbi.isActive });
       setRabbis((prev) => prev.map((r) => r.id === rabbi.id ? { ...r, isActive: !r.isActive } : r));
       showToast(rabbi.isActive ? 'החשבון הושבת' : 'החשבון הופעל');
     } catch {
       showToast('שגיאה בעדכון', 'error');
+    } finally {
+      setDeactivateConfirm(null);
+    }
+  };
+
+  const handleDeleteRabbi = async () => {
+    if (!deleteRabbi) return;
+    setDeleteLoading(true);
+    try {
+      await del(`/admin/rabbis/${deleteRabbi.id}`);
+      setRabbis((prev) => prev.filter((r) => r.id !== deleteRabbi.id));
+      setSelected((prev) => { const ns = new Set(prev); ns.delete(deleteRabbi.id); return ns; });
+      showToast(`${deleteRabbi.name} נמחק/ה מהמערכת לצמיתות`);
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'שגיאה במחיקת הרב';
+      showToast(msg, 'error');
+    } finally {
+      setDeleteLoading(false);
+      setDeleteRabbi(null);
     }
   };
 
@@ -385,6 +455,26 @@ export default function RabbisAdminPage() {
       )}
       {auditRabbi && (
         <AuditLogModal rabbi={auditRabbi} onClose={() => setAuditRabbi(null)} />
+      )}
+      {deleteRabbi && (
+        <ConfirmModal
+          title="מחיקת רב"
+          message={`האם אתה בטוח שברצונך למחוק את הרב ${deleteRabbi.name}? פעולה זו בלתי הפיכה`}
+          confirmLabel="מחק לצמיתות"
+          onClose={() => setDeleteRabbi(null)}
+          onConfirm={handleDeleteRabbi}
+          loading={deleteLoading}
+        />
+      )}
+      {deactivateConfirm && (
+        <ConfirmModal
+          title="השבתת רב"
+          message="השבתת הרב תמנע ממנו להתחבר ולקבל שאלות חדשות. להמשיך?"
+          confirmLabel="השבת"
+          confirmVariant="danger"
+          onClose={() => setDeactivateConfirm(null)}
+          onConfirm={() => doToggleActive(deactivateConfirm)}
+        />
       )}
 
       {/* Header */}
@@ -538,14 +628,33 @@ export default function RabbisAdminPage() {
                       <RoleBadge role={rabbi.role} />
                     </td>
                     <td className="px-4 py-3">
-                      <Badge
-                        status={rabbi.isActive ? 'success' : 'hidden'}
-                        label={rabbi.isActive ? 'פעיל' : 'מושבת'}
-                        withDot
-                      />
+                      <div className="flex items-center gap-2 group relative">
+                        <span className={clsx(
+                          'inline-block w-2.5 h-2.5 rounded-full flex-shrink-0',
+                          rabbi.isActive ? 'bg-emerald-500' : 'bg-gray-400'
+                        )} />
+                        <span className={clsx(
+                          'text-sm font-heebo',
+                          rabbi.isActive ? 'text-emerald-700' : 'text-[var(--text-muted)]'
+                        )}>
+                          {rabbi.isActive ? 'מופעל' : 'מושבת'}
+                        </span>
+                        <div className="absolute bottom-full right-0 mb-1 hidden group-hover:block z-10 pointer-events-none">
+                          <div className="bg-gray-800 text-white text-xs rounded-lg px-3 py-2 font-heebo whitespace-nowrap shadow-lg">
+                            {rabbi.isActive
+                              ? 'הרב יכול להתחבר, לקבל שאלות ולהופיע בשידורים'
+                              : 'הרב לא יכול להתחבר ולא מקבל שאלות חדשות'}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-secondary)] tabular-nums">
-                      {rabbi.answersThisMonth ?? 0}
+                      <div className="flex flex-col">
+                        <span>{rabbi.answersThisMonth ?? 0}</span>
+                        {(rabbi.assignedQuestions != null && rabbi.assignedQuestions > 0) && (
+                          <span className="text-xs text-[var(--text-muted)]">{rabbi.assignedQuestions} בטיפול</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)] text-xs">
                       {rabbi.lastLogin
@@ -555,9 +664,11 @@ export default function RabbisAdminPage() {
                     <td className="px-4 py-3">
                       <RowActions
                         rabbi={rabbi}
+                        isSelf={String(currentUser?.id) === String(rabbi.id)}
                         onEdit={() => setEditRabbi(rabbi)}
                         onToggleActive={() => handleToggleActive(rabbi)}
                         onChangeRole={() => setChangeRoleRabbi(rabbi)}
+                        onDelete={() => setDeleteRabbi(rabbi)}
                         onAuditLog={() => setAuditRabbi(rabbi)}
                       />
                     </td>

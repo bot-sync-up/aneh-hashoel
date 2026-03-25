@@ -24,7 +24,7 @@ const { stringify: csvStringify } = require('csv-stringify/sync');
 const { authenticate, requireAdmin } = require('../../middleware/authenticate');
 const { logAction, ACTIONS }         = require('../../middleware/auditLog');
 const analyticsService               = require('../../services/analyticsService');
-const { query: dbQuery }             = require('../../db/pool');
+const { query: dbQuery, withTransaction } = require('../../db/pool');
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.use(authenticate, requireAdmin);
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const VALID_STATUSES = ['pending', 'in_process', 'answered', 'hidden'];
-const BULK_ACTIONS   = ['hide', 'release', 'assign'];
+const BULK_ACTIONS   = ['hide', 'release', 'assign', 'delete'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -324,6 +324,77 @@ router.put('/:id/assign', async (req, res) => {
   }
 });
 
+// ─── DELETE /:id ──────────────────────────────────────────────────────────
+
+/**
+ * DELETE /admin/questions/:id
+ *
+ * Permanently delete a question and all its related data.
+ * Uses a transaction to ensure atomicity.
+ *
+ * Response: { ok, message }
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify question exists
+    const { rows: existing } = await dbQuery(
+      'SELECT id, title, status FROM questions WHERE id = $1',
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה' });
+    }
+
+    const question = existing[0];
+
+    await withTransaction(async (client) => {
+      // 1. Delete answers
+      await client.query('DELETE FROM answers WHERE question_id = $1', [id]);
+
+      // 2. Delete private notes
+      await client.query('DELETE FROM private_notes WHERE question_id = $1', [id]);
+
+      // 3. Delete discussion messages & members for discussions of this question
+      const { rows: discussions } = await client.query(
+        'SELECT id FROM discussions WHERE question_id = $1', [id]
+      );
+      if (discussions.length > 0) {
+        const discIds = discussions.map(d => d.id);
+        await client.query('DELETE FROM discussion_messages WHERE discussion_id = ANY($1::uuid[])', [discIds]);
+        await client.query('DELETE FROM discussion_members WHERE discussion_id = ANY($1::uuid[])', [discIds]);
+        await client.query('DELETE FROM discussions WHERE question_id = $1', [id]);
+      }
+
+      // 4. Delete notifications log entries
+      await client.query(
+        `DELETE FROM notifications_log WHERE entity_id = $1`,
+        [id]
+      );
+
+      // 5. Delete the question itself
+      await client.query('DELETE FROM questions WHERE id = $1', [id]);
+    });
+
+    await logAction(
+      req.rabbi.id,
+      ACTIONS.QUESTION_DELETED,
+      'question',
+      id,
+      { title: question.title, status: question.status },
+      null,
+      getIp(req),
+      req.headers['user-agent'] || null
+    );
+
+    return res.json({ ok: true, message: 'השאלה נמחקה לצמיתות' });
+  } catch (err) {
+    console.error('[admin/questions] DELETE /:id error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
 // ─── POST /bulk ───────────────────────────────────────────────────────────────
 
 /**
@@ -398,6 +469,44 @@ router.post('/bulk', async (req, res) => {
                         WHERE id = ANY($2::uuid[])`;
         updateParams = [targetRabbiId, questionIds];
         break;
+      }
+
+      case 'delete': {
+        // Permanently delete questions and all related data
+        await withTransaction(async (client) => {
+          // Delete answers
+          await client.query('DELETE FROM answers WHERE question_id = ANY($1::uuid[])', [questionIds]);
+          // Delete private notes
+          await client.query('DELETE FROM private_notes WHERE question_id = ANY($1::uuid[])', [questionIds]);
+          // Delete discussion data
+          const { rows: discussions } = await client.query(
+            'SELECT id FROM discussions WHERE question_id = ANY($1::uuid[])', [questionIds]
+          );
+          if (discussions.length > 0) {
+            const discIds = discussions.map(d => d.id);
+            await client.query('DELETE FROM discussion_messages WHERE discussion_id = ANY($1::uuid[])', [discIds]);
+            await client.query('DELETE FROM discussion_members WHERE discussion_id = ANY($1::uuid[])', [discIds]);
+            await client.query('DELETE FROM discussions WHERE question_id = ANY($1::uuid[])', [questionIds]);
+          }
+          // Delete notifications
+          await client.query('DELETE FROM notifications_log WHERE entity_id = ANY($1::text[])',
+            [questionIds.map(String)]);
+          // Delete questions
+          await client.query('DELETE FROM questions WHERE id = ANY($1::uuid[])', [questionIds]);
+        });
+
+        await logAction(
+          req.rabbi.id,
+          'admin.bulk_action',
+          'question',
+          null,
+          null,
+          { action, questionIds, deletedCount: questionIds.length },
+          getIp(req),
+          req.headers['user-agent'] || null
+        );
+
+        return res.json({ ok: true, updatedCount: questionIds.length });
       }
     }
 

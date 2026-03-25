@@ -189,7 +189,9 @@ router.get('/', async (req, res, next) => {
          rs.avg_response_minutes,
          rs.avg_response_time_hours,
          COALESCE(rs.thanks_count, 0)   AS thanks_count,
-         COALESCE(rs.views_count, 0)    AS views_count
+         COALESCE(rs.views_count, 0)    AS views_count,
+         (SELECT COUNT(*)::int FROM questions q
+          WHERE q.assigned_rabbi_id = r.id AND q.status = 'in_process') AS assigned_questions
        FROM rabbis r
        LEFT JOIN rabbi_stats rs
               ON rs.rabbi_id = r.id AND rs.week_start = $${weekParam}
@@ -504,30 +506,71 @@ router.put('/:id/status', async (req, res, next) => {
 // ─── DELETE /:id ──────────────────────────────────────────────────────────────
 
 /**
- * Soft-delete a rabbi by setting status = 'deleted'.
- * A deleted rabbi cannot log in and is excluded from all active queries.
+ * Permanently delete a rabbi and all related data.
+ *
+ * Pre-checks:
+ *   - Cannot delete yourself
+ *   - Rabbi must not have questions in_process (assigned & not yet answered)
+ *
+ * Cascade:
+ *   - Nullifies assigned_rabbi_id on answered/pending questions
+ *   - Deletes rabbi_templates, discussion_members, notifications_log,
+ *     refresh_tokens, device_sessions, badges, and the rabbi record
  */
 router.delete('/:id', async (req, res, next) => {
   try {
     const targetId = req.params.id;
 
+    // Cannot delete yourself
     if (String(req.rabbi.id) === String(targetId)) {
       return res.status(400).json({ error: 'לא ניתן למחוק את החשבון הנוכחי' });
     }
 
-    const { rows } = await query(
-      `UPDATE rabbis
-       SET    status     = 'deleted',
-              updated_at = NOW()
-       WHERE  id = $1
-         AND  status <> 'deleted'
-       RETURNING id, name, status`,
+    // Verify rabbi exists
+    const { rows: existing } = await query(
+      'SELECT id, name, email, role FROM rabbis WHERE id = $1',
       [targetId]
     );
-
-    if (!rows[0]) {
-      return res.status(404).json({ error: 'רב לא נמצא או שכבר מחוק' });
+    if (!existing[0]) {
+      return res.status(404).json({ error: 'רב לא נמצא' });
     }
+    const targetRabbi = existing[0];
+
+    // Check for in-process questions
+    const { rows: inProcess } = await query(
+      `SELECT COUNT(*)::int AS cnt FROM questions
+       WHERE assigned_rabbi_id = $1 AND status = 'in_process'`,
+      [targetId]
+    );
+    if (inProcess[0].cnt > 0) {
+      return res.status(400).json({
+        error: 'לרב יש שאלות בטיפול. יש לשחרר אותן קודם',
+      });
+    }
+
+    await withTransaction(async (client) => {
+      // Nullify assignment on remaining questions
+      await client.query(
+        `UPDATE questions SET assigned_rabbi_id = NULL WHERE assigned_rabbi_id = $1`,
+        [targetId]
+      );
+
+      // Delete related records (ignore errors for tables that may not exist)
+      const relatedDeletes = [
+        'DELETE FROM rabbi_templates WHERE rabbi_id = $1',
+        'DELETE FROM discussion_members WHERE rabbi_id = $1',
+        'DELETE FROM notifications_log WHERE rabbi_id = $1',
+        'DELETE FROM refresh_tokens WHERE rabbi_id = $1',
+        'DELETE FROM device_sessions WHERE rabbi_id = $1',
+        'DELETE FROM badges WHERE rabbi_id = $1',
+      ];
+      for (const sql of relatedDeletes) {
+        try { await client.query(sql, [targetId]); } catch (_) { /* table may not exist */ }
+      }
+
+      // Delete the rabbi
+      await client.query('DELETE FROM rabbis WHERE id = $1', [targetId]);
+    });
 
     setImmediate(() => {
       createAuditEntry(
@@ -535,13 +578,13 @@ router.delete('/:id', async (req, res, next) => {
         ACTIONS.RABBI_DELETED,
         'rabbi',
         targetId,
+        { name: targetRabbi.name, email: targetRabbi.email, role: targetRabbi.role },
         null,
-        { status: 'deleted' },
         _clientIp(req)
       ).catch(() => {});
     });
 
-    return res.json({ message: `${rows[0].name} נמחק/ה מהמערכת בהצלחה`, rabbi: rows[0] });
+    return res.json({ ok: true, message: `${targetRabbi.name} נמחק/ה מהמערכת לצמיתות` });
   } catch (err) {
     return next(err);
   }

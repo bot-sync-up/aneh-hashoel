@@ -11,12 +11,13 @@ import {
   MessageSquare,
   UserCheck,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
-import { get, patch } from '../../lib/api';
+import { get, patch, del } from '../../lib/api';
 import api from '../../lib/api';
 
 // ─── Status map ────────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ function SkeletonRow() {
 }
 
 // ─── Row actions ───────────────────────────────────────────────────────────
-function RowActions({ question, onStatusChange, onAssign, onHide, onOpenDiscussion }) {
+function RowActions({ question, onStatusChange, onAssign, onHide, onDelete, onOpenDiscussion }) {
   const [open, setOpen] = useState(false);
   const act = (fn) => () => { setOpen(false); fn(); };
 
@@ -78,6 +79,9 @@ function RowActions({ question, onStatusChange, onAssign, onHide, onOpenDiscussi
             <hr className="my-1 border-[var(--border-default)]" />
             <button className="flex w-full items-center gap-2 px-4 py-2 hover:bg-[var(--bg-muted)] text-[var(--text-primary)]" onClick={act(onOpenDiscussion)}>
               <MessageSquare size={14} /> פתח דיון
+            </button>
+            <button className="flex w-full items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600" onClick={act(onDelete)}>
+              <Trash2 size={14} /> מחק לצמיתות
             </button>
           </div>
         </>
@@ -135,6 +139,28 @@ function AssignModal({ question, rabbis, onClose, onSave }) {
   );
 }
 
+// ─── Confirm Delete Modal ────────────────────────────────────────────────
+function ConfirmDeleteModal({ message, onClose, onConfirm, loading }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 font-heebo" dir="rtl">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-xl w-80 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-red-600">מחיקת שאלה</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={16}/></button>
+        </div>
+        <p className="text-sm text-[var(--text-primary)]">{message}</p>
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>ביטול</Button>
+          <Button variant="danger" size="sm" loading={loading} onClick={onConfirm}>
+            <Trash2 size={14} className="ml-1" />
+            מחק לצמיתות
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────
 export default function AdminQuestionsPage() {
   const navigate = useNavigate();
@@ -151,6 +177,8 @@ export default function AdminQuestionsPage() {
   const [rabbis, setRabbis] = useState([]);
   const [statusModal, setStatusModal] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -269,6 +297,40 @@ export default function AdminQuestionsPage() {
     } catch { showToast('שגיאה בפעולה', 'error'); }
   };
 
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleteLoading(true);
+    try {
+      await del(`/admin/questions/${deleteModal.id}`);
+      setQuestions((prev) => prev.filter((q) => q.id !== deleteModal.id));
+      setSelected((prev) => { const ns = new Set(prev); ns.delete(deleteModal.id); return ns; });
+      showToast('השאלה נמחקה לצמיתות');
+    } catch {
+      showToast('שגיאה במחיקת השאלה', 'error');
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModal(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await api.post('/admin/questions/bulk', {
+        questionIds: [...selected],
+        action: 'delete',
+      });
+      setQuestions((prev) => prev.filter((q) => !selected.has(q.id)));
+      showToast(`${selected.size} שאלות נמחקו לצמיתות`);
+      setSelected(new Set());
+    } catch {
+      showToast('שגיאה במחיקה קבוצתית', 'error');
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModal(null);
+    }
+  };
+
   return (
     <div className="space-y-5" dir="rtl">
       {/* Modals */}
@@ -277,6 +339,16 @@ export default function AdminQuestionsPage() {
       )}
       {assignModal && (
         <AssignModal question={assignModal} rabbis={rabbis} onClose={() => setAssignModal(null)} onSave={handleAssignSave} />
+      )}
+      {deleteModal && (
+        <ConfirmDeleteModal
+          message={deleteModal.bulk
+            ? `האם אתה בטוח שברצונך למחוק ${deleteModal.count} שאלות? פעולה זו בלתי הפיכה`
+            : 'האם אתה בטוח שברצונך למחוק את השאלה? פעולה זו בלתי הפיכה'}
+          onClose={() => setDeleteModal(null)}
+          onConfirm={deleteModal.bulk ? handleBulkDelete : handleDelete}
+          loading={deleteLoading}
+        />
       )}
 
       {/* Toast */}
@@ -353,6 +425,10 @@ export default function AdminQuestionsPage() {
           <Button variant="danger" size="sm" onClick={handleBulkHide}>
             הסתר נבחרים
           </Button>
+          <Button variant="danger" size="sm" onClick={() => setDeleteModal({ bulk: true, count: selected.size })}>
+            <Trash2 size={14} className="ml-1" />
+            מחק נבחרים
+          </Button>
           <button className="mr-auto text-white/70 hover:text-white text-xs underline" onClick={() => setSelected(new Set())}>
             בטל בחירה
           </button>
@@ -425,6 +501,7 @@ export default function AdminQuestionsPage() {
                         onStatusChange={() => setStatusModal(q)}
                         onAssign={() => setAssignModal(q)}
                         onHide={() => handleHide(q)}
+                        onDelete={() => setDeleteModal(q)}
                         onOpenDiscussion={() => navigate(`/questions/${q.id}`)}
                       />
                     </td>

@@ -21,10 +21,11 @@
 
 const express = require('express');
 
-const { verifyMailgunSignature }                    = require('../utils/mailgunVerify');
-const { extractQuestionId, cleanEmailBody, validateSender } = require('../services/emailParser');
-const { query }                                     = require('../db/pool');
-const { logAction, ACTIONS }                        = require('../middleware/auditLog');
+const { verifyMailgunSignature }                                       = require('../utils/mailgunVerify');
+const { extractEmailAction, cleanEmailBody, validateSender,
+        findRabbiByEmail }                                             = require('../services/emailParser');
+const { query }                                                        = require('../db/pool');
+const { logAction, ACTIONS }                                           = require('../middleware/auditLog');
 
 const router = express.Router();
 
@@ -99,46 +100,144 @@ router.post('/inbound', async (req, res) => {
       ip,
     }, ip, null);
 
-    // ─── 3. Parse question ID from subject ────────────────────────────
-    const questionId = extractQuestionId(subject);
+    // ─── 3. Determine action from subject ([CLAIM:X] / [RELEASE:X] / [ID: X])
+    const emailAction = extractEmailAction(subject);
 
-    if (!questionId) {
-      console.warn('[emailInbound] לא נמצא מזהה שאלה בנושא:', subject);
-
-      await logAction(null, 'email.inbound_rejected', 'email', null, null, {
-        reason: 'missing_question_id',
-        sender,
-        subject: subject.substring(0, 200),
-      }, ip, null);
-
-      return res.status(200).json({ error: 'לא נמצא מזהה שאלה בנושא האימייל' });
+    if (!emailAction) {
+      console.warn('[emailInbound] לא נמצאה פעולה בנושא:', subject);
+      return res.status(200).json({ ok: true });   // silent ignore — not our email
     }
 
-    // ─── 4. Validate sender is the assigned rabbi ─────────────────────
+    const { action, questionId } = emailAction;
+    console.info(`[emailInbound] action=${action} questionId=${questionId} from=${sender}`);
+
+    // ─── 4a. CLAIM ───────────────────────────────────────────────────
+    if (action === 'claim') {
+      const rabbi = await findRabbiByEmail(sender);
+
+      if (!rabbi) {
+        console.warn('[emailInbound] claim: שולח לא זוהה כרב פעיל:', sender);
+        await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null,
+          { reason: 'unknown_sender', sender, action: 'claim' }, ip, null);
+        return res.status(200).json({ ok: true });
+      }
+
+      try {
+        const { claimQuestion } = require('../services/questions');
+        const result = await claimQuestion(questionId, rabbi.id);
+
+        if (!result.success) {
+          console.info(`[emailInbound] claim: שאלה ${questionId} כבר נתפסה — ${sender}`);
+          // Send polite "already taken" reply (fire-and-forget)
+          setImmediate(async () => {
+            try {
+              const emailSvc = require('../services/email');
+              await emailSvc.sendAlreadyClaimed(rabbi.email, rabbi.name, questionId);
+            } catch (e) {
+              console.warn('[emailInbound] claim: שגיאה בשליחת "כבר נתפסה":', e.message);
+            }
+          });
+          return res.status(200).json({ ok: true });
+        }
+
+        console.info(`[emailInbound] claim: שאלה ${questionId} נתפסה על ידי רב ${rabbi.id}`);
+        await logAction(rabbi.id, ACTIONS.QUESTION_CLAIMED, 'question', String(questionId), null,
+          { source: 'email' }, ip, null);
+
+        // Fire-and-forget: send full question email + socket broadcast
+        setImmediate(async () => {
+          try {
+            const emailSvc = require('../services/email');
+            await emailSvc.sendFullQuestion(rabbi.email, result.question);
+            console.info(`[emailInbound] claim: מייל שאלה מלאה נשלח לרב ${rabbi.id}`);
+          } catch (e) {
+            console.error('[emailInbound] claim: שגיאה בשליחת מייל מלא:', e.message);
+          }
+
+          try {
+            const io = router._io || (req.app && req.app.get('io'));
+            if (io) {
+              io.emit('question:claimed', { questionId, rabbiId: rabbi.id });
+            }
+          } catch (e) {
+            console.warn('[emailInbound] claim: socket error:', e.message);
+          }
+        });
+
+      } catch (claimErr) {
+        console.error('[emailInbound] claim error:', claimErr.message);
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    // ─── 4b. RELEASE ─────────────────────────────────────────────────
+    if (action === 'release') {
+      const rabbi = await findRabbiByEmail(sender);
+
+      if (!rabbi) {
+        console.warn('[emailInbound] release: שולח לא זוהה כרב פעיל:', sender);
+        return res.status(200).json({ ok: true });
+      }
+
+      try {
+        // Release only if this rabbi currently holds the question
+        const released = await query(
+          `UPDATE questions
+           SET    status = 'pending', assigned_rabbi_id = NULL,
+                  lock_timestamp = NULL, updated_at = NOW()
+           WHERE  id = $1
+             AND  assigned_rabbi_id = $2
+             AND  status IN ('in_process','claimed')
+           RETURNING id`,
+          [questionId, rabbi.id]
+        );
+
+        if (released.rowCount > 0) {
+          console.info(`[emailInbound] release: שאלה ${questionId} שוחררה על ידי רב ${rabbi.id}`);
+          await logAction(rabbi.id, ACTIONS.QUESTION_RELEASED, 'question', String(questionId), null,
+            { source: 'email' }, ip, null);
+
+          // Notify rabbi + broadcast socket
+          setImmediate(async () => {
+            try {
+              const emailSvc = require('../services/email');
+              await emailSvc.sendReleaseConfirmation(rabbi.email, rabbi.name, questionId);
+            } catch (e) {
+              console.warn('[emailInbound] release: שגיאה בשליחת אישור:', e.message);
+            }
+            try {
+              const io = router._io || (req.app && req.app.get('io'));
+              if (io) io.emit('question:released', { questionId });
+            } catch (e) { /* ignore */ }
+          });
+        } else {
+          console.info(`[emailInbound] release: שאלה ${questionId} לא שייכת לרב ${rabbi.id} — מתעלם`);
+        }
+      } catch (releaseErr) {
+        console.error('[emailInbound] release error:', releaseErr.message);
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    // ─── 4c. ANSWER ──────────────────────────────────────────────────
+    // (action === 'answer')
+
     const { valid, rabbi, question } = await validateSender(sender, questionId);
 
     if (!question) {
       console.warn('[emailInbound] שאלה לא נמצאה:', questionId);
-
-      await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null, {
-        reason: 'question_not_found',
-        sender,
-        questionId,
-      }, ip, null);
-
+      await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null,
+        { reason: 'question_not_found', sender, questionId }, ip, null);
       return res.status(200).json({ error: 'השאלה לא נמצאה במערכת' });
     }
 
     if (!valid) {
       console.warn('[emailInbound] שולח לא מורשה:', sender, 'לשאלה:', questionId);
-
-      await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null, {
-        reason: 'unauthorized_sender',
-        sender,
-        questionId,
-        assigned_rabbi_id: question.assigned_rabbi_id,
-      }, ip, null);
-
+      await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null,
+        { reason: 'unauthorized_sender', sender, questionId,
+          assigned_rabbi_id: question.assigned_rabbi_id }, ip, null);
       return res.status(200).json({ error: 'השולח אינו הרב המוקצה לשאלה זו' });
     }
 
@@ -147,26 +246,16 @@ router.post('/inbound', async (req, res) => {
 
     if (!cleanBody) {
       console.warn('[emailInbound] גוף אימייל ריק לאחר ניקוי, שאלה:', questionId);
-
-      await logAction(rabbi.id, 'email.inbound_rejected', 'email', String(questionId), null, {
-        reason: 'empty_body',
-        sender,
-        questionId,
-      }, ip, null);
-
+      await logAction(rabbi.id, 'email.inbound_rejected', 'email', String(questionId), null,
+        { reason: 'empty_body', sender, questionId }, ip, null);
       return res.status(200).json({ error: 'גוף האימייל ריק. לא ניתן לשמור תשובה ריקה' });
     }
 
     // ─── 6. Check if question is already answered ─────────────────────
     if (question.status === 'answered' && !question.follow_up_id) {
       console.warn('[emailInbound] שאלה כבר נענתה:', questionId);
-
-      await logAction(rabbi.id, 'email.inbound_rejected', 'email', String(questionId), null, {
-        reason: 'already_answered',
-        sender,
-        questionId,
-      }, ip, null);
-
+      await logAction(rabbi.id, 'email.inbound_rejected', 'email', String(questionId), null,
+        { reason: 'already_answered', sender, questionId }, ip, null);
       return res.status(200).json({ error: 'השאלה כבר נענתה' });
     }
 
@@ -174,7 +263,6 @@ router.post('/inbound', async (req, res) => {
     let answerId;
 
     if (question.follow_up_id) {
-      // This is a reply to a follow-up question
       const { rows } = await query(
         `INSERT INTO answers (question_id, rabbi_id, answer_text, source, follow_up_id, created_at, updated_at)
          VALUES ($1, $2, $3, 'email', $4, NOW(), NOW())
@@ -183,7 +271,6 @@ router.post('/inbound', async (req, res) => {
       );
       answerId = rows[0].id;
 
-      // Update follow-up status
       await query(
         `UPDATE follow_ups SET status = 'answered', answered_at = NOW(), updated_at = NOW()
          WHERE id = $1`,
@@ -192,7 +279,6 @@ router.post('/inbound', async (req, res) => {
 
       console.info('[emailInbound] תשובה לשאלת המשך נשמרה:', { answerId, questionId, followUpId: question.follow_up_id });
     } else {
-      // Regular answer
       const { rows } = await query(
         `INSERT INTO answers (question_id, rabbi_id, answer_text, source, created_at, updated_at)
          VALUES ($1, $2, $3, 'email', NOW(), NOW())
@@ -201,7 +287,6 @@ router.post('/inbound', async (req, res) => {
       );
       answerId = rows[0].id;
 
-      // Update question status
       await query(
         `UPDATE questions SET status = 'answered', answered_at = NOW(), updated_at = NOW()
          WHERE id = $1`,
@@ -211,7 +296,6 @@ router.post('/inbound', async (req, res) => {
       console.info('[emailInbound] תשובה נשמרה:', { answerId, questionId });
     }
 
-    // Audit log for successful answer
     await logAction(rabbi.id, ACTIONS.QUESTION_ANSWERED, 'question', String(questionId), null, {
       answer_id: answerId,
       source: 'email',
@@ -219,11 +303,9 @@ router.post('/inbound', async (req, res) => {
       body_length: cleanBody.length,
     }, ip, null);
 
-    // ─── 8. Trigger WordPress sync + asker notification ───────────────
-    // Fire-and-forget: do not block the response to Mailgun
+    // ─── 8. WP sync + asker notification + confirmation to rabbi ──────
     setImmediate(async () => {
       try {
-        // WordPress sync
         const wpSync = tryRequire('../services/wpSync');
         if (wpSync && typeof wpSync.syncAnswer === 'function') {
           await wpSync.syncAnswer(questionId, answerId);
@@ -234,7 +316,6 @@ router.post('/inbound', async (req, res) => {
       }
 
       try {
-        // Notify the asker
         const notifications = tryRequire('../services/notifications');
         if (notifications && typeof notifications.notifyAskerAnswered === 'function') {
           await notifications.notifyAskerAnswered(questionId, answerId);
@@ -244,15 +325,21 @@ router.post('/inbound', async (req, res) => {
         console.error('[emailInbound] שגיאה בשליחת התראה:', err.message, { questionId });
       }
 
+      // Confirmation email to rabbi
       try {
-        // Emit socket event for real-time UI update
+        const emailSvc = require('../services/email');
+        if (emailSvc.sendAnswerConfirmation) {
+          await emailSvc.sendAnswerConfirmation(rabbi.email, rabbi.name, questionId);
+        }
+      } catch (err) {
+        console.warn('[emailInbound] שגיאה בשליחת אישור לרב:', err.message);
+      }
+
+      try {
         const io = router._io || (req.app && req.app.get('io'));
         if (io) {
           io.emit('question:answered', {
-            questionId,
-            answerId,
-            rabbiId: rabbi.id,
-            source: 'email',
+            questionId, answerId, rabbiId: rabbi.id, source: 'email',
           });
         }
       } catch (err) {

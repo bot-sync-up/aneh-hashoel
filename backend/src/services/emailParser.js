@@ -23,7 +23,7 @@ const { query } = require('../db/pool');
 
 /**
  * Matches "[ID: ###]" anywhere in a subject line (case-insensitive).
- * The colon may be followed by optional whitespace.
+ * Also matches "Re: [ID: ###]" reply chains.
  *
  * Examples:
  *   "Re: שאלה בהלכה [ID: 42]"       → 42
@@ -31,6 +31,18 @@ const { query } = require('../db/pool');
  *   "RE: RE: [ID: 1234] ..."         → 1234
  */
 const QUESTION_ID_PATTERN = /\[ID:\s*(\d+)\]/i;
+
+/**
+ * Matches "[CLAIM:42]" — rabbi sends this to claim a question.
+ * Created by the "קבל שאלה" mailto: button in broadcast emails.
+ */
+const CLAIM_PATTERN = /\[CLAIM:\s*(\d+)\]/i;
+
+/**
+ * Matches "[RELEASE:42]" — rabbi sends this to release a claimed question.
+ * Created by the "שחרר שאלה" mailto: button in full-question emails.
+ */
+const RELEASE_PATTERN = /\[RELEASE:\s*(\d+)\]/i;
 
 /**
  * Lines starting with any of these patterns mark the beginning of quoted
@@ -369,6 +381,63 @@ async function validateSender(email, questionId) {
   return validateRabbiEmail(email, questionId);
 }
 
+// ─── extractEmailAction ────────────────────────────────────────────────────────
+
+/**
+ * Determine the action type from an inbound email subject line.
+ *
+ * Priority:
+ *   1. [CLAIM:XX]   → rabbi wants to claim question XX
+ *   2. [RELEASE:XX] → rabbi wants to release question XX
+ *   3. [ID: XX]     → rabbi is answering question XX
+ *
+ * @param {string} subject
+ * @returns {{ action: 'claim'|'release'|'answer', questionId: number } | null}
+ */
+function extractEmailAction(subject) {
+  if (!subject || typeof subject !== 'string') return null;
+
+  const claimMatch = subject.match(CLAIM_PATTERN);
+  if (claimMatch) {
+    const id = parseInt(claimMatch[1], 10);
+    if (Number.isFinite(id) && id > 0) return { action: 'claim', questionId: id };
+  }
+
+  const releaseMatch = subject.match(RELEASE_PATTERN);
+  if (releaseMatch) {
+    const id = parseInt(releaseMatch[1], 10);
+    if (Number.isFinite(id) && id > 0) return { action: 'release', questionId: id };
+  }
+
+  const answerId = extractQuestionId(subject);
+  if (answerId) return { action: 'answer', questionId: answerId };
+
+  return null;
+}
+
+// ─── findRabbiByEmail ──────────────────────────────────────────────────────────
+
+/**
+ * Look up an active rabbi by their email address (case-insensitive).
+ * Used for claim/release where any active rabbi may act (not only the assigned one).
+ *
+ * @param {string} email  Plain email address (no display name)
+ * @returns {Promise<object|null>}  Rabbi row or null
+ */
+async function findRabbiByEmail(email) {
+  if (!email) return null;
+  const normalized = email.trim().toLowerCase();
+  const { rows } = await query(
+    `SELECT id, name, email, title
+     FROM   rabbis
+     WHERE  LOWER(email) = $1
+       AND  status = 'active'
+     LIMIT  1`,
+    [normalized]
+  );
+  return rows[0] || null;
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -382,4 +451,7 @@ module.exports = {
   extractQuestionId: extractQuestionIdFull,
   cleanEmailContent,
   validateSender,
+  // Email-action routing (claim / release / answer)
+  extractEmailAction,
+  findRabbiByEmail,
 };

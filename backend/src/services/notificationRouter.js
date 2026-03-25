@@ -30,16 +30,6 @@
 
 const { query } = require('../db/pool');
 
-// ─── Per-rabbi action token builder ───────────────────────────────────────────
-
-function _generateClaimToken(questionId, rabbiId) {
-  try {
-    const { generateActionToken } = require('../utils/crypto');
-    return generateActionToken({ action: 'claim', questionId: String(questionId), rabbiId: String(rabbiId) });
-  } catch {
-    return null;
-  }
-}
 
 // ─── Lazy service loaders (avoid circular dep and gracefully handle missing modules)
 
@@ -151,17 +141,17 @@ async function _dispatchEmail(rabbi, type, data) {
       case 'question_broadcast':
       case 'urgent_question':
       case 'question_released': {
-        const { question, actionTokens } = data;
+        const { question } = data;
         if (svc.sendQuestionNotification) {
-          await svc.sendQuestionNotification(rabbi.email, question, actionTokens || {});
+          await svc.sendQuestionNotification(rabbi.email, question);
         }
         break;
       }
 
       case 'claim_confirmation': {
-        const { question, actionTokens } = data;
+        const { question } = data;
         if (svc.sendFullQuestion) {
-          await svc.sendFullQuestion(rabbi.email, question, actionTokens || {});
+          await svc.sendFullQuestion(rabbi.email, question);
         }
         break;
       }
@@ -402,18 +392,13 @@ async function notifyAll(type, data) {
       return [];
     });
 
-    // שלח אימייל לכל רב שבחר email — עם token ייחודי לכל רב
+    // שלח אימייל לכל רב שבחר email
     for (const rabbi of rabbis) {
       const pref     = _parsePreferences(rabbi.notification_pref);
       const channels = [];
 
       if (pref.email && rabbi.email) {
-        // Generate per-rabbi claim token so backend can claim directly without login
-        const perRabbiClaimToken = _generateClaimToken(data.question.id, rabbi.id);
-        const rabbiData = perRabbiClaimToken
-          ? { ...data, actionTokens: { ...(data.actionTokens || {}), claimToken: perRabbiClaimToken } }
-          : data;
-        await _dispatchEmail(rabbi, type, rabbiData).catch(() => {});
+        await _dispatchEmail(rabbi, type, data).catch(() => {});
         channels.push('email');
       }
 
@@ -436,11 +421,7 @@ async function notifyAll(type, data) {
       const channels = [];
 
       if (pref.email && rabbi.email) {
-        const perRabbiClaimToken = _generateClaimToken(data.question.id, rabbi.id);
-        const rabbiData = perRabbiClaimToken
-          ? { ...data, actionTokens: { ...(data.actionTokens || {}), claimToken: perRabbiClaimToken } }
-          : data;
-        await _dispatchEmail(rabbi, type, rabbiData).catch(() => {});
+        await _dispatchEmail(rabbi, type, data).catch(() => {});
         channels.push('email');
       }
 

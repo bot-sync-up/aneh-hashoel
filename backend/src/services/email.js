@@ -81,6 +81,28 @@ function appUrl() {
   return (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 }
 
+/**
+ * כתובת המייל הנכנס (inbound) אליה רבנים שולחים claim/release/answer.
+ * @returns {string}
+ */
+function inboundEmail() {
+  return process.env.EMAIL_INBOUND_ADDRESS || process.env.EMAIL_FROM_ADDRESS || '';
+}
+
+/**
+ * בונה mailto: link לכפתור פעולה באימייל.
+ * הכפתור פותח את לקוח המייל עם subject מוכן — הרב פשוט לוחץ שלח.
+ *
+ * @param {string} subject   נושא האימייל המוכן מראש
+ * @param {string} [body]    גוף אופציונלי
+ * @returns {string}  href למשמש
+ */
+function mailtoLink(subject, body = '') {
+  const to  = inboundEmail();
+  const enc = (s) => encodeURIComponent(s);
+  return `mailto:${to}?subject=${enc(subject)}${body ? `&body=${enc(body)}` : ''}`;
+}
+
 // ─── sendEmail ───────────────────────────────────────────────────────────────
 
 /**
@@ -117,23 +139,24 @@ async function sendEmail(to, subject, htmlContent, options = {}) {
 // ─── sendQuestionNotification ────────────────────────────────────────────────
 
 /**
- * שליחת התראה על שאלה חדשה לרב — סיכום קצר + כפתורי פעולה.
+ * שליחת התראה על שאלה חדשה לרב — כותרת + כפתור "קבל שאלה" כ-mailto.
+ * לחיצה על "קבל שאלה" פותחת לקוח מייל עם subject=[CLAIM:ID] מוכן לשליחה.
  *
- * @param {string} rabbiEmail    אימייל הרב
- * @param {object} question      אובייקט השאלה
- * @param {object} actionTokens  { claimToken }
+ * @param {string} rabbiEmail  אימייל הרב
+ * @param {object} question    אובייקט השאלה
  */
-async function sendQuestionNotification(rabbiEmail, question, actionTokens) {
-  const claimUrl = `${appUrl()}/api/action/claim?token=${actionTokens.claimToken}`;
-  const viewUrl  = `${appUrl()}/questions/${question.id}`;
-
+async function sendQuestionNotification(rabbiEmail, question) {
   const categoryLabel = question.category_name || question.category || 'כללי';
-  const urgencyLabel  = question.urgency === 'urgent' ? '🔴 דחוף' : '';
-  const preview       = (question.content || '').slice(0, 150);
+  const isUrgent      = question.urgency === 'urgent' || question.urgency === 'critical';
+
+  const claimUrl = mailtoLink(
+    `[CLAIM:${question.id}] ${question.title || 'שאלה חדשה'}`,
+    'שלח מייל זה כדי לקבל את השאלה לטיפולך'
+  );
 
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
-    <p style="margin: 0 0 12px; font-size: 15px;">שאלה חדשה ממתינה לתשובתך:</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">שאלה חדשה ממתינה לתשובה:</p>
 
     <div style="
       background-color: #f8f8fb;
@@ -144,21 +167,24 @@ async function sendQuestionNotification(rabbiEmail, question, actionTokens) {
     ">
       <p style="margin: 0 0 8px; font-weight: bold; font-size: 16px; color: ${BRAND_NAVY};">
         ${question.title || 'שאלה ללא כותרת'}
-        ${urgencyLabel ? `<span style="color: #cc0000; margin-right: 8px;">${urgencyLabel}</span>` : ''}
+        ${isUrgent ? `<span style="color:#cc0000; margin-right:8px;">⚠ דחוף</span>` : ''}
       </p>
-      <p style="margin: 0 0 8px; color: #666; font-size: 13px;">
-        קטגוריה: ${categoryLabel}
-      </p>
-      <p style="margin: 8px 0 0; color: #888; font-size: 13px; font-style: italic;">לצפייה בפרטי השאלה המלאים — לחץ על הכפתור למטה</p>
+      <p style="margin: 0; color: #666; font-size: 13px;">קטגוריה: ${categoryLabel}</p>
     </div>
+
+    <p style="margin: 0 0 4px; font-size: 13px; color: #555;">
+      לחץ על "קבל שאלה" — ייפתח לקוח המייל שלך עם הנושא מוכן, פשוט לחץ שלח.
+    </p>
+    <p style="margin: 0 0 16px; font-size: 13px; color: #888;">
+      השאלה תוקצה לרב הראשון ששולח.
+    </p>
   `;
 
   const html = createEmailHTML('שאלה חדשה ממתינה', bodyContent, [
     { label: 'קבל שאלה', url: claimUrl, color: BRAND_GOLD },
-    { label: 'צפה בשאלה', url: viewUrl, color: BRAND_NAVY },
   ]);
 
-  const subject = `${urgencyLabel ? '[דחוף] ' : ''}שאלה חדשה — ${question.title || 'ענה את השואל'}`;
+  const subject = `${isUrgent ? '[דחוף] ' : ''}שאלה חדשה — ${question.title || 'ענה את השואל'}`;
 
   return sendEmail(rabbiEmail, subject, html);
 }
@@ -168,14 +194,17 @@ async function sendQuestionNotification(rabbiEmail, question, actionTokens) {
 /**
  * שליחת תוכן שאלה מלא לרב — לאחר שהשאלה נתפסה.
  *
- * @param {string} rabbiEmail    אימייל הרב
- * @param {object} question      אובייקט השאלה
- * @param {object} actionTokens  { answerToken, releaseToken, discussionToken }
+ * כל הכפתורים הם mailto: links — ללא תלות באתר.
+ *   "ענה"       → reply-to כבר מוגדר, כפתור פותח compose עם [ID:X] בנושא
+ *   "שחרר"      → compose עם [RELEASE:X] בנושא
+ *
+ * @param {string} rabbiEmail  אימייל הרב
+ * @param {object} question    אובייקט השאלה
  */
-async function sendFullQuestion(rabbiEmail, question, actionTokens) {
-  const answerUrl     = `${appUrl()}/api/action/answer?token=${actionTokens.answerToken}`;
-  const releaseUrl    = `${appUrl()}/api/action/release?token=${actionTokens.releaseToken}`;
-  const discussionUrl = `${appUrl()}/api/action/discussion?token=${actionTokens.discussionToken}`;
+async function sendFullQuestion(rabbiEmail, question) {
+  const subject    = `[ID: ${question.id}] ${question.title || 'שאלה לטיפולך'} — ענה את השואל`;
+  const answerUrl  = mailtoLink(subject, '');   // reply keeps same subject → [ID:X] parsed
+  const releaseUrl = mailtoLink(`[RELEASE:${question.id}] שחרור שאלה`, '');
 
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
@@ -191,29 +220,93 @@ async function sendFullQuestion(rabbiEmail, question, actionTokens) {
       <p style="margin: 0 0 12px; font-weight: bold; font-size: 17px; color: ${BRAND_NAVY};">
         ${question.title || 'שאלה ללא כותרת'}
       </p>
-      <div style="margin: 0; color: #333; font-size: 15px; line-height: 1.8; white-space: pre-wrap;">
+      <div style="margin: 0; color: #333; font-size: 15px; line-height: 1.8;">
         ${question.content || ''}
       </div>
       ${question.asker_name ? `<p style="margin: 12px 0 0; color: #888; font-size: 13px;">שואל/ת: ${question.asker_name}</p>` : ''}
     </div>
 
-    <p style="margin: 16px 0 4px; color: #888; font-size: 13px;">
-      ניתן להשיב ישירות למייל זה או באמצעות הכפתורים למטה.
+    <p style="margin: 0 0 16px; font-size: 14px; color: #444; font-weight: 500;">
+      <strong>להשיב:</strong> לחץ על "ענה על השאלה" — ייפתח מייל עם הנושא הנכון, כתוב את תשובתך ושלח.
     </p>
   `;
 
-  const subject = `[ID: ${question.id}] ${question.title || 'שאלה לטיפולך'} — ענה את השואל`;
-
   const html = createEmailHTML('שאלה לטיפולך', bodyContent, [
-    { label: 'ענה על השאלה', url: answerUrl, color: BRAND_GOLD },
-    { label: 'שחרר שאלה', url: releaseUrl, color: '#cc4444' },
-    { label: 'פתח דיון פנימי', url: discussionUrl, color: BRAND_NAVY },
+    { label: 'ענה על השאלה', url: answerUrl,  color: BRAND_GOLD },
+    { label: 'שחרר שאלה',   url: releaseUrl, color: '#cc4444'  },
   ]);
 
-  // Reply-To: set to inbound email address so rabbi replies go to the right place
-  const inboundAddress = process.env.EMAIL_INBOUND_ADDRESS || process.env.EMAIL_FROM_ADDRESS;
+  // Reply-To → inbound parser catches replies automatically
+  return sendEmail(rabbiEmail, subject, html, { replyTo: inboundEmail() });
+}
 
-  return sendEmail(rabbiEmail, subject, html, { replyTo: inboundAddress });
+// ─── sendAlreadyClaimed ──────────────────────────────────────────────────────
+
+/**
+ * מידע לרב שניסה לתפוס שאלה שכבר נתפסה.
+ *
+ * @param {string} rabbiEmail
+ * @param {string} rabbiName
+ * @param {number} questionId
+ */
+async function sendAlreadyClaimed(rabbiEmail, rabbiName, questionId) {
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">
+      השאלה #${questionId} כבר נתפסה על ידי רב אחר לפני הודעתך.
+    </p>
+    <p style="margin: 0; font-size: 14px; color: #888;">
+      שאלות חדשות ישלחו אליך בהמשך.
+    </p>
+  `;
+
+  const html = createEmailHTML('השאלה כבר נתפסה', bodyContent);
+  return sendEmail(rabbiEmail, 'השאלה כבר נתפסה — ענה את השואל', html);
+}
+
+// ─── sendReleaseConfirmation ──────────────────────────────────────────────────
+
+/**
+ * אישור שחרור שאלה לרב.
+ *
+ * @param {string} rabbiEmail
+ * @param {string} rabbiName
+ * @param {number} questionId
+ */
+async function sendReleaseConfirmation(rabbiEmail, rabbiName, questionId) {
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
+    <p style="margin: 0; font-size: 15px;">
+      השאלה #${questionId} שוחררה בהצלחה וחזרה לתור הממתינות.
+    </p>
+  `;
+
+  const html = createEmailHTML('שאלה שוחררה', bodyContent);
+  return sendEmail(rabbiEmail, 'אישור שחרור שאלה — ענה את השואל', html);
+}
+
+// ─── sendAnswerConfirmation ───────────────────────────────────────────────────
+
+/**
+ * אישור לרב שתשובתו התקבלה ונשמרה.
+ *
+ * @param {string} rabbiEmail
+ * @param {string} rabbiName
+ * @param {number} questionId
+ */
+async function sendAnswerConfirmation(rabbiEmail, rabbiName, questionId) {
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">
+      תשובתך לשאלה #${questionId} התקבלה ונשמרה בהצלחה.
+    </p>
+    <p style="margin: 0; font-size: 14px; color: #888;">
+      השואל יקבל הודעה בהקדם.
+    </p>
+  `;
+
+  const html = createEmailHTML('תשובתך התקבלה', bodyContent);
+  return sendEmail(rabbiEmail, `תשובתך לשאלה #${questionId} התקבלה — ענה את השואל`, html);
 }
 
 // ─── sendThankNotification ───────────────────────────────────────────────────
@@ -441,6 +534,9 @@ module.exports = {
   sendEmail,
   sendQuestionNotification,
   sendFullQuestion,
+  sendAlreadyClaimed,
+  sendReleaseConfirmation,
+  sendAnswerConfirmation,
   sendThankNotification,
   sendWeeklyReport,
   sendPasswordReset,

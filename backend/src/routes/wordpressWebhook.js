@@ -100,10 +100,10 @@ function normaliseWebhookPayload(body) {
     modifiedGmt:   src.post_modified_gmt || src.modified_gmt || null,
     createdGmt:    src.post_date_gmt     || src.date_gmt     || null,
     slug:          src.post_name         || src.slug          || null,
-    // ACF / meta fields
-    askerName:     meta.asker_name        || src.asker_name   || null,
-    askerEmail:    meta.asker_email       || src.asker_email  || null,
-    askerPhone:    meta.asker_phone       || src.asker_phone  || null,
+    // ACF / meta fields — WP JetEngine uses visitor_* prefix
+    askerName:     meta.visitor_name      || meta.asker_name  || src.visitor_name  || src.asker_name  || null,
+    askerEmail:    meta.visitor_email     || meta.asker_email || src.visitor_email || src.asker_email || null,
+    askerPhone:    meta.visitor_phone     || meta.asker_phone || src.visitor_phone || src.asker_phone || null,
     categorySlug:  meta.question_category || src.category     || null,
     urgency:       meta.urgency           || src.urgency       || 'normal',
     questionStatus:meta.status            || null,              // WP custom status field
@@ -243,33 +243,38 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
     }
   });
 
-  // Fire-and-forget: fetch full WP data to get attachment_url and wp_link
-  if (!question.attachment_url || !question.wp_link) {
-    setImmediate(async () => {
-      try {
-        const wpService = require('../services/wpService');
-        const result = await wpService.getQuestionById(payload.wpPostId);
-        if (result.success && result.data) {
-          const wpQ = result.data;
-          const imgUrl   = wpQ.meta?.['ask-visitor-img'] || null;
-          const wpLink   = wpQ.link || null;
-          if (imgUrl || wpLink) {
-            await query(
-              `UPDATE questions
-               SET    attachment_url = COALESCE(attachment_url, $1),
-                      wp_link        = COALESCE(wp_link, $2),
-                      updated_at     = NOW()
-               WHERE  id = $3`,
-              [imgUrl, wpLink, question.id]
-            );
-            console.log(`[wp-webhook] enriched question ${question.id} with img=${!!imgUrl} link=${!!wpLink}`);
-          }
-        }
-      } catch (enrichErr) {
-        console.warn('[wp-webhook] failed to enrich question with WP data:', enrichErr.message);
+  // Fire-and-forget: fetch full WP data to get attachment_url, wp_link, and asker contact
+  setImmediate(async () => {
+    try {
+      const wpService = require('../services/wpService');
+      const result = await wpService.getQuestionById(payload.wpPostId);
+      if (result.success && result.data) {
+        const wpQ    = result.data;
+        const meta   = wpQ.meta || {};
+        const imgUrl = meta['ask-visitor-img'] || null;
+        const wpLink = wpQ.link || null;
+        // WP JetEngine stores contact as visitor_email / visitor_phone
+        const email  = meta['visitor_email'] || meta['asker_email'] || null;
+        const phone  = meta['visitor_phone'] || meta['asker_phone'] || null;
+        const name   = meta['visitor_name']  || meta['asker_name']  || null;
+
+        await query(
+          `UPDATE questions
+           SET    attachment_url     = COALESCE(attachment_url, $1),
+                  wp_link            = COALESCE(wp_link, $2),
+                  asker_email        = COALESCE(NULLIF(asker_email,''), $3),
+                  asker_phone        = COALESCE(NULLIF(asker_phone,''), $4),
+                  asker_name         = COALESCE(NULLIF(asker_name,''), $5),
+                  updated_at         = NOW()
+           WHERE  id = $6`,
+          [imgUrl, wpLink, email, phone, name, question.id]
+        );
+        console.log(`[wp-webhook] enriched question ${question.id} img=${!!imgUrl} email=${!!email}`);
       }
-    });
-  }
+    } catch (enrichErr) {
+      console.warn('[wp-webhook] failed to enrich question with WP data:', enrichErr.message);
+    }
+  });
 
   console.log(
     `[wp-webhook] new-question ✓ created id=${question.id} ` +

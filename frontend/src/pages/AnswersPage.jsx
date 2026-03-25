@@ -47,7 +47,14 @@ function AnswerCard({ question, currentRabbiId }) {
     answer_rabbi_id,
     view_count = 0,
     thank_count = 0,
+    created_at,
+    published_at,
+    answeredAt,
+    createdAt,
   } = question;
+
+  // Resolve the best available date — API may use different field names
+  const displayDate = answered_at || answeredAt || published_at || created_at || createdAt;
 
   // Question text (strip HTML for display)
   const rawQuestionText = questionContent || questionBody || '';
@@ -60,8 +67,8 @@ function AnswerCard({ question, currentRabbiId }) {
   const rabbiName = assigned_rabbi?.display_name ?? assigned_rabbi?.name ?? rabbi_name;
 
   const canEdit = isMe && (() => {
-    if (!answered_at) return false;
-    return (Date.now() - new Date(answered_at).getTime()) < EDIT_WINDOW_MS;
+    if (!displayDate) return false;
+    return (Date.now() - new Date(displayDate).getTime()) < EDIT_WINDOW_MS;
   })();
 
   return (
@@ -85,7 +92,7 @@ function AnswerCard({ question, currentRabbiId }) {
         )}
         <span className="mr-auto text-xs text-[var(--text-muted)] font-heebo flex items-center gap-1">
           <Calendar size={11} />
-          {formatDate(answered_at)}
+          {formatDate(displayDate)}
         </span>
       </div>
 
@@ -128,10 +135,10 @@ function AnswerCard({ question, currentRabbiId }) {
           <Heart size={11} />
           {thank_count} תודות
         </span>
-        {answered_at && (
+        {displayDate && (
           <span className="flex items-center gap-1 mr-auto">
             <Clock size={11} />
-            {formatRelative(answered_at)}
+            {formatRelative(displayDate)}
           </span>
         )}
         {canEdit && (

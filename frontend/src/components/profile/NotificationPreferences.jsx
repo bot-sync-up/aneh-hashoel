@@ -10,7 +10,7 @@ const EVENT_ROWS = [
   { key: 'new_question',      label: 'שאלה חדשה',           defaultEmail: true,  defaultWhatsapp: true,  defaultPush: false },
   { key: 'claim_approved',    label: 'אישור תפיסה',          defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'answer_published',  label: 'תשובה פורסמה',         defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
-  { key: 'user_thanks',       label: 'תודה מגולש',           defaultEmail: false, defaultWhatsapp: false, defaultPush: false },
+  { key: 'user_thanks',       label: 'תודה מגולש',           defaultEmail: false, defaultWhatsapp: false, defaultPush: false, alwaysOn: true, alwaysOnNote: 'התראות תודה נשלחות תמיד ולא ניתנות לביטול' },
   { key: 'lock_reminder',     label: 'תזכורת נעילה',         defaultEmail: true,  defaultWhatsapp: true,  defaultPush: false },
   { key: 'followup_question', label: 'שאלת המשך',            defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'weekly_report',     label: 'דוח שבועי',            defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
@@ -177,6 +177,9 @@ export default function NotificationPreferences({ pushConfigured = false }) {
               >
                 <td className="px-4 py-3 text-right text-[var(--text-primary)] font-medium">
                   {row.label}
+                  {row.alwaysOnNote && (
+                    <p className="text-xs font-normal text-[var(--text-muted)] mt-0.5">{row.alwaysOnNote}</p>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center">

@@ -363,7 +363,7 @@ export default function AdminQuestionsPage() {
         <div>
           <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">ניהול שאלות</h2>
           <p className="text-sm text-[var(--text-muted)] font-heebo mt-0.5">
-            {loading ? '...' : `${filtered.length} שאלות`}
+            {loading ? '...' : `${filtered.length} ${filtered.length === 1 ? 'שאלה' : 'שאלות'}`}
           </p>
         </div>
         <Button
@@ -467,7 +467,7 @@ export default function AdminQuestionsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((q) => (
+                filtered.map((q, index) => (
                   <tr
                     key={q.id}
                     className={clsx(
@@ -478,7 +478,7 @@ export default function AdminQuestionsPage() {
                     <td className="px-3 py-3">
                       <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleOne(q.id)} className="rounded" />
                     </td>
-                    <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{q.id}</td>
+                    <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{index + 1}</td>
                     <td className="px-3 py-3 max-w-[260px]">
                       <span className="text-[var(--text-primary)] font-medium line-clamp-1">{q.title}</span>
                     </td>

@@ -118,7 +118,7 @@ export default function ActivityChart({ data, loading = false }) {
         <ResponsiveContainer width="100%" height={220}>
           <LineChart
             data={chartData}
-            margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
+            margin={{ top: 4, right: 8, left: 4, bottom: 0 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -145,7 +145,18 @@ export default function ActivityChart({ data, loading = false }) {
               axisLine={false}
               tickLine={false}
               allowDecimals={false}
-              width={28}
+              width={48}
+              label={{
+                value: 'מספר שאלות',
+                angle: -90,
+                position: 'insideRight',
+                style: {
+                  fontSize: 11,
+                  fontFamily: 'Heebo, sans-serif',
+                  fill: 'var(--text-muted)',
+                  textAnchor: 'middle',
+                },
+              }}
             />
             <Tooltip
               content={<HebrewTooltip />}

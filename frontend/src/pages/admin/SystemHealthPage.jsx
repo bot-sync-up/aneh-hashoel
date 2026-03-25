@@ -73,7 +73,7 @@ function ServiceCard({ name, icon: Icon, status, latency, description, loading }
           'text-xs font-medium font-heebo px-2 py-1 rounded-md inline-flex items-center gap-1 w-fit',
           ok ? 'bg-emerald-100 text-emerald-700' : unknown ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-700'
         )}>
-          {ok ? '✓ פעיל ותקין' : unknown ? '? לא ידוע' : '✗ לא זמין'}
+          {ok ? '✓ פעיל ותקין' : unknown ? '— לא מוגדר' : '✗ לא זמין'}
         </div>
       )}
     </div>
@@ -272,7 +272,7 @@ export default function SystemHealthPage() {
           <div className="flex flex-wrap gap-6">
             <div>
               <p className="text-3xl font-bold text-[#1B2B5E] font-heebo tabular-nums">
-                {health?.uptimePercent ?? '—'}%
+                {health?.uptimePercent != null ? `${health.uptimePercent}%` : '—'}
               </p>
               <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">זמינות (30 יום)</p>
             </div>
@@ -284,7 +284,7 @@ export default function SystemHealthPage() {
             </div>
             <div>
               <p className="text-xl font-bold text-[var(--text-primary)] font-heebo tabular-nums">
-                {health?.avgResponseMs ?? '—'}ms
+                {health?.avgResponseMs != null ? `${health.avgResponseMs}ms` : '—'}
               </p>
               <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">זמן תגובה ממוצע</p>
             </div>

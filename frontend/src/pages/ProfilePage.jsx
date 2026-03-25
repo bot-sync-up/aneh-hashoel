@@ -281,7 +281,8 @@ function CategoriesTab({ rabbi }) {
           if (c.children?.length) acc.push(...flatten(c.children));
           return acc;
         }, []);
-        setCategories(flatten(data?.categories ?? []));
+        const raw = data?.categories ?? (Array.isArray(data) ? data : []);
+        setCategories(flatten(raw));
       })
       .catch(() => {});
   }, []);

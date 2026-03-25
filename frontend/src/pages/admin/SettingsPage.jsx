@@ -225,9 +225,6 @@ export default function SettingsPage() {
             <Lock size={14} className="text-[var(--text-muted)]" />
             <span>מספר מקסימלי: <strong>1</strong></span>
           </div>
-          <span className="text-xs text-[var(--text-muted)] font-heebo">
-            (נעול — ניתן לשינוי רק ע"י Anthropic)
-          </span>
         </div>
       </Section>
 

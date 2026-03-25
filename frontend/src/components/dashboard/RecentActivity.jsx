@@ -19,25 +19,39 @@ const EVENT_CONFIG = {
     Icon: MessageCirclePlus,
     color: 'text-blue-500',
     bg: 'bg-blue-100 dark:bg-blue-900/30',
-    describe: (e) => `שאלה חדשה התקבלה${e.category ? ` בנושא ${e.category}` : ''}`,
+    describe: (e) => {
+      const title = e.questionTitle || e.title;
+      return title ? `שאלה חדשה: ${title}` : `שאלה חדשה התקבלה${e.category ? ` בנושא ${e.category}` : ''}`;
+    },
   },
   'question:claimed': {
     Icon: UserCheck,
     color: 'text-amber-500',
     bg: 'bg-amber-100 dark:bg-amber-900/30',
-    describe: (e) => `שאלה נלקחה לטיפול${e.rabbiName ? ` על ידי ${e.rabbiName}` : ''}`,
+    describe: (e) => {
+      const title = e.questionTitle || e.title;
+      const rabbi = e.rabbiName ? ` ע"י ${e.rabbiName}` : '';
+      return title ? `שאלה נתפסה: ${title}${rabbi}` : `שאלה נלקחה לטיפול${rabbi}`;
+    },
   },
   'question:answered': {
     Icon: CheckCircle2,
     color: 'text-emerald-500',
     bg: 'bg-emerald-100 dark:bg-emerald-900/30',
-    describe: (e) => `שאלה נענתה${e.rabbiName ? ` על ידי ${e.rabbiName}` : ''}`,
+    describe: (e) => {
+      const title = e.questionTitle || e.title;
+      const rabbi = e.rabbiName ? ` ע"י ${e.rabbiName}` : '';
+      return title ? `תשובה פורסמה: ${title}${rabbi}` : `שאלה נענתה${rabbi}`;
+    },
   },
   'question:updated': {
     Icon: Activity,
     color: 'text-purple-500',
     bg: 'bg-purple-100 dark:bg-purple-900/30',
-    describe: () => 'שאלה עודכנה',
+    describe: (e) => {
+      const title = e.questionTitle || e.title;
+      return title ? `שאלה עודכנה: ${title}` : 'שאלה עודכנה';
+    },
   },
   default: {
     Icon: Bell,

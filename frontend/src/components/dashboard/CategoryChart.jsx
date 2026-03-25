@@ -24,18 +24,18 @@ const CATEGORY_LABELS = {
   other: 'אחר',
 };
 
-// Palette — navy-gold brand tones + accessible extras
+// Palette — lighter tones that work in both light and dark mode
 const PALETTE = [
-  '#1B2B5E', // navy
-  '#B8973A', // gold
-  '#3A5298', // medium blue
+  '#5B7BC2', // medium blue (replaces navy — visible on dark backgrounds)
   '#D4AF57', // light gold
-  '#2A6B4F', // teal-green
-  '#8B3A3A', // muted rose
-  '#5B4A8A', // purple
-  '#2A6E8A', // teal
-  '#6B5B2A', // dark gold
-  '#3A5E3A', // forest green
+  '#6B8FD4', // sky blue
+  '#B8973A', // gold
+  '#4EAD7B', // teal-green
+  '#D46B6B', // rose
+  '#8B6FBF', // purple
+  '#4EA8C4', // teal
+  '#C4A04E', // warm gold
+  '#5AAD5A', // green
 ];
 
 function getLabel(key) {
@@ -87,7 +87,7 @@ function HebrewTooltip({ active, payload }) {
         <span className="font-semibold">{item.name}</span>
       </div>
       <p className="text-[var(--text-secondary)] text-xs">
-        {item.value} שאלות
+        {item.value} {item.value === 1 ? 'שאלה' : 'שאלות'}
         {item.payload.percent !== undefined && (
           <span className="mr-1">
             ({(item.payload.percent * 100).toFixed(1)}%)

@@ -533,7 +533,7 @@ export default function DashboardPage() {
                   </Button>
                 }
               >
-                השאלות שלי
+                השאלות שלי{' '}
                 {myQuestions.length > 0 && (
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1B2B5E] text-white text-xs font-bold font-heebo ms-2">
                     {myQuestions.length}
@@ -588,7 +588,7 @@ export default function DashboardPage() {
                   </Button>
                 }
               >
-                שאלות ממתינות
+                שאלות ממתינות{' '}
                 {pendingQ.length > 0 && (
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold font-heebo ms-2">
                     {pendingQ.length}
@@ -763,7 +763,7 @@ export default function DashboardPage() {
                             {idx + 1}. {cat.name}
                           </span>
                           <span className="text-sm font-bold font-heebo text-[var(--text-primary)] tabular-nums">
-                            {cat.count} שאלות
+                            {cat.count} {cat.count === 1 ? 'שאלה' : 'שאלות'}
                           </span>
                         </li>
                       ))}

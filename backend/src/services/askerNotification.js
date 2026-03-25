@@ -220,6 +220,9 @@ async function notifyAskerNewAnswer(questionId) {
   ${data.title ? `<blockquote style="border-right: 4px solid #B8973A; padding-right: 16px; margin: 16px 0; color: #333;">${data.title}</blockquote>` : ''}
   <p>קיבלת תשובה לשאלתך.${answerUrl ? ` לצפייה בתשובה המלאה לחץ על הקישור: <a href="${answerUrl}" style="color: #2563eb;">${answerUrl}</a>` : ''}</p>
   <p>בברכה,<br>צוות ענה את השואל</p>
+  <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
+    פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
+  </div>
 </div>`;
 
   // Send email
@@ -303,6 +306,9 @@ async function notifyAskerFollowUp(questionId) {
             : '<p>התשובה מחכה לך באתר.</p>'
           }
           <p>בברכה,<br>צוות ענה את השואל</p>
+          <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
+            פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
+          </div>
         </div>`
       );
     } catch (err) {
@@ -385,6 +391,9 @@ async function notifyAskerPrivateAnswer(questionId) {
           </div>
           <p style="color: #666; font-size: 12px;">תשובה זו נשלחה אליך באופן אישי ואינה מפורסמת באתר.</p>
           <p>בברכה,<br>צוות ענה את השואל</p>
+          <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
+            פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
+          </div>
         </div>`
       );
       console.log(`[askerNotification] תשובה פרטית נשלחה במייל לשואל (שאלה ${questionId})`);
@@ -424,6 +433,9 @@ async function notifyAskerQuestionReceived(question) {
         <p>${question.title || question.content || ''}</p>
       </div>
       <p style="color: #666; font-size: 14px;">המרכז למורשת מרן</p>
+      <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
+        פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
+      </div>
     </div>
   `;
 

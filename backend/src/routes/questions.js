@@ -705,16 +705,12 @@ router.patch('/category/:id', authenticate, async (req, res, next) => {
         return res.status(400).json({ error: 'קטגוריה לא נמצאה או לא מאושרת' });
     }
 
-    // Only assigned rabbi or admin can set category
+    // Any authenticated rabbi can set category — verify question exists
     const { rows: qRows } = await dbQuery(
       `SELECT id, assigned_rabbi_id, status FROM questions WHERE id = $1`, [req.params.id]
     );
     if (!qRows[0])
       return res.status(404).json({ error: 'שאלה לא נמצאה' });
-
-    const q = qRows[0];
-    if (!isAdmin && String(q.assigned_rabbi_id) !== String(req.rabbi.id))
-      return res.status(403).json({ error: 'אין הרשאה לשנות קטגוריה לשאלה זו' });
 
     const { rows } = await dbQuery(
       `UPDATE questions SET category_id = $1 WHERE id = $2

@@ -298,7 +298,7 @@ export default function QuestionDetailPage() {
                 )}
               >
                 {getCategoryLabel(category)}
-                {(isMe || rabbi?.role === 'admin') && (
+                {rabbi && (
                   <button
                     type="button"
                     title="שנה קטגוריה"
@@ -310,7 +310,7 @@ export default function QuestionDetailPage() {
                 )}
               </span>
             )}
-            {!category && (isMe || rabbi?.role === 'admin') && !editingCategory && (
+            {!category && rabbi && !editingCategory && (
               <button
                 type="button"
                 className="text-xs text-brand-navy dark:text-dark-accent font-heebo underline hover:no-underline"

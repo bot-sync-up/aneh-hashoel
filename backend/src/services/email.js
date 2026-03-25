@@ -23,6 +23,76 @@
 const nodemailer = require('nodemailer');
 const { createEmailHTML, BRAND_NAVY, BRAND_GOLD } = require('../templates/emailBase');
 
+// ─── Email Template Defaults & Resolution ────────────────────────────────────
+
+const EMAIL_TEMPLATE_DEFAULTS = {
+  asker_system_name: 'שאל את הרב',
+  rabbi_system_name: 'ענה את השואל',
+  asker_question_received_subject: 'שאלתך התקבלה — {system_name}',
+  asker_question_received_body: 'שלום {name},\nשאלתך "{title}" התקבלה בהצלחה.\nנודיע לך כשתתקבל תשובה.',
+  asker_answer_ready_subject: 'התקבלה תשובה לשאלתך — {system_name}',
+  asker_answer_ready_body: 'שלום {name},\nהרב {rabbi_name} ענה על שאלתך "{title}".\nלצפייה בתשובה:',
+  rabbi_new_question_subject: 'שאלה חדשה — {system_name}',
+  rabbi_new_question_body: 'שאלה חדשה התקבלה במערכת.\nכותרת: {title}',
+  rabbi_thank_subject: 'תודה מגולש — {system_name}',
+  rabbi_thank_body: 'כבוד הרב,\nגולש הודה לך על תשובתך לשאלה: "{title}".\nהמשך במלאכת הקודש!',
+  rabbi_full_question_subject: '[ID: {id}] {title} — {system_name}',
+  rabbi_full_question_body: 'להלן השאלה המלאה.\nניתן להשיב ישירות למייל זה.',
+  rabbi_claim_subject: '[CLAIM:{id}] קבלת שאלה — {system_name}',
+  rabbi_release_subject: '[RELEASE:{id}] שחרור שאלה — {system_name}',
+};
+
+/** Cache for loaded templates (refreshed every 5 minutes) */
+let _templateCache = null;
+let _templateCacheTime = 0;
+const TEMPLATE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Reads email templates from system_config with fallback to defaults.
+ * Caches the result for 5 minutes.
+ *
+ * @returns {Promise<object>}
+ */
+async function getEmailTemplates() {
+  const now = Date.now();
+  if (_templateCache && (now - _templateCacheTime) < TEMPLATE_CACHE_TTL) {
+    return _templateCache;
+  }
+
+  try {
+    const { query } = require('../db/pool');
+    const { rows } = await query(
+      "SELECT value FROM system_config WHERE key = 'email_templates'"
+    );
+
+    if (rows.length > 0 && rows[0].value) {
+      _templateCache = { ...EMAIL_TEMPLATE_DEFAULTS, ...rows[0].value };
+    } else {
+      _templateCache = { ...EMAIL_TEMPLATE_DEFAULTS };
+    }
+  } catch (err) {
+    console.error('[email] Failed to load email templates from DB:', err.message);
+    _templateCache = { ...EMAIL_TEMPLATE_DEFAULTS };
+  }
+
+  _templateCacheTime = now;
+  return _templateCache;
+}
+
+/**
+ * Replaces {variable} placeholders in a template string.
+ *
+ * @param {string} template  - Template string with {var} placeholders
+ * @param {object} vars      - Key-value pairs for replacement
+ * @returns {string}
+ */
+function resolveTemplate(template, vars = {}) {
+  if (!template) return '';
+  return template.replace(/\{(\w+)\}/g, (match, key) => {
+    return vars[key] !== undefined ? String(vars[key]) : match;
+  });
+}
+
 // ─── Transporter (lazy singleton) ─────────────────────────────────────────────
 
 let _transporter = null;
@@ -146,17 +216,27 @@ async function sendEmail(to, subject, htmlContent, options = {}) {
  * @param {object} question    אובייקט השאלה
  */
 async function sendQuestionNotification(rabbiEmail, question) {
+  const templates     = await getEmailTemplates();
+  const systemName    = templates.rabbi_system_name;
   const categoryLabel = question.category_name || question.category || 'כללי';
   const isUrgent      = question.urgency === 'urgent' || question.urgency === 'critical';
 
+  const vars = {
+    system_name: systemName,
+    title:       question.title || 'שאלה חדשה',
+    id:          question.id,
+  };
+
+  const claimSubject = resolveTemplate(templates.rabbi_claim_subject, vars);
   const claimUrl = mailtoLink(
-    `[CLAIM:${question.id}] ${question.title || 'שאלה חדשה'}`,
+    claimSubject,
     'שלח מייל זה כדי לקבל את השאלה לטיפולך'
   );
 
+  const bodyText = resolveTemplate(templates.rabbi_new_question_body, vars);
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
-    <p style="margin: 0 0 12px; font-size: 15px;">שאלה חדשה ממתינה לתשובה:</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">${bodyText.replace(/\n/g, '<br/>')}</p>
 
     <div style="
       background-color: #f8f8fb;
@@ -184,7 +264,7 @@ async function sendQuestionNotification(rabbiEmail, question) {
     { label: 'קבל שאלה', url: claimUrl, color: BRAND_GOLD },
   ]);
 
-  const subject = `${isUrgent ? '[דחוף] ' : ''}שאלה חדשה — ${question.title || 'ענה את השואל'}`;
+  const subject = `${isUrgent ? '[דחוף] ' : ''}${resolveTemplate(templates.rabbi_new_question_subject, vars)}`;
 
   return sendEmail(rabbiEmail, subject, html);
 }
@@ -202,13 +282,23 @@ async function sendQuestionNotification(rabbiEmail, question) {
  * @param {object} question    אובייקט השאלה
  */
 async function sendFullQuestion(rabbiEmail, question) {
-  const subject    = `[ID: ${question.id}] ${question.title || 'שאלה לטיפולך'} — ענה את השואל`;
-  const answerUrl  = mailtoLink(subject, '');   // reply keeps same subject → [ID:X] parsed
-  const releaseUrl = mailtoLink(`[RELEASE:${question.id}] שחרור שאלה`, '');
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+  const vars = {
+    system_name: systemName,
+    title:       question.title || 'שאלה לטיפולך',
+    id:          question.id,
+    name:        question.asker_name || '',
+  };
 
+  const subject    = resolveTemplate(templates.rabbi_full_question_subject, vars);
+  const answerUrl  = mailtoLink(subject, '');   // reply keeps same subject → [ID:X] parsed
+  const releaseSubject = resolveTemplate(templates.rabbi_release_subject, vars);
+  const releaseUrl = mailtoLink(releaseSubject, '');
+
+  const bodyText = resolveTemplate(templates.rabbi_full_question_body, vars);
   const bodyContent = `
-    <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
-    <p style="margin: 0 0 12px; font-size: 15px;">להלן השאלה שקיבלת לטיפולך:</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">${bodyText.replace(/\n/g, '<br/>')}</p>
 
     <div style="
       background-color: #f8f8fb;
@@ -250,6 +340,9 @@ async function sendFullQuestion(rabbiEmail, question) {
  * @param {number} questionId
  */
 async function sendAlreadyClaimed(rabbiEmail, rabbiName, questionId) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
     <p style="margin: 0 0 12px; font-size: 15px;">
@@ -261,7 +354,7 @@ async function sendAlreadyClaimed(rabbiEmail, rabbiName, questionId) {
   `;
 
   const html = createEmailHTML('השאלה כבר נתפסה', bodyContent);
-  return sendEmail(rabbiEmail, 'השאלה כבר נתפסה — ענה את השואל', html);
+  return sendEmail(rabbiEmail, `השאלה כבר נתפסה — ${systemName}`, html);
 }
 
 // ─── sendReleaseConfirmation ──────────────────────────────────────────────────
@@ -274,6 +367,9 @@ async function sendAlreadyClaimed(rabbiEmail, rabbiName, questionId) {
  * @param {number} questionId
  */
 async function sendReleaseConfirmation(rabbiEmail, rabbiName, questionId) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
     <p style="margin: 0; font-size: 15px;">
@@ -282,7 +378,7 @@ async function sendReleaseConfirmation(rabbiEmail, rabbiName, questionId) {
   `;
 
   const html = createEmailHTML('שאלה שוחררה', bodyContent);
-  return sendEmail(rabbiEmail, 'אישור שחרור שאלה — ענה את השואל', html);
+  return sendEmail(rabbiEmail, `אישור שחרור שאלה — ${systemName}`, html);
 }
 
 // ─── sendAnswerConfirmation ───────────────────────────────────────────────────
@@ -295,6 +391,9 @@ async function sendReleaseConfirmation(rabbiEmail, rabbiName, questionId) {
  * @param {number} questionId
  */
 async function sendAnswerConfirmation(rabbiEmail, rabbiName, questionId) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${rabbiName || 'רב'},</p>
     <p style="margin: 0 0 12px; font-size: 15px;">
@@ -306,7 +405,7 @@ async function sendAnswerConfirmation(rabbiEmail, rabbiName, questionId) {
   `;
 
   const html = createEmailHTML('תשובתך התקבלה', bodyContent);
-  return sendEmail(rabbiEmail, `תשובתך לשאלה #${questionId} התקבלה — ענה את השואל`, html);
+  return sendEmail(rabbiEmail, `תשובתך לשאלה #${questionId} התקבלה — ${systemName}`, html);
 }
 
 // ─── sendThankNotification ───────────────────────────────────────────────────
@@ -318,7 +417,16 @@ async function sendAnswerConfirmation(rabbiEmail, rabbiName, questionId) {
  * @param {object} question    אובייקט השאלה
  */
 async function sendThankNotification(rabbiEmail, question) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+  const vars = {
+    system_name: systemName,
+    title:       question.title || 'שאלה',
+    id:          question.id,
+  };
   const viewUrl = `${appUrl()}/questions/${question.id}`;
+
+  const thankSubject = resolveTemplate(templates.rabbi_thank_subject, vars);
 
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
@@ -352,7 +460,7 @@ async function sendThankNotification(rabbiEmail, question) {
     { label: 'צפה בשאלה', url: viewUrl, color: BRAND_GOLD },
   ]);
 
-  return sendEmail(rabbiEmail, 'גולש הודה לך על תשובתך — ענה את השואל', html);
+  return sendEmail(rabbiEmail, thankSubject, html);
 }
 
 // ─── sendThankNotificationEmail ──────────────────────────────────────────────
@@ -365,17 +473,24 @@ async function sendThankNotification(rabbiEmail, question) {
  * @param {object} question    אובייקט עם id ו-title
  */
 async function sendThankNotificationEmail(rabbiEmail, question) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+  const vars = {
+    system_name: systemName,
+    title:       question.title || 'שאלה',
+    id:          question.id,
+  };
+
+  const thankBody = resolveTemplate(templates.rabbi_thank_body, vars);
+  const thankSubject = resolveTemplate(templates.rabbi_thank_subject, vars);
+
   const bodyContent = `
-    <p style="margin: 0 0 12px; font-size: 15px;">כבוד הרב,</p>
-    <p style="margin: 0 0 16px; font-size: 15px;">
-      גולש הודה לך על תשובתך לשאלה: <strong>${question.title || 'שאלה'}</strong>.
-    </p>
-    <p style="margin: 0; font-size: 15px;">המשך במלאכת הקודש!</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">${thankBody.replace(/\n/g, '<br/>')}</p>
   `;
 
   const html = createEmailHTML('תודה מגולש', bodyContent);
 
-  return sendEmail(rabbiEmail, 'תודה מגולש — ענה את השואל', html);
+  return sendEmail(rabbiEmail, thankSubject, html);
 }
 
 // ─── sendWeeklyReport ────────────────────────────────────────────────────────
@@ -466,7 +581,10 @@ async function sendWeeklyReport(rabbiEmail, stats) {
     { label: 'לוח בקרה', url: dashboardUrl, color: BRAND_GOLD },
   ]);
 
-  return sendEmail(rabbiEmail, `דו"ח שבועי — ${stats.weekStart} עד ${stats.weekEnd} — ענה את השואל`, html);
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
+  return sendEmail(rabbiEmail, `דו"ח שבועי — ${stats.weekStart} עד ${stats.weekEnd} — ${systemName}`, html);
 }
 
 // ─── sendPasswordReset ───────────────────────────────────────────────────────
@@ -495,7 +613,10 @@ async function sendPasswordReset(email, resetLink) {
     { label: 'איפוס סיסמה', url: resetLink, color: BRAND_GOLD },
   ]);
 
-  return sendEmail(email, 'איפוס סיסמה — ענה את השואל', html);
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
+  return sendEmail(email, `איפוס סיסמה — ${systemName}`, html);
 }
 
 // ─── sendNewDeviceAlert ──────────────────────────────────────────────────────
@@ -548,7 +669,10 @@ async function sendNewDeviceAlert(email, deviceInfo) {
     { label: 'שנה סיסמה', url: `${appUrl()}/profile?tab=security`, color: '#cc4444' },
   ]);
 
-  return sendEmail(email, 'התחברות ממכשיר חדש — ענה את השואל', html);
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
+  return sendEmail(email, `התחברות ממכשיר חדש — ${systemName}`, html);
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
@@ -565,4 +689,8 @@ module.exports = {
   sendWeeklyReport,
   sendPasswordReset,
   sendNewDeviceAlert,
+  // Template utilities
+  getEmailTemplates,
+  resolveTemplate,
+  EMAIL_TEMPLATE_DEFAULTS,
 };

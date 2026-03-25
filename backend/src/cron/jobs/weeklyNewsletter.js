@@ -3,11 +3,11 @@
 /**
  * weeklyNewsletter.js
  * ─────────────────────────────────────────────────────────────────────────────
- * שו"ת השבוע — שולח ניוזלטר שבועי עם השאלה המתוגמלת ביותר מהשבוע האחרון.
+ * שו"ת השבוע — שולח ניוזלטר שבועי עם שאלות נבחרות.
  * רץ כל יום שישי בשעה 10:00 (0 10 * * 5).
  *
- * השאלה שנבחרת היא זו שקיבלה את מספר התודות הגבוה ביותר בשבוע האחרון.
- * לא נכללים פרטי השואל (אנונימי).
+ * מנהל יכול לבחור שאלות ידנית דרך לוח הניהול. אם לא נבחרו שאלות,
+ * נבחרת אוטומטית השאלה עם הכי הרבה תודות מהשבוע האחרון.
  *
  * אם MailWizz לא מוגדר — מתעד את התוכן בלוג בלבד.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -15,6 +15,47 @@
 
 const { query } = require('../../db/pool');
 const mailwizzService = require('../../services/mailwizzService');
+const systemSettings = require('../../config/systemSettings');
+
+/**
+ * Fetches admin-selected questions from system_config.
+ * Returns empty array if none selected.
+ *
+ * @returns {Promise<object[]>}
+ */
+async function _getAdminSelectedQuestions() {
+  try {
+    const selectedIds = await systemSettings.getSetting('newsletter_selected_questions');
+
+    if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
+      return [];
+    }
+
+    const { rows } = await query(
+      `SELECT
+         q.id,
+         q.title,
+         q.content,
+         q.thank_count,
+         q.view_count,
+         q.answered_at,
+         q.wp_link,
+         c.name AS category_name,
+         r.name AS rabbi_name
+       FROM   questions q
+       LEFT JOIN categories c ON c.id = q.category_id
+       LEFT JOIN rabbis     r ON r.id = q.assigned_rabbi_id
+       WHERE  q.id = ANY($1::uuid[])
+       ORDER BY q.thank_count DESC, q.view_count DESC`,
+      [selectedIds]
+    );
+
+    return rows;
+  } catch (err) {
+    console.error('[weekly-newsletter] שגיאה בטעינת שאלות נבחרות:', err.message);
+    return [];
+  }
+}
 
 /**
  * Fetches the most-thanked answered question from the past week.
@@ -52,27 +93,19 @@ async function _getMostThankedQuestion() {
 }
 
 /**
- * Formats the newsletter HTML content.
+ * Formats the newsletter HTML content for a single question.
  *
  * @param {object} question
  * @returns {string}
  */
-function _formatNewsletterHtml(question) {
+function _formatQuestionHtml(question) {
   const category = question.category_name || 'כללי';
   const rabbi = question.rabbi_name || 'אחד מרבני המרכז';
   const title = question.title || 'שאלה ותשובה';
   const contentPreview = (question.content || '').slice(0, 300);
   const link = question.wp_link || '#';
-  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
   return `
-    <div dir="rtl" style="font-family: 'Heebo', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h1 style="color: #1B2B5E; font-size: 24px; text-align: center; border-bottom: 2px solid #B8973A; padding-bottom: 12px;">
-        שו"ת השבוע
-      </h1>
-      <p style="color: #666; text-align: center; font-size: 14px;">
-        מהמרכז למורשת מרן — השאלה שזכתה להכי הרבה תודות השבוע
-      </p>
       <div style="background: #f9f9f9; border-radius: 12px; padding: 20px; margin: 20px 0;">
         <p style="color: #B8973A; font-size: 13px; margin: 0 0 8px;">
           ${category}
@@ -86,13 +119,39 @@ function _formatNewsletterHtml(question) {
         <p style="color: #666; font-size: 13px; margin-top: 12px;">
           השיב: הרב ${rabbi}
         </p>
-      </div>
-      <div style="text-align: center; margin: 24px 0;">
-        <a href="${link}"
-           style="display: inline-block; background: #B8973A; color: #fff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px;">
-          לקריאת התשובה המלאה
-        </a>
-      </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <a href="${link}"
+             style="display: inline-block; background: #B8973A; color: #fff; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">
+            לקריאת התשובה המלאה
+          </a>
+        </div>
+      </div>`;
+}
+
+/**
+ * Formats the full newsletter HTML content.
+ *
+ * @param {object[]} questions
+ * @returns {string}
+ */
+function _formatNewsletterHtml(questions) {
+  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const isSingle = questions.length === 1;
+  const subtitle = isSingle
+    ? 'מהמרכז למורשת מרן — השאלה שזכתה להכי הרבה תודות השבוע'
+    : 'מהמרכז למורשת מרן — שאלות נבחרות מהשבוע';
+
+  const questionsHtml = questions.map(_formatQuestionHtml).join('\n');
+
+  return `
+    <div dir="rtl" style="font-family: 'Heebo', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="color: #1B2B5E; font-size: 24px; text-align: center; border-bottom: 2px solid #B8973A; padding-bottom: 12px;">
+        שו"ת השבוע
+      </h1>
+      <p style="color: #666; text-align: center; font-size: 14px;">
+        ${subtitle}
+      </p>
+      ${questionsHtml}
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
       <p style="color: #999; font-size: 12px; text-align: center;">
         המרכז למורשת מרן — ענה את השואל
@@ -105,24 +164,41 @@ function _formatNewsletterHtml(question) {
 
 /**
  * Main cron handler — runs every Friday at 10:00.
+ * If admin has selected questions, uses those; otherwise auto-selects.
  */
 async function runWeeklyNewsletter() {
-  console.info('[weekly-newsletter] מחפש את השאלה המתוגמלת ביותר השבוע...');
+  console.info('[weekly-newsletter] בודק שאלות נבחרות ע"י מנהל...');
 
-  const question = await _getMostThankedQuestion();
+  // Check for admin-selected questions first
+  let questions = await _getAdminSelectedQuestions();
 
-  if (!question) {
-    console.info('[weekly-newsletter] לא נמצאו שאלות שנענו השבוע — דילוג');
-    return;
+  if (questions.length > 0) {
+    console.info(`[weekly-newsletter] נמצאו ${questions.length} שאלות שנבחרו ע"י מנהל`);
+  } else {
+    // Fallback: auto-select most thanked
+    console.info('[weekly-newsletter] אין שאלות שנבחרו — בוחר אוטומטית...');
+    const autoQuestion = await _getMostThankedQuestion();
+
+    if (!autoQuestion) {
+      console.info('[weekly-newsletter] לא נמצאו שאלות שנענו השבוע — דילוג');
+      return;
+    }
+
+    questions = [autoQuestion];
   }
 
-  console.info(
-    `[weekly-newsletter] נבחרה שאלה #${question.id}: "${question.title}" ` +
-    `(${question.thank_count} תודות, ${question.view_count} צפיות)`
-  );
+  for (const q of questions) {
+    console.info(
+      `[weekly-newsletter] שאלה #${q.id}: "${q.title}" ` +
+      `(${q.thank_count} תודות, ${q.view_count} צפיות)`
+    );
+  }
 
-  const subject = `שו"ת השבוע — ${question.title || 'שאלה ותשובה'}`;
-  const htmlBody = _formatNewsletterHtml(question);
+  const subject = questions.length === 1
+    ? `שו"ת השבוע — ${questions[0].title || 'שאלה ותשובה'}`
+    : `שו"ת השבוע — ${questions.length} שאלות נבחרות`;
+
+  const htmlBody = _formatNewsletterHtml(questions);
 
   const result = await mailwizzService.triggerCampaign(subject, htmlBody);
 
@@ -131,6 +207,13 @@ async function runWeeklyNewsletter() {
   } else {
     console.info(`[weekly-newsletter] קמפיין לא נשלח (${result.error}) — התוכן תועד בלוג`);
     console.info(`[weekly-newsletter] נושא: ${subject}`);
+  }
+
+  // Clear the admin selection after sending
+  try {
+    await systemSettings.setSetting('newsletter_selected_questions', [], null);
+  } catch (clearErr) {
+    console.error('[weekly-newsletter] שגיאה בניקוי בחירות:', clearErr.message);
   }
 }
 

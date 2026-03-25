@@ -673,6 +673,41 @@ async function getAttachmentUrl(attachmentId) {
   }
 }
 
+// ─── syncThankCount ──────────────────────────────────────────────────────────
+
+/**
+ * Sync thank count to the corresponding WordPress post meta.
+ *
+ * Endpoint: PATCH /ask-rabai/{wpPostId} with meta: { ask_thank_count }
+ *
+ * @param {number} wpPostId
+ * @param {number} thankCount
+ * @returns {Promise<{ success: boolean, data?: object, error?: string }>}
+ */
+async function syncThankCount(wpPostId, thankCount) {
+  if (!wpPostId) {
+    return { success: false, error: 'wpPostId נדרש' };
+  }
+
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.post(`/ask-rabai/${wpPostId}`, {
+        meta: { ask_thank_count: thankCount },
+      }),
+      `syncThankCount(${wpPostId})`
+    );
+
+    console.log(`[wpService] syncThankCount ✓ wpPostId=${wpPostId} thankCount=${thankCount}`);
+    return { success: true, data: response.data };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+    console.error(`[wpService] syncThankCount(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -686,5 +721,6 @@ module.exports = {
   getAskerPhone,
   postRabbiOfWeek,
   syncRetryFailed,
+  syncThankCount,
   logSync,
 };

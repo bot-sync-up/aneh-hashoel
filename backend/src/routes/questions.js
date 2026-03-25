@@ -604,6 +604,14 @@ router.post('/thank/:id', thankRateLimiter, async (req, res, next) => {
       });
     }
 
+    // Fire-and-forget: sync thank count to WordPress
+    if (result.wpPostId) {
+      const { syncThankCount } = require('../services/wpService');
+      syncThankCount(result.wpPostId, result.thankCount).catch((err) => {
+        console.error('[questions] syncThankCount error:', err.message);
+      });
+    }
+
     // Schedule WhatsApp + email thank notification — fire-and-forget
     questionService.scheduleThankNotification(req.params.id, result.rabbiId)
       .catch((err) => {

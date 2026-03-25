@@ -258,11 +258,29 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
       if (result.success && result.data) {
         const wpQ  = result.data;
         const meta = wpQ.meta || {};
-        const imgUrl = meta['ask-visitor-img'] || null;
+        const acf  = wpQ.acf  || {};
+
+        // Log ALL meta keys to diagnose missing email
+        console.log('[wpWebhook] WP API meta keys:', Object.keys(meta).join(', '));
+        console.log('[wpWebhook] WP API acf keys:', Object.keys(acf).join(', '));
+
+        // Search ALL meta values for anything that looks like an email
+        const allFields = { ...meta, ...acf };
+        const emailField = Object.entries(allFields).find(([k, v]) =>
+          typeof v === 'string' && v.includes('@') && (k.toLowerCase().includes('email') || k.toLowerCase().includes('mail'))
+        );
+        const phoneField = Object.entries(allFields).find(([k, v]) =>
+          typeof v === 'string' && v.length >= 9 && (k.toLowerCase().includes('phone') || k.toLowerCase().includes('tel'))
+        );
+
+        if (emailField) console.log(`[wpWebhook] found email in field "${emailField[0]}": ${emailField[1]}`);
+        if (phoneField) console.log(`[wpWebhook] found phone in field "${phoneField[0]}": ${phoneField[1]}`);
+
+        const imgUrl = meta['ask-visitor-img'] || acf['ask-visitor-img'] || null;
         const wpLink = wpQ.link || null;
-        const email  = meta['visitor_email'] || meta['asker_email'] || meta['asker-email'] || null;
-        const phone  = meta['visitor_phone'] || meta['asker_phone'] || meta['asker-phone'] || null;
-        const name   = meta['visitor_name']  || meta['asker_name']  || null;
+        const email  = emailField ? emailField[1] : (meta['visitor_email'] || meta['asker_email'] || acf['visitor_email'] || acf['asker_email'] || null);
+        const phone  = phoneField ? phoneField[1] : (meta['visitor_phone'] || meta['asker_phone'] || acf['visitor_phone'] || acf['asker_phone'] || null);
+        const name   = meta['visitor_name']  || meta['asker_name']  || acf['visitor_name']  || acf['asker_name']  || null;
 
         await query(
           `UPDATE questions
@@ -652,6 +670,14 @@ router.post('/thank-click', verifyWebhookSecret, async (req, res, next) => {
       updateErr.message
     );
     // Non-fatal — still notify the rabbi if we can
+  }
+
+  // ── Fire-and-forget: sync thank count to WordPress ─────────────────────
+  if (payload.wpPostId) {
+    const { syncThankCount } = require('../services/wpService');
+    syncThankCount(payload.wpPostId, newThankCount).catch((err) => {
+      console.error('[wpWebhook] syncThankCount error:', err.message);
+    });
   }
 
   // ── Notify assigned rabbi via Socket.io ───────────────────────────────────

@@ -827,6 +827,176 @@ router.post('/sync-log/retry', async (req, res) => {
 });
 
 // =============================================================================
+// EMAIL TEMPLATE SETTINGS
+// =============================================================================
+
+/**
+ * GET /admin/email-settings
+ * Returns the email_templates setting from system_config.
+ */
+router.get('/email-settings', async (req, res) => {
+  try {
+    const templates = await systemSettings.getSetting('email_templates');
+    return res.json({ ok: true, templates: templates || null });
+  } catch (err) {
+    console.error('[admin] GET /email-settings error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * PUT /admin/email-settings
+ * Saves email template settings to system_config under key 'email_templates'.
+ * Body: { templates: { asker_system_name, rabbi_system_name, ... } }
+ */
+router.put('/email-settings', async (req, res) => {
+  try {
+    const { templates } = req.body;
+
+    if (!templates || typeof templates !== 'object' || Array.isArray(templates)) {
+      return res.status(400).json({ error: 'גוף הבקשה חייב להכיל אובייקט templates' });
+    }
+
+    const result = await systemSettings.setSetting(
+      'email_templates',
+      templates,
+      req.rabbi.id,
+      getIp(req)
+    );
+
+    return res.json({ ok: true, updated: result });
+  } catch (err) {
+    console.error('[admin] PUT /email-settings error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// =============================================================================
+// NEWSLETTER ADMIN SELECTION
+// =============================================================================
+
+/**
+ * GET /admin/newsletter/candidates
+ * Returns top 10 answered questions from the past week (most thanked, most viewed).
+ */
+router.get('/newsletter/candidates', async (req, res) => {
+  try {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const { rows } = await dbQuery(
+      `SELECT
+         q.id,
+         q.title,
+         q.content,
+         q.thank_count,
+         q.view_count,
+         q.answered_at,
+         q.wp_link,
+         c.name AS category_name,
+         r.name AS rabbi_name
+       FROM   questions q
+       LEFT JOIN categories c ON c.id = q.category_id
+       LEFT JOIN rabbis     r ON r.id = q.assigned_rabbi_id
+       WHERE  q.status = 'answered'
+         AND  q.answered_at >= $1
+         AND  q.answered_at IS NOT NULL
+       ORDER BY q.thank_count DESC, q.view_count DESC
+       LIMIT 10`,
+      [weekAgo.toISOString()]
+    );
+
+    return res.json({ ok: true, candidates: rows });
+  } catch (err) {
+    console.error('[admin] GET /newsletter/candidates error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * POST /admin/newsletter/select
+ * Saves selected question IDs for the next newsletter.
+ * Body: { questionIds: string[] }
+ */
+router.post('/newsletter/select', async (req, res) => {
+  try {
+    const { questionIds } = req.body;
+
+    if (!Array.isArray(questionIds)) {
+      return res.status(400).json({ error: 'questionIds חייב להיות מערך' });
+    }
+
+    const result = await systemSettings.setSetting(
+      'newsletter_selected_questions',
+      questionIds,
+      req.rabbi.id,
+      getIp(req)
+    );
+
+    return res.json({ ok: true, updated: result });
+  } catch (err) {
+    console.error('[admin] POST /newsletter/select error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * POST /admin/newsletter/send
+ * Triggers immediate newsletter send with selected questions.
+ */
+router.post('/newsletter/send', async (req, res) => {
+  try {
+    const { runWeeklyNewsletter } = require('../cron/jobs/weeklyNewsletter');
+    await runWeeklyNewsletter();
+
+    // Record last sent date
+    await systemSettings.setSetting(
+      'newsletter_last_sent',
+      new Date().toISOString(),
+      req.rabbi.id,
+      getIp(req)
+    );
+
+    return res.json({ ok: true, message: 'ניוזלטר נשלח בהצלחה' });
+  } catch (err) {
+    console.error('[admin] POST /newsletter/send error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * GET /admin/newsletter/status
+ * Returns last sent date and currently selected questions.
+ */
+router.get('/newsletter/status', async (req, res) => {
+  try {
+    const lastSent = await systemSettings.getSetting('newsletter_last_sent');
+    const selectedIds = await systemSettings.getSetting('newsletter_selected_questions');
+
+    let selectedQuestions = [];
+    if (Array.isArray(selectedIds) && selectedIds.length > 0) {
+      const { rows } = await dbQuery(
+        `SELECT q.id, q.title, q.thank_count, q.view_count, r.name AS rabbi_name
+         FROM   questions q
+         LEFT JOIN rabbis r ON r.id = q.assigned_rabbi_id
+         WHERE  q.id = ANY($1::uuid[])`,
+        [selectedIds]
+      );
+      selectedQuestions = rows;
+    }
+
+    return res.json({
+      ok: true,
+      lastSent: lastSent || null,
+      selectedQuestions,
+    });
+  } catch (err) {
+    console.error('[admin] GET /newsletter/status error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// =============================================================================
 // Private helpers
 // =============================================================================
 

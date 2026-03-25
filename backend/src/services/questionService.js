@@ -647,7 +647,7 @@ async function _sendTimeoutWarningEmail(row) {
  */
 async function incrementThankCount(questionId, ip) {
   const { rows: qRows } = await dbQuery(
-    `SELECT id, assigned_rabbi_id, thank_count FROM questions WHERE id = $1`,
+    `SELECT id, assigned_rabbi_id, thank_count, wp_post_id FROM questions WHERE id = $1`,
     [questionId]
   );
 
@@ -669,6 +669,7 @@ async function incrementThankCount(questionId, ip) {
       thankCount:     question.thank_count,
       alreadyThanked: true,
       rabbiId:        question.assigned_rabbi_id,
+      wpPostId:       question.wp_post_id,
     };
   }
 
@@ -695,6 +696,7 @@ async function incrementThankCount(questionId, ip) {
     thankCount:     thank_count,
     alreadyThanked: false,
     rabbiId:        assigned_rabbi_id,
+    wpPostId:       question.wp_post_id,
   };
 }
 

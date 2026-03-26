@@ -337,8 +337,9 @@ async function publishAnswer(wpPostId, answerData) {
     meta: {
       'ask-answ':        answerData.content,
       'ask-rabbi':       answerData.rabbiName   || '',
-      'ask-signature':   answerData.signature   || '',
       'ask-answered-at': answerData.publishedAt || new Date().toISOString(),
+      // Note: ask-signature removed — WP generates signature automatically
+      // from the rabi-add taxonomy term assignment
     },
   };
 

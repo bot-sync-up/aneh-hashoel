@@ -171,7 +171,17 @@ function decryptField(encrypted) {
   if (encrypted == null) {
     return null;
   }
-  return decrypt(encrypted);
+  // If value doesn't look encrypted (no iv:authTag:ciphertext format),
+  // return as-is (handles plaintext values from WP enrichment)
+  if (typeof encrypted === 'string' && encrypted.split(':').length !== 3) {
+    return encrypted;
+  }
+  try {
+    return decrypt(encrypted);
+  } catch {
+    // Fallback: return raw value if decryption fails
+    return encrypted;
+  }
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────

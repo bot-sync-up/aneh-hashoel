@@ -442,23 +442,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
         </div>
       )}
 
-      {/* Signature */}
-      <div className="rounded-lg border border-[var(--border-default)] overflow-hidden">
-        <button type="button" onClick={() => setSignatureOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--bg-surface-raised)] text-sm font-medium font-heebo text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors focus-visible:outline-none"
-          aria-expanded={signatureOpen}
-        >
-          <span>חתימה — תצורף בסוף התשובה</span>
-          {signatureOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
-        </button>
-        {signatureOpen && (
-          <div className="px-4 py-3 bg-[var(--bg-surface)] border-t border-[var(--border-default)]">
-            {signature
-              ? <p className="text-sm text-[var(--text-secondary)] font-heebo whitespace-pre-wrap leading-relaxed" dir="rtl">{signature}</p>
-              : <p className="text-sm text-[var(--text-muted)] font-heebo italic">לא הוגדרה חתימה בפרופיל.</p>}
-          </div>
-        )}
-      </div>
+      {/* Signature removed — WP generates it automatically from rabi-add taxonomy */}
 
       {saveError && <p role="alert" className="text-sm text-red-600 font-heebo px-1">{saveError}</p>}
 

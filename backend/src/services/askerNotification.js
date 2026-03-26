@@ -252,7 +252,6 @@ async function notifyAskerNewAnswer(questionId) {
     <p style="margin: 16px 0 0; color: #888; font-size: 13px;">
       לצפייה בתשובה המלאה — לחץ על הכפתור למטה.
     </p>
-    <p style="margin: 16px 0 0;">בברכה,<br><strong>הרב ${data.rabbi_name}</strong></p>
   `;
 
   const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];

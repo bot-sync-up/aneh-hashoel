@@ -251,9 +251,10 @@ export default function QuestionDetailPage() {
   const isAnswered = status === 'answered';
   const isInProcessByOther = isInProcess && !isMe;
 
-  // 30-minute edit window: only if I answered this question and within 30 min
+  // Edit window: 30 minutes for rabbis, unlimited for admins
   const EDIT_WINDOW_MS = 30 * 60 * 1000;
-  const canEditAnswer = isAnswered && (isMyAnswer || isMe) && (() => {
+  const canEditAnswer = isAnswered && (isMyAnswer || isMe || isAdmin) && (() => {
+    if (isAdmin) return true; // admins can always edit
     if (!answered_at) return false;
     const answeredMs = new Date(answered_at).getTime();
     return (Date.now() - answeredMs) < EDIT_WINDOW_MS;

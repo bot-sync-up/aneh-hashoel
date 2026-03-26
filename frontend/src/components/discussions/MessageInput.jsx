@@ -59,7 +59,7 @@ export default function MessageInput({
         handleSend();
       }
     },
-    [discussionId, emit, emitStopTyping] // eslint-disable-line react-hooks/exhaustive-deps
+    [discussionId, emit, emitStopTyping, handleSend]
   );
 
   // Auto-resize textarea

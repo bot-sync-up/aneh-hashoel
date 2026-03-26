@@ -330,7 +330,7 @@ export default function RabbisAdminPage() {
       const raw = Array.isArray(data) ? data : data.rabbis ?? [];
       setRabbis(raw.map((r) => ({
         ...r,
-        isActive:          r.isActive ?? (r.status === 'active'),
+        isActive:          r.is_active === true || r.isActive === true || r.status === 'active',
         answersThisMonth:  r.answersThisMonth ?? r.answers_count ?? 0,
         assignedQuestions:  r.assignedQuestions ?? r.assigned_questions ?? 0,
         lastLogin:         r.lastLogin ?? r.last_login_at,

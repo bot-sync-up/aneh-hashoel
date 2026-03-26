@@ -85,7 +85,7 @@ function decrypt(encrypted) {
  * @param {string} subject  Email subject
  * @param {string} html     Email body (HTML)
  */
-async function sendEmail(to, subject, html) {
+async function sendEmail(to, subject, html, options = {}) {
   let nodemailer;
   try {
     nodemailer = require('nodemailer');
@@ -104,8 +104,12 @@ async function sendEmail(to, subject, html) {
     },
   });
 
+  const fromName = options.fromName || 'ענה את השואל';
+  const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@aneh-hashoel.co.il';
+  const fromField = process.env.SMTP_FROM || `"${fromName}" <${fromEmail}>`;
+
   await transporter.sendMail({
-    from:    process.env.SMTP_FROM || '"ענה את השואל" <noreply@aneh-hashoel.co.il>',
+    from:    fromField,
     to,
     subject,
     html,
@@ -328,21 +332,21 @@ async function notifyAskerFollowUp(questionId) {
   // Send email
   if (email) {
     try {
+      const { createEmailHTML } = require('../templates/emailBase');
+      const followUpHtml = createEmailHTML(`
+        <p style="margin:0 0 12px; font-size:15px;">הרב ${data.rabbi_name} השיב לשאלת ההמשך שלך:</p>
+        <div style="background:#f8f6f0; border-right:3px solid #B8973A; padding:12px 16px; border-radius:4px; margin:12px 0;">
+          <p style="font-weight:bold; margin:0 0 6px;">שאלה: ${data.title}</p>
+        </div>
+        <div style="background:#fff; border:1px solid #eee; padding:12px 16px; border-radius:4px; margin:12px 0;">
+          ${data.follow_up_answer || ''}
+        </div>
+      `, { systemName: 'מערכת שאל את הרב' });
       await sendEmail(
         email,
         'תשובת המשך לשאלתך — ענה את השואל',
-        `<div dir="rtl" style="font-family: Arial, sans-serif;">
-          <h2>שלום,</h2>
-          <p>הרב ${data.rabbi_name} הוסיף תשובת המשך לשאלתך.</p>
-          ${answerUrl
-            ? `<p><a href="${answerUrl}" style="color: #2563eb;">לחץ כאן לצפייה בתשובה</a></p>`
-            : '<p>התשובה מחכה לך באתר.</p>'
-          }
-          <p>בברכה,<br>צוות ענה את השואל</p>
-          <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
-            פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
-          </div>
-        </div>`
+        followUpHtml,
+        { fromName: 'מערכת שאל את הרב' }
       );
     } catch (err) {
       console.error(`[askerNotification] שגיאה בשליחת אימייל המשך (שאלה ${questionId}):`, err.message);

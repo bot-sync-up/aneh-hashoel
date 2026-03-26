@@ -403,6 +403,8 @@ router.get('/templates', async (req, res, next) => {
          t.title,
          t.content,
          t.category_id,
+         t.shortcut,
+         t.usage_count,
          c.name AS category_name,
          t.created_at
        FROM rabbi_templates t
@@ -428,7 +430,7 @@ router.get('/templates', async (req, res, next) => {
  */
 router.post('/templates', async (req, res, next) => {
   try {
-    const { title, content, category_id } = req.body ?? {};
+    const { title, content, category_id, shortcut } = req.body ?? {};
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ error: 'כותרת התבנית היא שדה חובה' });
@@ -456,11 +458,13 @@ router.post('/templates', async (req, res, next) => {
       resolvedCategoryId = catId;
     }
 
+    const resolvedShortcut = shortcut ? String(shortcut).trim().slice(0, 50) : null;
+
     const { rows } = await query(
-      `INSERT INTO rabbi_templates (rabbi_id, title, content, category_id, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       RETURNING id, rabbi_id, title, content, category_id, created_at`,
-      [req.rabbi.id, title.trim(), content.trim(), resolvedCategoryId]
+      `INSERT INTO rabbi_templates (rabbi_id, title, content, category_id, shortcut, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       RETURNING id, rabbi_id, title, content, category_id, shortcut, usage_count, created_at`,
+      [req.rabbi.id, title.trim(), content.trim(), resolvedCategoryId, resolvedShortcut]
     );
 
     return res.status(201).json({
@@ -489,7 +493,7 @@ router.put('/templates/:id', async (req, res, next) => {
     // Ownership check
     await _ownTemplate(templateId, req.rabbi.id);
 
-    const { title, content, category_id } = req.body ?? {};
+    const { title, content, category_id, shortcut } = req.body ?? {};
 
     const setClauses = [];
     const params     = [];
@@ -511,6 +515,11 @@ router.put('/templates/:id', async (req, res, next) => {
       }
       params.push(trimmed);
       setClauses.push(`content = $${idx++}`);
+    }
+
+    if (shortcut !== undefined) {
+      params.push(shortcut ? String(shortcut).trim().slice(0, 50) : null);
+      setClauses.push(`shortcut = $${idx++}`);
     }
 
     if (category_id !== undefined) {
@@ -544,7 +553,7 @@ router.put('/templates/:id', async (req, res, next) => {
       `UPDATE rabbi_templates
        SET    ${setClauses.join(', ')}
        WHERE  id = $${idx}
-       RETURNING id, rabbi_id, title, content, category_id, created_at`,
+       RETURNING id, rabbi_id, title, content, category_id, shortcut, usage_count, created_at`,
       params
     );
 

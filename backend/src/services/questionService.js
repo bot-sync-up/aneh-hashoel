@@ -692,6 +692,14 @@ async function incrementThankCount(questionId, ip) {
     _emitSafe('question:thankReceived', { questionId, thankCount: thank_count }, assigned_rabbi_id);
   }
 
+  // Recalculate lead hot status after thank increment
+  try {
+    const leadsService = require('./leadsService');
+    await leadsService.upsertLead({ ...question, thank_count });
+  } catch (e) {
+    console.warn('[thank] lead update failed:', e.message);
+  }
+
   return {
     thankCount:     thank_count,
     alreadyThanked: false,

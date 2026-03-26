@@ -376,10 +376,10 @@ export default function StatsPage() {
                   <Line
                     type="monotone"
                     dataKey="count"
-                    stroke="#1B2B5E"
+                    stroke="#7B8EC2"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: '#1B2B5E', strokeWidth: 0 }}
-                    activeDot={{ r: 5, fill: '#B8973A', strokeWidth: 0 }}
+                    dot={{ r: 3, fill: '#7B8EC2', strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: '#D4AF57', strokeWidth: 0 }}
                     name="תשובות"
                   />
                 </LineChart>
@@ -407,7 +407,7 @@ export default function StatsPage() {
                   <XAxis type="number" tick={{ fontSize: 10, fontFamily: 'Heebo, sans-serif', fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fontFamily: 'Heebo, sans-serif', fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={90} />
                   <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--bg-muted)' }} />
-                  <Bar dataKey="count" fill="#B8973A" radius={[0, 4, 4, 0]} maxBarSize={20} name="תשובות" />
+                  <Bar dataKey="count" fill="#D4AF57" radius={[0, 4, 4, 0]} maxBarSize={20} name="תשובות" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

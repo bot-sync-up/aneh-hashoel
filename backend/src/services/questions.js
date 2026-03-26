@@ -175,7 +175,12 @@ async function getQuestionById(id, requestingRabbiId = null) {
      LEFT JOIN rabbis        r  ON r.id  = q.assigned_rabbi_id
      LEFT JOIN categories    c  ON c.id  = q.category_id
      LEFT JOIN answers       a  ON a.question_id = q.id
-     LEFT JOIN private_notes pn ON pn.question_id = q.id AND pn.rabbi_id = $2
+     LEFT JOIN LATERAL (
+       SELECT content FROM private_notes
+       WHERE question_id = q.id AND rabbi_id = $2
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) pn ON true
      WHERE  q.id = $1`,
     [id, requestingRabbiId]
   );

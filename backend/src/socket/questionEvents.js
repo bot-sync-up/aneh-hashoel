@@ -89,7 +89,7 @@ function broadcastNewQuestion(io, question, rabbiIds) {
  * The notification is deliberately generic — it does not reveal who claimed it.
  *
  * Event:   question:claimed
- * Payload: { questionId, timestamp }
+ * Payload: { id, status, message, timestamp }
  *
  * @param {import('socket.io').Server} io              - Socket.io server instance
  * @param {string}                     questionId      - Question ID
@@ -97,7 +97,8 @@ function broadcastNewQuestion(io, question, rabbiIds) {
  */
 function notifyQuestionClaimed(io, questionId, excludeSocketId) {
   const payload = {
-    questionId,
+    id: questionId,
+    status: 'in_process',
     message:   'שאלה זו נלקחה לטיפול',
     timestamp: new Date().toISOString(),
   };
@@ -116,14 +117,15 @@ function notifyQuestionClaimed(io, questionId, excludeSocketId) {
  * Notify all rabbis that a question has been released back to the queue.
  *
  * Event:   question:released
- * Payload: { questionId, timestamp }
+ * Payload: { id, status, message, timestamp }
  *
  * @param {import('socket.io').Server} io         - Socket.io server instance
  * @param {string}                     questionId - Question ID
  */
 function notifyQuestionReleased(io, questionId) {
   emitToAll(io, 'question:released', {
-    questionId,
+    id: questionId,
+    status: 'pending',
     message:   'השאלה חזרה לתור',
     timestamp: new Date().toISOString(),
   });
@@ -136,16 +138,20 @@ function notifyQuestionReleased(io, questionId) {
  * Also updates the global question room so any subscribed observers refresh.
  *
  * Event:   question:answered
- * Payload: { questionId, rabbiId, timestamp }
+ * Payload: { id, answerId, rabbiId, status, answered_at, timestamp }
  *
  * @param {import('socket.io').Server} io         - Socket.io server instance
  * @param {string}                     questionId - Question ID
  * @param {string}                     rabbiId    - Rabbi who answered
+ * @param {string}                     [answerId] - Answer ID
  */
-function notifyQuestionAnswered(io, questionId, rabbiId) {
+function notifyQuestionAnswered(io, questionId, rabbiId, answerId) {
   const payload = {
-    questionId,
+    id: questionId,
+    answerId: answerId || null,
     rabbiId,
+    status: 'answered',
+    answered_at: new Date().toISOString(),
     timestamp: new Date().toISOString(),
   };
 
@@ -178,6 +184,7 @@ function notifyQuestionTransferred(io, fromRabbiId, toRabbiId, question) {
   const timestamp = new Date().toISOString();
 
   emitToRabbi(io, fromRabbiId, 'question:transferred', {
+    id: question.id,
     questionId: question.id,
     direction:  'outgoing',
     toRabbiId,
@@ -186,6 +193,7 @@ function notifyQuestionTransferred(io, fromRabbiId, toRabbiId, question) {
   });
 
   emitToRabbi(io, toRabbiId, 'question:transferred', {
+    id: question.id,
     questionId: question.id,
     direction:  'incoming',
     fromRabbiId,
@@ -194,6 +202,7 @@ function notifyQuestionTransferred(io, fromRabbiId, toRabbiId, question) {
   });
 
   emitToAdmins(io, 'question:transferred', {
+    id: question.id,
     questionId: question.id,
     fromRabbiId,
     toRabbiId,
@@ -269,8 +278,10 @@ function notifyThankReceived(io, rabbiId, question, thankCount) {
  */
 function broadcastStatusChange(io, questionId, newStatus, extra = {}) {
   const payload = {
+    id: questionId,
     questionId,
     newStatus,
+    status: newStatus,
     ...extra,
     timestamp: new Date().toISOString(),
   };

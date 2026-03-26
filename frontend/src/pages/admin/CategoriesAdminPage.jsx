@@ -325,12 +325,18 @@ export default function CategoriesAdminPage() {
 
   const handleDragStart = (e, id) => { setDragging(id); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-  const handleDrop = (e, targetId) => {
+  const handleDrop = async (e, targetId) => {
     e.preventDefault();
     if (dragging === targetId) { setDragging(null); return; }
-    // Simple reorder: swap positions (real impl would call PATCH /order)
+    const draggedId = dragging;
     setDragging(null);
-    showToast('הסדר עודכן');
+    try {
+      await patch(`/admin/categories/${draggedId}/reorder`, { targetId, position: 'after' });
+      load();
+      showToast('הסדר עודכן');
+    } catch (e) {
+      showToast('שגיאה בעדכון הסדר', 'error');
+    }
   };
 
   const handleAddRoot = async () => {

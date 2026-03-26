@@ -96,7 +96,7 @@ export default function SaveTemplateModal({
 
     const payload = {
       title: title.trim(),
-      category: category || undefined,
+      category_id: category || undefined,
       content: content.trim(),
     };
 

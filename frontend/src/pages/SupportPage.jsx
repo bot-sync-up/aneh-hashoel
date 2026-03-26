@@ -80,8 +80,8 @@ function ConversationView({ request, onBack }) {
               className={clsx(
                 'max-w-[80%] rounded-xl px-4 py-2.5 shadow-sm',
                 msg.sender_role === 'admin'
-                  ? 'mr-auto bg-[#1B2B5E] text-white'
-                  : 'ml-auto bg-white text-[var(--text-primary)] border border-[var(--border-default)]'
+                  ? 'me-auto bg-[#1B2B5E] text-white rounded-tl-sm'
+                  : 'ms-auto bg-white text-[var(--text-primary)] border border-[var(--border-default)] rounded-tr-sm'
               )}
             >
               <div className="flex items-center gap-2 mb-1">

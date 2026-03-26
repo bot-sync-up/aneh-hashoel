@@ -269,8 +269,9 @@ router.post('/claim/:id', authenticate, async (req, res, next) => {
     const io = _io(req);
     if (io) {
       emitToAll(io, 'question:claimed', {
-        questionId: req.params.id,
-        rabbiId:    req.rabbi.id,
+        id:              req.params.id,
+        assigned_rabbi:  req.rabbi.id,
+        status:          'in_process',
       });
     }
 
@@ -308,7 +309,7 @@ router.post('/release/:id', authenticate, async (req, res, next) => {
 
     const io = _io(req);
     if (io) {
-      emitToAll(io, 'question:released', { questionId: req.params.id });
+      emitToAll(io, 'question:released', { id: req.params.id, status: 'pending' });
     }
 
     logAction(
@@ -442,9 +443,11 @@ router.post(
       const io = _io(req);
       if (io) {
         emitToAll(io, 'question:answered', {
-          questionId: req.params.id,
-          answerId:   answer.id,
-          rabbiId:    req.rabbi.id,
+          id:          req.params.id,
+          answerId:    answer.id,
+          rabbiId:     req.rabbi.id,
+          status:      'answered',
+          answered_at: new Date().toISOString(),
         });
       }
 

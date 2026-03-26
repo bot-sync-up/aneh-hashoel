@@ -829,7 +829,7 @@ router.get('/action', async (req, res) => {
 
         const io = res.app.get('io');
         if (io) {
-          io.emit('question:released', { questionId, rabbiId });
+          io.emit('question:released', { id: questionId, status: 'pending' });
         }
       }
     }

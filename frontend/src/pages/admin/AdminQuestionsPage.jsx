@@ -179,6 +179,7 @@ export default function AdminQuestionsPage() {
   const [assignModal, setAssignModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [bulkAssignModal, setBulkAssignModal] = useState(false);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -313,6 +314,23 @@ export default function AdminQuestionsPage() {
     }
   };
 
+  const handleBulkAssignSave = async (rabbiId) => {
+    setBulkAssignModal(false);
+    const rabbi = rabbis.find(r => String(r.id) === String(rabbiId));
+    try {
+      await Promise.all([...selected].map((id) =>
+        patch(`/admin/questions/${id}`, { assigned_rabbi_id: rabbiId, status: 'in_process' })
+      ));
+      setQuestions((prev) => prev.map((q) =>
+        selected.has(q.id)
+          ? { ...q, status: 'in_process', assignedRabbi: rabbi?.name ?? '—' }
+          : q
+      ));
+      setSelected(new Set());
+      showToast(`${selected.size} שאלות הועברו ל${rabbi?.name ?? 'רב'}`);
+    } catch { showToast('שגיאה בהעברה לרב', 'error'); }
+  };
+
   const handleBulkDelete = async () => {
     setDeleteLoading(true);
     try {
@@ -339,6 +357,9 @@ export default function AdminQuestionsPage() {
       )}
       {assignModal && (
         <AssignModal question={assignModal} rabbis={rabbis} onClose={() => setAssignModal(null)} onSave={handleAssignSave} />
+      )}
+      {bulkAssignModal && (
+        <AssignModal question={{ id: 'bulk' }} rabbis={rabbis} onClose={() => setBulkAssignModal(false)} onSave={handleBulkAssignSave} />
       )}
       {deleteModal && (
         <ConfirmDeleteModal
@@ -419,7 +440,7 @@ export default function AdminQuestionsPage() {
           <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBulkRelease}>
             שחרר נבחרים
           </Button>
-          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => {}}>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => setBulkAssignModal(true)}>
             העבר לרב
           </Button>
           <Button variant="danger" size="sm" onClick={handleBulkHide}>

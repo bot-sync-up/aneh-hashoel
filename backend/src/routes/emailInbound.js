@@ -157,7 +157,7 @@ router.post('/inbound', async (req, res) => {
           try {
             const io = router._io || (req.app && req.app.get('io'));
             if (io) {
-              io.emit('question:claimed', { questionId, rabbiId: rabbi.id });
+              io.emit('question:claimed', { id: questionId, assigned_rabbi: rabbi.id, status: 'in_process' });
             }
           } catch (e) {
             console.warn('[emailInbound] claim: socket error:', e.message);
@@ -208,7 +208,7 @@ router.post('/inbound', async (req, res) => {
             }
             try {
               const io = router._io || (req.app && req.app.get('io'));
-              if (io) io.emit('question:released', { questionId });
+              if (io) io.emit('question:released', { id: questionId, status: 'pending' });
             } catch (e) { /* ignore */ }
           });
         } else {
@@ -339,7 +339,7 @@ router.post('/inbound', async (req, res) => {
         const io = router._io || (req.app && req.app.get('io'));
         if (io) {
           io.emit('question:answered', {
-            questionId, answerId, rabbiId: rabbi.id, source: 'email',
+            id: questionId, answerId, rabbiId: rabbi.id, status: 'answered', answered_at: new Date().toISOString(), source: 'email',
           });
         }
       } catch (err) {

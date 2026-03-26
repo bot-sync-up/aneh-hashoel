@@ -18,7 +18,7 @@ import {
   Send,
   Paperclip,
 } from 'lucide-react';
-import PageHeader, { Breadcrumb } from '../components/layout/PageHeader';
+import PageHeader from '../components/layout/PageHeader';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -43,7 +43,7 @@ import {
 export default function QuestionDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { rabbi } = useAuth();
+  const { rabbi, isAdmin } = useAuth();
   const { on } = useSocket();
 
   const [question, setQuestion] = useState(null);
@@ -246,7 +246,6 @@ export default function QuestionDetailPage() {
   const assignedRabbiId = assigned_rabbi?.id ?? question?.assigned_rabbi_id;
   const assignedRabbiName = assigned_rabbi?.name ?? assigned_rabbi?.display_name ?? question?.rabbi_name;
   const isMe = rabbi && assignedRabbiId && String(assignedRabbiId) === String(rabbi?.id);
-  const isAdmin = rabbi?.role === 'admin';
   const isPending = status === 'pending';
   const isInProcess = status === 'in_process';
   const isAnswered = status === 'answered';
@@ -1066,6 +1065,11 @@ function PrivateNotesEditor({ questionId, initialNotes, onSaved }) {
   const [notes, setNotes] = useState(initialNotes || '');
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
+
+  // Sync local state when initialNotes changes (e.g., after refetch)
+  useEffect(() => {
+    setNotes(initialNotes || '');
+  }, [initialNotes]);
 
   const handleSave = async () => {
     setSaving(true);

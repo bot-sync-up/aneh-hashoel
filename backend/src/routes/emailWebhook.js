@@ -213,7 +213,7 @@ function triggerPostProcessing({ questionId, answerId, rabbiId, app }) {
     try {
       const io = (app && app.get('io')) || null;
       if (io) {
-        io.emit('question:answered', { questionId, answerId, rabbiId, source: 'email' });
+        io.emit('question:answered', { id: questionId, answerId, rabbiId, status: 'answered', answered_at: new Date().toISOString(), source: 'email' });
       }
     } catch (err) {
       console.error('[emailWebhook] שגיאה בפרסום Socket.io event:', err.message);

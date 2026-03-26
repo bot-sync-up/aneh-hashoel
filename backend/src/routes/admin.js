@@ -1259,6 +1259,39 @@ router.patch('/categories/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.patch('/categories/:id/reorder', requireAdmin, async (req, res) => {
+  try {
+    const { targetId, position } = req.body;
+    const sourceId = parseInt(req.params.id, 10);
+    const tgtId = parseInt(targetId, 10);
+    if (!Number.isFinite(sourceId) || !Number.isFinite(tgtId)) {
+      return res.status(400).json({ error: 'מזהי קטגוריה אינם חוקיים' });
+    }
+    // Get current sort_order of both categories
+    const { rows } = await dbQuery(
+      `SELECT id, sort_order FROM categories WHERE id IN ($1, $2)`,
+      [sourceId, tgtId]
+    );
+    if (rows.length < 2) {
+      return res.status(404).json({ error: 'אחת הקטגוריות לא נמצאה' });
+    }
+    const source = rows.find(r => r.id === sourceId);
+    const target = rows.find(r => r.id === tgtId);
+    // Swap sort_order values
+    await dbQuery(
+      `UPDATE categories SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+      [target.sort_order, sourceId]
+    );
+    await dbQuery(
+      `UPDATE categories SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+      [source.sort_order, tgtId]
+    );
+    return res.json({ ok: true, message: 'הסדר עודכן בהצלחה' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/categories/:id', requireAdmin, async (req, res) => {
   try {
     await dbQuery('DELETE FROM categories WHERE id = $1', [req.params.id]);

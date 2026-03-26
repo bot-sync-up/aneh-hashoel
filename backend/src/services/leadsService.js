@@ -288,7 +288,7 @@ async function getLeadById(id) {
   // Fetch question history for this lead
   // The questions table uses `asker_email` column for encrypted email
   const { rows: questions } = await query(
-    `SELECT id, title, status, category_id, thank_count, is_urgent, created_at, answered_at
+    `SELECT id, title, status, category_id, thank_count, urgency, created_at, answered_at
      FROM   questions
      WHERE  asker_email = $1
      ORDER  BY created_at DESC

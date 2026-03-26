@@ -242,14 +242,14 @@ async function notifyAskerNewAnswer(questionId) {
   `;
 
   const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];
-  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons);
+  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons, { systemName: 'מערכת שאל את הרב' });
 
   // Send email
   if (email) {
     try {
       await sendEmail(
         email,
-        'התשובה לשאלתך מוכנה — שאל את הרב',
+        'התשובה לשאלתך מוכנה — מערכת שאל את הרב',
         html
       );
     } catch (err) {
@@ -444,7 +444,7 @@ async function notifyAskerQuestionReceived(question) {
 
   const { createEmailHTML } = require('../templates/emailBase');
 
-  const subject = 'קיבלנו את שאלתך — שאל את הרב';
+  const subject = 'קיבלנו את שאלתך — מערכת שאל את הרב';
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${question.asker_name || 'שואל יקר'},</p>
     <p style="margin: 0 0 16px; font-size: 15px;">
@@ -458,7 +458,7 @@ async function notifyAskerQuestionReceived(question) {
       נשלח לך מייל נוסף כאשר תתקבל תשובה מהרב.
     </p>
   `;
-  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent);
+  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], { systemName: 'מערכת שאל את הרב' });
 
   await sendEmail(email, subject, html);
 }

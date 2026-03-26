@@ -54,7 +54,8 @@ function renderButton(button) {
  *   מערך כפתורי פעולה אופציונלי
  * @returns {string}  HTML מלא של האימייל
  */
-function createEmailHTML(title, bodyContent, actionButtons = []) {
+function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
+  const systemName = options.systemName || 'ענה את השואל';
   const buttonsHTML = actionButtons.length > 0
     ? `
       <div style="
@@ -154,7 +155,7 @@ function createEmailHTML(title, bodyContent, actionButtons = []) {
                 font-weight: 700;
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.3;
-              ">ענה את השואל</h1>
+              ">${systemName}</h1>
             </td>
           </tr>
 
@@ -208,7 +209,7 @@ function createEmailHTML(title, bodyContent, actionButtons = []) {
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.5;
               ">
-                מייל זה נשלח ממערכת "ענה את השואל"
+                מייל זה נשלח ממערכת "${systemName}"
               </p>
               <p style="
                 margin: 0;

@@ -263,7 +263,8 @@ async function notifyAskerNewAnswer(questionId) {
       await sendEmail(
         email,
         'התשובה לשאלתך מוכנה — מערכת שאל את הרב',
-        html
+        html,
+        { fromName: 'מערכת שאל את הרב' }
       );
     } catch (err) {
       console.error(`[askerNotification] שגיאה בשליחת אימייל לשואל (שאלה ${questionId}):`, err.message);
@@ -473,7 +474,7 @@ async function notifyAskerQuestionReceived(question) {
   `;
   const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], { systemName: 'מערכת שאל את הרב' });
 
-  await sendEmail(email, subject, html);
+  await sendEmail(email, subject, html, { fromName: 'מערכת שאל את הרב' });
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────

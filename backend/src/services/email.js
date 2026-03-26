@@ -198,8 +198,13 @@ function mailtoLink(subject, body = '') {
  */
 async function sendEmail(to, subject, htmlContent, options = {}) {
   try {
+    // Support custom sender name via options.fromName
+    const from = options.fromName
+      ? `"${options.fromName}" <${process.env.EMAIL_FROM_ADDRESS || 'noreply@aneh-hashoel.co.il'}>`
+      : fromAddress();
+
     const mailOptions = {
-      from:    fromAddress(),
+      from,
       to,
       subject,
       html:    htmlContent,

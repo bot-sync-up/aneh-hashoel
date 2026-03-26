@@ -209,7 +209,7 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.5;
               ">
-                מייל זה נשלח ממערכת "${systemName}"
+                מייל זה נשלח ממערכת ${systemName}
               </p>
               <p style="
                 margin: 0;

@@ -169,13 +169,15 @@ async function getQuestionById(id, requestingRabbiId = null) {
             a.is_private AS answer_is_private,
             a.rabbi_id   AS answer_rabbi_id,
             a.created_at AS answer_created_at,
-            a.updated_at AS answer_updated_at
+            a.updated_at AS answer_updated_at,
+            pn.content   AS private_notes
      FROM   questions q
-     LEFT JOIN rabbis     r ON r.id = q.assigned_rabbi_id
-     LEFT JOIN categories c ON c.id = q.category_id
-     LEFT JOIN answers    a ON a.question_id = q.id
+     LEFT JOIN rabbis        r  ON r.id  = q.assigned_rabbi_id
+     LEFT JOIN categories    c  ON c.id  = q.category_id
+     LEFT JOIN answers       a  ON a.question_id = q.id
+     LEFT JOIN private_notes pn ON pn.question_id = q.id AND pn.rabbi_id = $2
      WHERE  q.id = $1`,
-    [id]
+    [id, requestingRabbiId]
   );
 
   if (result.rows.length === 0) {

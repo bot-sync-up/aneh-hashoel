@@ -57,7 +57,7 @@ async function upsertLead(question) {
     asker_phone_encrypted,      // encrypted phone for DB storage
     asker_name,
     category_id,
-    is_urgent,
+    urgency,                    // questions table uses 'urgency' varchar, not 'is_urgent' boolean
     thank_count = 0,
     created_at,
   } = question;
@@ -74,14 +74,15 @@ async function upsertLead(question) {
     // Aggregate stats for this asker across all questions
     let question_count = 1;
     let total_thanks = 0;
-    let has_urgent = is_urgent || false;
+    // The questions table has 'urgency' (varchar: 'normal'|'urgent'), not 'is_urgent' (boolean)
+    let has_urgent = (urgency === 'urgent' || urgency === 'critical' || urgency === 'high') || false;
 
     if (asker_email_encrypted) {
       // The questions table stores encrypted email in the `asker_email` column
       const { rows: stats } = await query(
         `SELECT COUNT(*)::int          AS question_count,
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
-                bool_or(is_urgent)     AS has_urgent
+                bool_or(urgency IN ('urgent','critical','high')) AS has_urgent
          FROM   questions
          WHERE  asker_email = $1`,
         [asker_email_encrypted]
@@ -94,7 +95,7 @@ async function upsertLead(question) {
       const { rows: stats } = await query(
         `SELECT COUNT(*)::int          AS question_count,
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
-                bool_or(is_urgent)     AS has_urgent
+                bool_or(urgency IN ('urgent','critical','high')) AS has_urgent
          FROM   questions
          WHERE  asker_name = $1 AND asker_email IS NULL`,
         [asker_name]
@@ -154,7 +155,7 @@ async function syncLeadsFromQuestions() {
     `SELECT id, asker_name,
             asker_email  AS asker_email_col,
             asker_phone  AS asker_phone_col,
-            category_id, is_urgent, thank_count, created_at
+            category_id, urgency, thank_count, created_at
      FROM questions
      ORDER BY created_at ASC`
   );

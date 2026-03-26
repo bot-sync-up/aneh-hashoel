@@ -171,6 +171,7 @@ export default function AdminQuestionsPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [selected, setSelected] = useState(new Set());
+  const [sortBy, setSortBy] = useState('created_at_desc');
   const [exportLoading, setExportLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -220,6 +221,18 @@ export default function AdminQuestionsPage() {
     const matchCat = categoryFilter === 'all' || String(q.categoryId) === categoryFilter;
     const matchUrgent = !urgentOnly || q.isUrgent;
     return matchSearch && matchStatus && matchCat && matchUrgent;
+  }).sort((a, b) => {
+    if (sortBy === 'created_at_asc') {
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    }
+    if (sortBy === 'urgent_first') {
+      const aUrgent = a.isUrgent ? 0 : 1;
+      const bUrgent = b.isUrgent ? 0 : 1;
+      if (aUrgent !== bUrgent) return aUrgent - bUrgent;
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    }
+    // default: created_at_desc
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
 
   const allSelected = filtered.length > 0 && filtered.every((q) => selected.has(q.id));
@@ -421,6 +434,15 @@ export default function AdminQuestionsPage() {
         >
           <option value="all">כל הקטגוריות</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="h-10 px-3 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+        >
+          <option value="created_at_desc">חדשות ראשון</option>
+          <option value="created_at_asc">ישנות ראשון</option>
+          <option value="urgent_first">דחוף ראשון</option>
         </select>
         <label className="flex items-center gap-2 text-sm font-heebo text-[var(--text-primary)] cursor-pointer select-none">
           <input

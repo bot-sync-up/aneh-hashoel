@@ -54,24 +54,52 @@ router.post('/contact', authenticate, async (req, res, next) => {
       [requestId, rabbiId, message.trim()]
     );
 
-    // Fire-and-forget: send email to admin
+    // Fire-and-forget: send email notification to all admins
     setImmediate(async () => {
       try {
         const { sendEmail } = require('../services/email');
         const { createEmailHTML } = require('../templates/emailBase');
 
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (!adminEmail) return;
-
         const rabbiName = req.rabbi.name || 'רב';
+        const subjectLine = `פנייה חדשה מ-${rabbiName}: ${subject.trim()}`;
         const html = createEmailHTML({
           title: `פנייה חדשה מ${rabbiName}`,
           body: `<p><strong>נושא:</strong> ${subject.trim()}</p><p>${message.trim().replace(/\n/g, '<br>')}</p>`,
           ctaText: 'צפה בפניות',
-          ctaUrl: `${process.env.APP_URL || 'http://localhost:3000'}/admin/support`,
+          ctaUrl: `${process.env.APP_URL || 'https://aneh.syncup.co.il'}/admin/support`,
         });
 
-        await sendEmail(adminEmail, `פנייה חדשה: ${subject.trim()}`, html);
+        // Collect all admin email addresses
+        const adminEmails = new Set();
+
+        // 1. From environment variable
+        const envAdmin = process.env.ADMIN_EMAIL;
+        if (envAdmin) adminEmails.add(envAdmin);
+
+        // 2. From database — all rabbis with role='admin'
+        try {
+          const { rows: adminRows } = await dbQuery(
+            `SELECT email FROM rabbis WHERE role = 'admin' AND is_active = true`
+          );
+          for (const row of adminRows) {
+            if (row.email) adminEmails.add(row.email);
+          }
+        } catch (dbErr) {
+          console.warn('[support] Failed to fetch admin emails from DB:', dbErr.message);
+        }
+
+        if (adminEmails.size === 0) {
+          console.warn('[support] No admin emails found — skipping notification');
+          return;
+        }
+
+        // Send to each admin
+        const sendPromises = [...adminEmails].map((email) =>
+          sendEmail(email, subjectLine, html).catch((e) =>
+            console.error(`[support] Failed to notify admin ${email}:`, e.message)
+          )
+        );
+        await Promise.all(sendPromises);
       } catch (err) {
         console.error('[support] Failed to send admin notification:', err.message);
       }

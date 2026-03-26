@@ -6,7 +6,7 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
-import { RefreshCw, Inbox, Pencil } from 'lucide-react';
+import { RefreshCw, Inbox, Pencil, LayoutGrid, List } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import QuestionCard from '../components/questions/QuestionCard';
 import QuestionFilters from '../components/questions/QuestionFilters';
@@ -18,7 +18,8 @@ import Button from '../components/ui/Button';
 import { get, post } from '../lib/api';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
-import { truncate } from '../lib/utils';
+import Badge from '../components/ui/Badge';
+import { truncate, formatRelative } from '../lib/utils';
 
 // Status is always 'pending' on this page — not part of user-controlled filters
 const DEFAULT_FILTERS = {
@@ -32,6 +33,7 @@ const DEFAULT_FILTERS = {
 };
 
 const PAGE_SIZE = 20;
+const VIEW_MODE_KEY = 'questions_view_mode';
 
 export default function QuestionsPage() {
   const { on } = useSocket();
@@ -40,6 +42,10 @@ export default function QuestionsPage() {
 
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem(VIEW_MODE_KEY) || 'cards'; }
+    catch { return 'cards'; }
+  });
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
@@ -195,6 +201,12 @@ export default function QuestionsPage() {
     setFilters(DEFAULT_FILTERS);
   };
 
+  const toggleViewMode = () => {
+    const next = viewMode === 'cards' ? 'table' : 'cards';
+    setViewMode(next);
+    try { localStorage.setItem(VIEW_MODE_KEY, next); } catch {}
+  };
+
   // ── Claim / Release callbacks ────────────────────────────────────────────
 
   const handleClaimed = (updatedQuestion) => {
@@ -223,15 +235,25 @@ export default function QuestionsPage() {
             : 'שאלות הממתינות לטיפול'
         }
         actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<RefreshCw size={14} />}
-            onClick={() => fetchPage({ ...filters, page: 1 })}
-            disabled={loading}
-          >
-            רענן
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleViewMode}
+              className="flex items-center justify-center w-9 h-9 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+              aria-label={viewMode === 'cards' ? 'תצוגת טבלה' : 'תצוגת כרטיסים'}
+              title={viewMode === 'cards' ? 'תצוגת טבלה' : 'תצוגת כרטיסים'}
+            >
+              {viewMode === 'cards' ? <List size={16} /> : <LayoutGrid size={16} />}
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<RefreshCw size={14} />}
+              onClick={() => fetchPage({ ...filters, page: 1 })}
+              disabled={loading}
+            >
+              רענן
+            </Button>
+          </div>
         }
       />
 
@@ -279,13 +301,14 @@ export default function QuestionsPage() {
         )}
 
         {/* Question cards grid */}
-        {!loading && !error && questions.length > 0 && (
+        {!loading && !error && questions.length > 0 && viewMode === 'cards' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {questions.map((question) => (
               <QuestionCard
                 key={question.id}
                 question={question}
                 showActions
+                showContentPreview
                 isNew={newIds.has(question.id)}
                 onClaim={setClaimTarget}
                 onRelease={setReleaseTarget}
@@ -293,6 +316,66 @@ export default function QuestionsPage() {
                 onDiscussion={setDiscussionTarget}
               />
             ))}
+          </div>
+        )}
+
+        {/* Question table view */}
+        {!loading && !error && questions.length > 0 && viewMode === 'table' && (
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm font-heebo">
+                <thead>
+                  <tr className="bg-[var(--bg-surface-raised)] text-[var(--text-secondary)]">
+                    <th className="px-3 py-3 text-right font-semibold w-16">#</th>
+                    <th className="px-3 py-3 text-right font-semibold">כותרת</th>
+                    <th className="px-3 py-3 text-right font-semibold">קטגוריה</th>
+                    <th className="px-3 py-3 text-right font-semibold">סטטוס</th>
+                    <th className="px-3 py-3 text-right font-semibold">תאריך</th>
+                    <th className="px-3 py-3 text-right font-semibold">פעולות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {questions.map((question, index) => (
+                    <tr
+                      key={question.id}
+                      className={clsx(
+                        'border-t border-[var(--border-default)] transition-colors hover:bg-[var(--bg-surface-raised)] cursor-pointer',
+                        newIds.has(question.id) && 'bg-red-50/30 dark:bg-red-900/10'
+                      )}
+                      onClick={() => navigate(`/questions/${question.id}`)}
+                    >
+                      <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{index + 1}</td>
+                      <td className="px-3 py-3 max-w-[320px]">
+                        <span className="text-[var(--text-primary)] font-medium line-clamp-1">{question.title}</span>
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text-secondary)]">
+                        {question.category_name || question.category || '—'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge status={question.status} withDot size="xs">
+                          {question.status === 'pending' ? 'ממתין' : question.status === 'in_process' ? 'בטיפול' : question.status}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">
+                        {formatRelative(question.created_at)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="primary" size="sm" leftIcon={<Pencil size={12} />} onClick={() => setAnswerTarget(question)}>
+                            ענה
+                          </Button>
+                          {question.status === 'pending' && (
+                            <Button variant="secondary" size="sm" onClick={() => setClaimTarget(question)} className="bg-brand-gold hover:bg-brand-gold-dark text-white">
+                              תפוס
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

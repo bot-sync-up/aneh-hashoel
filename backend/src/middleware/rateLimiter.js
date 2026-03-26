@@ -85,12 +85,12 @@ const apiLimiter = rateLimit({
 
 /**
  * Limiter for authentication endpoints.
- * 30 requests per 15 minutes per IP.
+ * 100 requests per 15 minutes per IP.
  * Covers: POST /auth/login, POST /auth/forgot-password, POST /auth/resend-otp.
  */
 const authLimiter = rateLimit({
   windowMs:        15 * 60 * 1000, // 15 minutes
-  max:             30,
+  max:             100,
   standardHeaders: true,
   legacyHeaders:   false,
   keyGenerator:    clientIp,
@@ -100,8 +100,21 @@ const authLimiter = rateLimit({
   },
 });
 
-// loginLimiter is an alias for authLimiter (used by auth.js)
-const loginLimiter = authLimiter;
+/**
+ * Limiter specifically for login endpoints.
+ * 50 requests per 15 minutes per IP.
+ */
+const loginLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000, // 15 minutes
+  max:             50,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator:    clientIp,
+  message: {
+    ok:    false,
+    error: 'יותר מדי ניסיונות כניסה. נסה שוב בעוד 15 דקות.',
+  },
+});
 
 // ─── claimLimiter ─────────────────────────────────────────────────────────────
 

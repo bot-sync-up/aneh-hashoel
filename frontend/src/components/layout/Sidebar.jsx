@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import logoSrc from '../../assets/logo.png';
 import { clsx } from 'clsx';
 import {
@@ -90,6 +90,7 @@ function Sidebar({ notificationCount = 0 }) {
   const { isDark, toggleTheme } = useTheme();
   const { on } = useSocket();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [pendingCount, setPendingCount] = useState(0);
   const [myOpenCount, setMyOpenCount] = useState(0);
@@ -173,7 +174,12 @@ function Sidebar({ notificationCount = 0 }) {
       >
         {/* Logo + text (expanded) */}
         {!collapsed && (
-          <div className="flex flex-col items-center gap-2 w-full">
+          <div
+            className="flex flex-col items-center gap-2 w-full cursor-pointer"
+            onClick={() => navigate('/')}
+            role="button"
+            aria-label="חזור לדשבורד"
+          >
             <div className="w-full rounded-xl bg-white p-2 shadow-md" style={{aspectRatio: '3/1'}}>
               <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
             </div>
@@ -190,7 +196,12 @@ function Sidebar({ notificationCount = 0 }) {
 
         {/* Logo only (collapsed) */}
         {collapsed && (
-          <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-md flex-shrink-0">
+          <div
+            className="w-10 h-10 rounded-xl bg-white p-1 shadow-md flex-shrink-0 cursor-pointer"
+            onClick={() => navigate('/')}
+            role="button"
+            aria-label="חזור לדשבורד"
+          >
             <img src={logoSrc} alt="ענה את השואל" className="w-full h-full object-contain" />
           </div>
         )}

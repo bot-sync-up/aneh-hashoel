@@ -31,9 +31,18 @@ import { formatRelative, getCategoryLabel, colorFromCategory, truncate } from '.
  *   onDiscussion  — callback when "דיון" is clicked; receives question
  *   isNew         — if true, shows "חדש!" flash animation
  */
+/**
+ * Strip HTML tags and return plain text.
+ */
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+}
+
 function QuestionCard({
   question,
   showActions = true,
+  showContentPreview = false,
   onClaim,
   onRelease,
   onAnswer,
@@ -180,6 +189,13 @@ function QuestionCard({
         <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy transition-colors">
           {truncatedTitle}
         </h3>
+
+        {/* Content preview */}
+        {showContentPreview && content && (
+          <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed mb-2 line-clamp-2">
+            {truncate(stripHtml(content), 100)}
+          </p>
+        )}
 
         {/* Private notes snippet (only shown when rabbi owns it) */}
         {private_notes && isMe && (

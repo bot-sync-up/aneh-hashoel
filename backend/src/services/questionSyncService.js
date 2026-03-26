@@ -219,8 +219,12 @@ async function syncPendingQuestions(io = null) {
     // ── CRM: upsert lead for this asker (fire-and-forget) ─────────────────
     upsertLead({
       ...question,
-      asker_email: question.asker_email || null, // already decrypted in createFromWebhook
-      asker_phone: question.asker_phone || null,
+      // question.asker_email is the *encrypted* value from the DB;
+      // pass it as asker_email_encrypted, and use the original plaintext from WP.
+      asker_email_encrypted: question.asker_email,
+      asker_phone_encrypted: question.asker_phone,
+      asker_email: questionData.asker_email || null,
+      asker_phone: questionData.asker_phone || null,
     }).catch((err) => {
       console.error(`[questionSync] upsertLead error (questionId=${question.id}):`, err.message);
     });

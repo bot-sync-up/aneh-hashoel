@@ -330,6 +330,8 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
           const { upsertLead } = require('../services/leadsService');
           await upsertLead({
             ...question,
+            asker_email_encrypted: question.asker_email,
+            asker_phone_encrypted: question.asker_phone,
             asker_email: email,
             asker_phone: phone,
           });

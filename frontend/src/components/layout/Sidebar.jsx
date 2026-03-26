@@ -93,6 +93,7 @@ function Sidebar({ notificationCount = 0 }) {
 
   const [pendingCount, setPendingCount] = useState(0);
   const [myOpenCount, setMyOpenCount] = useState(0);
+  const [unreadDiscussionsCount, setUnreadDiscussionsCount] = useState(0);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -102,14 +103,25 @@ function Sidebar({ notificationCount = 0 }) {
     } catch {}
   }, []);
 
+  const fetchDiscussionCounts = useCallback(async () => {
+    try {
+      const data = await get('/discussions');
+      const discussions = Array.isArray(data) ? data : data?.discussions ?? [];
+      const totalUnread = discussions.reduce((sum, d) => sum + (d.unread_count || 0), 0);
+      setUnreadDiscussionsCount(totalUnread);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchCounts();
+    fetchDiscussionCounts();
     const offNew      = on('question:new',      fetchCounts);
     const offClaimed  = on('question:claimed',  fetchCounts);
     const offReleased = on('question:released', fetchCounts);
     const offAnswered = on('question:answered', fetchCounts);
-    return () => { offNew(); offClaimed(); offReleased(); offAnswered(); };
-  }, [fetchCounts, on]);
+    const offDiscMsg  = on('discussion:message', fetchDiscussionCounts);
+    return () => { offNew(); offClaimed(); offReleased(); offAnswered(); offDiscMsg(); };
+  }, [fetchCounts, fetchDiscussionCounts, on]);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -216,6 +228,7 @@ function Sidebar({ notificationCount = 0 }) {
               notificationCount={
                 item.to === '/my-questions'  ? myOpenCount  :
                 item.to === '/questions'     ? pendingCount :
+                item.to === '/discussions'   ? unreadDiscussionsCount :
                 item.badge                  ? notificationCount : 0
               }
             />
@@ -332,7 +345,7 @@ function NavItem({ item, collapsed, notificationCount = 0 }) {
   const Icon = item.icon;
   const hasNotif = notificationCount > 0;
   // notification items use red; question count items use gold
-  const isQCount = item.to === '/my-questions' || item.to === '/questions';
+  const isQCount = item.to === '/my-questions' || item.to === '/questions' || item.to === '/discussions';
   const badgeBg = isQCount ? 'bg-brand-gold text-brand-navy' : 'bg-red-500 text-white';
 
   const linkContent = (

@@ -108,7 +108,7 @@ passport.deserializeUser((user, done) => done(null, user));
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function _frontendUrl() {
-  return (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+  return (process.env.FRONTEND_URL || process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '');
 }
 
 /**
@@ -159,7 +159,7 @@ function _setRefreshCookie(res, token) {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days in ms
     path:     '/api/auth',
   });
@@ -173,7 +173,7 @@ function _clearRefreshCookie(res) {
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path:     '/api/auth',
   });
 }
@@ -363,7 +363,12 @@ router.get(
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  (req, res, next) => {
+    passport.authenticate('google', {
+      session: false,
+      failureRedirect: `${_frontendUrl()}/login`,
+    })(req, res, next);
+  },
   async (req, res, next) => {
     try {
       const googleProfile = req.user;

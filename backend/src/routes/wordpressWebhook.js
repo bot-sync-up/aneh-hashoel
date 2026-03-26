@@ -242,6 +242,11 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
       const { upsertLead } = require('../services/leadsService');
       await upsertLead({
         ...question,
+        // question.asker_email contains the encrypted value from DB;
+        // map it to asker_email_encrypted so upsertLead can store it,
+        // and pass the plaintext as asker_email for hash generation.
+        asker_email_encrypted: question.asker_email,
+        asker_phone_encrypted: question.asker_phone,
         asker_email: payload.askerEmail,
         asker_phone: payload.askerPhone,
       });

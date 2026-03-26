@@ -42,6 +42,8 @@ const PAGE_SIZE_MAX     = 100;
 const VALID_ROLES       = new Set(['rabbi', 'admin', 'customer_service']);
 const VALID_STATUSES    = new Set(['active', 'inactive']);
 
+const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || '7156775@gmail.com').toLowerCase().trim();
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function _parseLimit(raw) {
@@ -510,6 +512,17 @@ router.put('/:id/status', async (req, res, next) => {
       return res.status(400).json({ error: 'לא ניתן לבטל את הפעילות של החשבון הנוכחי' });
     }
 
+    // Super admin protection — cannot deactivate the primary system admin
+    if (status === 'inactive') {
+      const { rows: targetRows } = await query(
+        `SELECT email FROM rabbis WHERE id = $1`,
+        [targetId]
+      );
+      if (targetRows[0]?.email && targetRows[0].email.toLowerCase().trim() === SUPER_ADMIN_EMAIL) {
+        return res.status(400).json({ error: 'לא ניתן להשבית את מנהל המערכת הראשי' });
+      }
+    }
+
     const { rows } = await query(
       `UPDATE rabbis
        SET    status     = $1,
@@ -582,6 +595,11 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'רב לא נמצא' });
     }
     const targetRabbi = existing[0];
+
+    // Super admin protection — cannot delete the primary system admin
+    if (targetRabbi.email && targetRabbi.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL) {
+      return res.status(400).json({ error: 'לא ניתן למחוק את מנהל המערכת הראשי' });
+    }
 
     // Check for in-process questions
     const { rows: inProcess } = await query(
@@ -671,13 +689,18 @@ router.put('/:id/role', async (req, res, next) => {
     }
 
     const { rows: existing } = await query(
-      `SELECT id, name, role FROM rabbis WHERE id = $1 AND status <> 'deleted'`,
+      `SELECT id, name, role, email FROM rabbis WHERE id = $1 AND status <> 'deleted'`,
       [targetId]
     );
     if (!existing[0]) {
       return res.status(404).json({ error: 'רב לא נמצא' });
     }
     const oldRole = existing[0].role;
+
+    // Super admin protection — cannot demote the primary system admin
+    if (role !== 'admin' && existing[0].email && existing[0].email.toLowerCase().trim() === SUPER_ADMIN_EMAIL) {
+      return res.status(400).json({ error: 'לא ניתן לשנות את תפקיד מנהל המערכת הראשי' });
+    }
 
     const { rows } = await query(
       `UPDATE rabbis

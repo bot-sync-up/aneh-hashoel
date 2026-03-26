@@ -635,15 +635,15 @@ export default function RabbisAdminPage() {
                         )} />
                         <span className={clsx(
                           'text-sm font-heebo',
-                          rabbi.isActive ? 'text-emerald-700' : 'text-[var(--text-muted)]'
+                          rabbi.isActive ? 'text-emerald-700' : 'text-red-600'
                         )}>
-                          {rabbi.isActive ? 'מופעל' : 'מושבת'}
+                          {rabbi.isActive ? 'מופעל' : 'מושבת \u2014 לא יכול להתחבר'}
                         </span>
                         <div className="absolute bottom-full right-0 mb-1 hidden group-hover:block z-10 pointer-events-none">
-                          <div className="bg-gray-800 text-white text-xs rounded-lg px-3 py-2 font-heebo whitespace-nowrap shadow-lg">
+                          <div className="bg-gray-800 text-white text-xs rounded-lg px-3 py-2 font-heebo whitespace-nowrap shadow-lg max-w-xs">
                             {rabbi.isActive
                               ? 'הרב יכול להתחבר, לקבל שאלות ולהופיע בשידורים'
-                              : 'הרב לא יכול להתחבר ולא מקבל שאלות חדשות'}
+                              : 'חשבון מושבת: הרב לא יכול להתחבר למערכת, לא מקבל שאלות חדשות ולא מופיע ברשימת הרבנים הפעילים. ניתן להפעיל מחדש דרך תפריט הפעולות.'}
                           </div>
                         </div>
                       </div>

@@ -51,10 +51,10 @@ function _isHot(questionCount, thankCount, hasUrgent) {
 async function upsertLead(question) {
   const {
     id:           questionId,
-    asker_email:  plainEmail,   // already decrypted by caller
-    asker_phone:  plainPhone,
-    asker_email_encrypted,
-    asker_phone_encrypted,
+    asker_email:  plainEmail,   // plaintext email (passed explicitly by caller)
+    asker_phone:  plainPhone,   // plaintext phone (passed explicitly by caller)
+    asker_email_encrypted,      // encrypted email for DB storage
+    asker_phone_encrypted,      // encrypted phone for DB storage
     asker_name,
     category_id,
     is_urgent,
@@ -77,12 +77,13 @@ async function upsertLead(question) {
     let has_urgent = is_urgent || false;
 
     if (asker_email_encrypted) {
+      // The questions table stores encrypted email in the `asker_email` column
       const { rows: stats } = await query(
         `SELECT COUNT(*)::int          AS question_count,
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
                 bool_or(is_urgent)     AS has_urgent
          FROM   questions
-         WHERE  asker_email_encrypted = $1`,
+         WHERE  asker_email = $1`,
         [asker_email_encrypted]
       );
       question_count = stats[0]?.question_count || 1;
@@ -95,7 +96,7 @@ async function upsertLead(question) {
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
                 bool_or(is_urgent)     AS has_urgent
          FROM   questions
-         WHERE  asker_name = $1 AND asker_email_encrypted IS NULL`,
+         WHERE  asker_name = $1 AND asker_email IS NULL`,
         [asker_name]
       );
       question_count = stats[0]?.question_count || 1;
@@ -146,8 +147,13 @@ async function upsertLead(question) {
  * @returns {Promise<{ synced: number, skipped: number }>}
  */
 async function syncLeadsFromQuestions() {
+  // The questions table may have encrypted email/phone in either
+  // `asker_email_encrypted` (original schema) or `asker_email` (fix migration).
+  // Read both and use whichever is populated.
   const { rows } = await query(
-    `SELECT id, asker_name, asker_email_encrypted, asker_phone_encrypted,
+    `SELECT id, asker_name,
+            asker_email  AS asker_email_col,
+            asker_phone  AS asker_phone_col,
             category_id, is_urgent, thank_count, created_at
      FROM questions
      ORDER BY created_at ASC`
@@ -157,16 +163,19 @@ async function syncLeadsFromQuestions() {
   let skipped = 0;
 
   for (const q of rows) {
+    const encryptedEmail = q.asker_email_col || null;
+    const encryptedPhone = q.asker_phone_col || null;
+
     // Try to decrypt email for hash
     let plainEmail = null;
     try {
-      plainEmail = decryptField(q.asker_email_encrypted) || null;
+      plainEmail = decryptField(encryptedEmail) || null;
     } catch { /* ignore */ }
 
-    const lead = {
-      ...q,
-      asker_email: plainEmail,
-    };
+    let plainPhone = null;
+    try {
+      plainPhone = decryptField(encryptedPhone) || null;
+    } catch { /* ignore */ }
 
     // Skip if no email AND no name
     if (!plainEmail && !q.asker_name) {
@@ -174,7 +183,13 @@ async function syncLeadsFromQuestions() {
       continue;
     }
 
-    await upsertLead(lead);
+    await upsertLead({
+      ...q,
+      asker_email: plainEmail,
+      asker_phone: plainPhone,
+      asker_email_encrypted: encryptedEmail,
+      asker_phone_encrypted: encryptedPhone,
+    });
     synced++;
   }
 
@@ -270,10 +285,11 @@ async function getLeadById(id) {
   };
 
   // Fetch question history for this lead
+  // The questions table uses `asker_email` column for encrypted email
   const { rows: questions } = await query(
     `SELECT id, title, status, category_id, thank_count, is_urgent, created_at, answered_at
      FROM   questions
-     WHERE  asker_email_encrypted = $1
+     WHERE  asker_email = $1
      ORDER  BY created_at DESC
      LIMIT  50`,
     [rows[0].asker_email_encrypted]

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { ChevronRight, UserPlus, LogOut, ExternalLink, Users, Lock, Unlock, Trash2 } from 'lucide-react';
+import { ChevronRight, UserPlus, LogOut, ExternalLink, Users, Lock, Unlock, Trash2, X, UserMinus } from 'lucide-react';
 import api from '../../lib/api';
 import Avatar, { AvatarGroup } from '../ui/Avatar';
 import Tooltip from '../ui/Tooltip';
@@ -26,9 +26,12 @@ export default function DiscussionHeader({
   const { on } = useSocket();
 
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showMembersList, setShowMembersList] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const [allRabbis, setAllRabbis] = useState([]);
   const [addLoading, setAddLoading] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState(null);
   const [leavingDiscussion, setLeavingDiscussion] = useState(false);
   const [lockingDiscussion, setLockingDiscussion] = useState(false);
   const [deletingDiscussion, setDeletingDiscussion] = useState(false);
@@ -97,6 +100,29 @@ export default function DiscussionHeader({
         setShowAddMember(false);
       } catch {
         // ignore — TODO: show toast
+      }
+    },
+    [discussionId, onDiscussionUpdate]
+  );
+
+  // ── Remove member ─────────────────────────────────────────────────────────
+
+  const handleRemoveMember = useCallback(
+    async (targetRabbiId) => {
+      setRemovingMemberId(targetRabbiId);
+      try {
+        await api.delete(`/discussions/${discussionId}/members/${targetRabbiId}`);
+        // Update local discussion members
+        onDiscussionUpdate?.((prev) => ({
+          ...prev,
+          members: (prev?.members || []).filter((m) => m.id !== targetRabbiId),
+          member_count: Math.max(0, (prev?.member_count || 1) - 1),
+        }));
+        setConfirmRemoveMember(null);
+      } catch {
+        // ignore — TODO: show toast
+      } finally {
+        setRemovingMemberId(null);
       }
     },
     [discussionId, onDiscussionUpdate]
@@ -230,10 +256,15 @@ export default function DiscussionHeader({
         </div>
       </div>
 
-      {/* Member avatars (with online dots) */}
+      {/* Member avatars (with online dots) — clickable to open members panel */}
       {avatarList.length > 0 && (
-        <div className="hidden sm:flex flex-shrink-0">
-          <div className="flex flex-row-reverse -space-x-2 space-x-reverse">
+        <div className="hidden sm:flex flex-shrink-0 relative">
+          <button
+            type="button"
+            onClick={() => setShowMembersList((v) => !v)}
+            className="flex flex-row-reverse -space-x-2 space-x-reverse hover:opacity-80 transition-opacity"
+            aria-label="ניהול משתתפים"
+          >
             {avatarList.map((av, i) => (
               <Tooltip key={av.id} content={av.name} placement="bottom">
                 <div className="relative" style={{ zIndex: avatarList.length - i }}>
@@ -259,6 +290,116 @@ export default function DiscussionHeader({
                 +{memberCount - 5}
               </span>
             )}
+          </button>
+
+          {/* Members management dropdown */}
+          {showMembersList && (
+            <div
+              className="
+                absolute left-0 top-full mt-1 z-30
+                w-64 bg-[var(--bg-surface)] border border-[var(--border-default)]
+                rounded-lg shadow-lg overflow-hidden
+              "
+              dir="rtl"
+            >
+              <div className="px-3 py-2 border-b border-[var(--border-default)] flex items-center justify-between">
+                <span className="text-sm font-bold font-heebo text-[var(--text-primary)]">
+                  משתתפים ({memberCount})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowMembersList(false)}
+                  className="p-0.5 rounded hover:bg-[var(--bg-muted)] text-[var(--text-muted)]"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <ul className="max-h-60 overflow-y-auto">
+                {members.map((m) => {
+                  const isCreator = String(m.id) === String(discussion?.created_by);
+                  const canRemove =
+                    !isCreator &&
+                    (String(discussion?.created_by) === String(rabbi?.id) || rabbi?.role === 'admin');
+                  const isSelf = String(m.id) === String(rabbi?.id);
+
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-default)] last:border-b-0"
+                    >
+                      <Avatar
+                        src={m.avatar_url || m.profile_photo}
+                        name={m.name || m.full_name || 'רב'}
+                        size="xs"
+                        online={onlineIds.has(m.id)}
+                      />
+                      <span className="flex-1 text-sm font-heebo text-[var(--text-primary)] truncate">
+                        {m.name || m.full_name || 'רב'}
+                        {isCreator && (
+                          <span className="text-xs text-[var(--text-muted)] mr-1">(יוצר)</span>
+                        )}
+                        {isSelf && (
+                          <span className="text-xs text-[var(--text-muted)] mr-1">(אני)</span>
+                        )}
+                      </span>
+                      {canRemove && (
+                        <Tooltip content="הסר מהדיון" placement="left">
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveMember(m)}
+                            disabled={removingMemberId === m.id}
+                            className="
+                              p-1 rounded text-[var(--text-muted)]
+                              hover:text-red-500 hover:bg-red-50
+                              transition-colors duration-150
+                              disabled:opacity-50
+                            "
+                            aria-label={`הסר ${m.name || 'משתתף'} מהדיון`}
+                          >
+                            {removingMemberId === m.id ? (
+                              <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-500 rounded-full animate-spin inline-block" />
+                            ) : (
+                              <UserMinus size={14} />
+                            )}
+                          </button>
+                        </Tooltip>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Confirm remove member modal */}
+      {confirmRemoveMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+          <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)] mb-3">
+              הסרת משתתף
+            </h3>
+            <p className="text-sm text-[var(--text-primary)] font-heebo mb-5">
+              האם להסיר את {confirmRemoveMember.name || confirmRemoveMember.full_name || 'המשתתף'} מהדיון?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmRemoveMember(null)}
+                className="px-4 py-2 rounded-lg text-sm font-heebo border border-[var(--border-default)] hover:bg-[var(--bg-muted)]"
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemoveMember(confirmRemoveMember.id)}
+                disabled={removingMemberId === confirmRemoveMember.id}
+                className="px-4 py-2 rounded-lg text-sm font-heebo font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {removingMemberId === confirmRemoveMember.id ? 'מסיר...' : 'הסר'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -428,6 +569,15 @@ export default function DiscussionHeader({
         <div
           className="fixed inset-0 z-20"
           onClick={() => setShowAddMember(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Click-away for members list dropdown */}
+      {showMembersList && (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setShowMembersList(false)}
           aria-hidden="true"
         />
       )}

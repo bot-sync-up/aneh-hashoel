@@ -120,14 +120,9 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
   }
 
   const rabbi = rabbiRows[0];
-  const signature = rabbi.signature || '';
 
-  // Auto-append rabbi signature to content
-  // Use <div> not <p> — signature is already HTML with block elements
-  const sigHtml = signature ? sanitizeRichText(signature) : '';
-  const contentWithSignature = sigHtml
-    ? `${sanitizedContent}<div dir="rtl" style="margin-top:1em">${sigHtml}</div>`
-    : sanitizedContent;
+  // Signature removed — WP generates it automatically from rabi-add taxonomy
+  const contentWithSignature = sanitizedContent;
 
   // 4 + 5. Insert answer and update question in a transaction
   const answer = await withTransaction(async (client) => {
@@ -149,15 +144,14 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
 
     const { rows: answerRows } = await client.query(
       `INSERT INTO answers
-         (question_id, rabbi_id, content, signature, content_versions, is_private, created_at)
+         (question_id, rabbi_id, content, content_versions, is_private, created_at)
        VALUES
-         ($1, $2, $3, $4, $5, $6, NOW())
+         ($1, $2, $3, $4, $5, NOW())
        RETURNING *`,
       [
         questionId,
         rabbiId,
         contentWithSignature,
-        signature,
         JSON.stringify([{
           content: contentWithSignature,
           edited_at: new Date().toISOString(),

@@ -127,33 +127,6 @@ function PersonalTab({ rabbi }) {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState(null);
-
-  const editor = useEditor({
-    extensions: [StarterKit, UnderlineMark],
-    content: rabbi?.signature || '',
-    editorProps: {
-      attributes: {
-        class: 'min-h-[80px] px-3 py-2 focus:outline-none text-sm font-heebo text-[var(--text-primary)]',
-        dir: 'rtl',
-        'aria-label': 'חתימה',
-      },
-    },
-    onBlur: ({ editor: ed }) => handleSignatureBlur(ed.getHTML()),
-  });
-
-  const handleSignatureBlur = useCallback(async (html) => {
-    setAutoSaveStatus('saving');
-    try {
-      await api.patch('/rabbis/profile', { signature: html });
-      updateRabbi({ signature: html });
-      setAutoSaveStatus('saved');
-      setTimeout(() => setAutoSaveStatus(null), 3000);
-    } catch {
-      setAutoSaveStatus('error');
-    }
-  }, [updateRabbi]);
-
   const validate = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = 'שדה חובה';
@@ -235,21 +208,6 @@ function PersonalTab({ rabbi }) {
           onInput={(e) => e.target.value = e.target.value.replace(/[^0-9+\-\s]/g, '')}
           className={inputCls('phone')} autoComplete="tel" dir="ltr" placeholder="0500000000" />
         {errors.phone && <p className="mt-1 text-xs text-red-500 font-heebo" role="alert">{errors.phone}</p>}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className={labelCls} id="sig-label">חתימה (מופיעה בתשובות)</label>
-          <AutoSaveIndicator status={autoSaveStatus} />
-        </div>
-        <div className={clsx(
-          'rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)]',
-          'focus-within:ring-2 focus-within:ring-brand-gold focus-within:border-brand-gold transition-colors duration-150'
-        )} aria-labelledby="sig-label">
-          <EditorToolbar editor={editor} />
-          <EditorContent editor={editor} />
-        </div>
-        <p className="mt-1 text-xs text-[var(--text-muted)] font-heebo">נשמרת אוטומטית בעת עזיבת השדה</p>
       </div>
 
       <div className="flex items-center gap-3 pt-1">

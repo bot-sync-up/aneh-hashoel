@@ -311,15 +311,34 @@ async function syncAnswersToWP(options = {}) {
 
   // ── 2. Push each answer to WP ─────────────────────────────────────────────
   for (const row of rows) {
+    // If rabbi has no wp_term_id, create the rabbi in WP first
+    let rabbiTermId = row.wp_rabbi_term_id || null;
+    if (!rabbiTermId && row.rabbi_name) {
+      try {
+        const { createWPRabbi } = require('./wpService');
+        const wpResult = await createWPRabbi(row.rabbi_name);
+        if (wpResult.success && wpResult.data?.id) {
+          rabbiTermId = wpResult.data.id;
+          // Save the wp_term_id back to the rabbi record
+          await query(
+            `UPDATE rabbis SET wp_term_id = $1 WHERE name = $2 AND wp_term_id IS NULL`,
+            [rabbiTermId, row.rabbi_name]
+          );
+          console.log(`[questionSync] created WP rabbi "${row.rabbi_name}" → termId=${rabbiTermId}`);
+        }
+      } catch (e) {
+        console.warn(`[questionSync] failed to create WP rabbi "${row.rabbi_name}":`, e.message);
+      }
+    }
+
     const publishResult = await publishAnswer(row.wp_post_id, {
       content:           row.answer_content,
       rabbiName:         row.rabbi_name,
-      signature:         row.rabbi_signature || '',
       publishedAt:       row.published_at
         ? new Date(row.published_at).toISOString()
         : new Date().toISOString(),
       wpCategoryTermId:  row.wp_category_term_id || null,
-      wpRabbiTermId:     row.wp_rabbi_term_id || null,
+      wpRabbiTermId:     rabbiTermId,
     });
 
     if (publishResult.success) {

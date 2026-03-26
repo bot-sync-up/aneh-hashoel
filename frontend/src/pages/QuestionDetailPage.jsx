@@ -246,6 +246,7 @@ export default function QuestionDetailPage() {
   const assignedRabbiId = assigned_rabbi?.id ?? question?.assigned_rabbi_id;
   const assignedRabbiName = assigned_rabbi?.name ?? assigned_rabbi?.display_name ?? question?.rabbi_name;
   const isMe = rabbi && assignedRabbiId && String(assignedRabbiId) === String(rabbi?.id);
+  const isAdmin = rabbi?.role === 'admin';
   const isPending = status === 'pending';
   const isInProcess = status === 'in_process';
   const isAnswered = status === 'answered';
@@ -771,8 +772,8 @@ export default function QuestionDetailPage() {
           />
         )}
 
-        {/* ── Private notes accordion (only shown to owning rabbi) ───────── */}
-        {isMe && (
+        {/* ── Private notes accordion (shown to assigned rabbi or admin) ───────── */}
+        {(isMe || isAdmin) && (
           <div className="rounded-card border border-amber-200 dark:border-amber-700 overflow-hidden">
             <button
               type="button"

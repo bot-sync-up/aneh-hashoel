@@ -153,15 +153,12 @@ export default function QuestionsPage() {
     });
 
     const offClaimed = on('question:claimed', ({ id, assigned_rabbi, status }) => {
-      // If filtering by pending only, remove claimed questions from the list
-      setQuestions((prev) => {
-        if (filters.status === 'pending' || filters.status === '') {
-          return prev.filter((q) => q.id !== id);
-        }
-        return prev.map((q) =>
-          q.id === id ? { ...q, status, assigned_rabbi } : q
-        );
-      });
+      // Update status to in_process — keep in list but show as claimed
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === id ? { ...q, status: status || 'in_process', assigned_rabbi } : q
+        )
+      );
     });
 
     const offReleased = on('question:released', ({ id }) => {
@@ -175,15 +172,8 @@ export default function QuestionsPage() {
     const offAnswered = on(
       'question:answered',
       ({ id, status, assigned_rabbi, answered_at }) => {
-        // If filtering by pending only, remove answered questions from list
-        setQuestions((prev) => {
-          if (filters.status === 'pending' || filters.status === '') {
-            return prev.filter((q) => q.id !== id);
-          }
-          return prev.map((q) =>
-            q.id === id ? { ...q, status, assigned_rabbi, answered_at } : q
-          );
-        });
+        // This page shows open questions — remove answered ones immediately
+        setQuestions((prev) => prev.filter((q) => q.id !== id));
       }
     );
 

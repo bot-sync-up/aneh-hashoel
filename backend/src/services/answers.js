@@ -81,10 +81,21 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
   }
 
   // Enforce category assignment before publishing (skip for private answers)
-  if (!isPrivate && !question.category_id) {
-    const e = new Error('יש לשייך קטגוריה לשאלה לפני פרסום תשובה');
-    e.status = 400;
-    throw e;
+  // Category "הכל" (default) doesn't count — rabbi must pick a specific category
+  const DEFAULT_CATEGORY_NAME = 'הכל';
+  if (!isPrivate) {
+    let categoryValid = !!question.category_id;
+    if (categoryValid) {
+      const { rows: catRows } = await dbQuery(
+        `SELECT name FROM categories WHERE id = $1`, [question.category_id]
+      );
+      if (catRows[0] && catRows[0].name === DEFAULT_CATEGORY_NAME) categoryValid = false;
+    }
+    if (!categoryValid) {
+      const e = new Error('יש לשייך קטגוריה לשאלה לפני פרסום תשובה — הקטגוריה "הכל" אינה מספיקה');
+      e.status = 400;
+      throw e;
+    }
   }
 
   // Allow direct answer on pending questions (auto-claim) or own in_process questions

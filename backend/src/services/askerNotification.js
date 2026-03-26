@@ -227,25 +227,29 @@ async function notifyAskerNewAnswer(questionId) {
   }
 
   const answerUrl = buildAnswerUrl(data);
+  const { createEmailHTML } = require('../templates/emailBase');
 
   const greeting = data.asker_name ? `שלום ${data.asker_name},` : 'שלום,';
-  const html = `<div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-  <h2 style="color: #1B2B5E;">${greeting}</h2>
-  <p>שמחים לבשר לך שהרב <strong>${data.rabbi_name}</strong> ענה על שאלתך:</p>
-  ${data.title ? `<blockquote style="border-right: 4px solid #B8973A; padding-right: 16px; margin: 16px 0; color: #333;">${data.title}</blockquote>` : ''}
-  <p>קיבלת תשובה לשאלתך.${answerUrl ? ` לצפייה בתשובה המלאה לחץ על הקישור: <a href="${answerUrl}" style="color: #2563eb;">${answerUrl}</a>` : ''}</p>
-  <p>בברכה,<br>צוות ענה את השואל</p>
-  <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
-    פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
-  </div>
-</div>`;
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">${greeting}</p>
+    <p style="margin: 0 0 16px; font-size: 15px;">
+      שמחים לבשר לך שהרב <strong>${data.rabbi_name}</strong> ענה על שאלתך.
+    </p>
+    ${data.title ? `<div style="background: #f8f9fa; border-right: 4px solid #B8973A; padding: 16px; margin: 16px 0; border-radius: 4px;"><strong>נושא השאלה:</strong><br/><p style="margin: 8px 0 0;">${data.title}</p></div>` : ''}
+    <p style="margin: 16px 0 0; color: #888; font-size: 13px;">
+      לצפייה בתשובה המלאה — לחץ על הכפתור למטה.
+    </p>
+  `;
+
+  const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];
+  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons);
 
   // Send email
   if (email) {
     try {
       await sendEmail(
         email,
-        'התשובה לשאלתך מוכנה — ענה את השואל',
+        'התשובה לשאלתך מוכנה — שאל את הרב',
         html
       );
     } catch (err) {
@@ -257,8 +261,8 @@ async function notifyAskerNewAnswer(questionId) {
   if (phone) {
     try {
       const whatsappMessage = answerUrl
-        ? `שלום, הרב ${data.rabbi_name} ענה על שאלתך באתר ענה את השואל.\nלצפייה בתשובה: ${answerUrl}`
-        : `שלום, הרב ${data.rabbi_name} ענה על שאלתך באתר ענה את השואל. התשובה מחכה לך באתר.`;
+        ? `שלום, הרב ${data.rabbi_name} ענה על שאלתך באתר שאל את הרב.\nלצפייה בתשובה: ${answerUrl}`
+        : `שלום, הרב ${data.rabbi_name} ענה על שאלתך באתר שאל את הרב. התשובה מחכה לך באתר.`;
 
       await sendWhatsApp(phone, whatsappMessage);
     } catch (err) {

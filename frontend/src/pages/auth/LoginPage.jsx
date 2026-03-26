@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import logoSrc from '../../assets/logo.png';
 import toast from 'react-hot-toast';
@@ -78,10 +78,14 @@ function GoogleSignInButton({ disabled }) {
 export default function LoginPage() {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
-  const [serverError, setServerError] = useState('');
+  const [serverError, setServerError] = useState(() => {
+    // Show error from OAuth redirect (e.g. "חשבון Google זה אינו מקושר לרב במערכת")
+    return searchParams.get('error') || '';
+  });
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 

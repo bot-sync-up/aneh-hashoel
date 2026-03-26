@@ -225,13 +225,14 @@ function PersonalTab({ rabbi }) {
           className={clsx(inputCls('email'), 'opacity-60 cursor-not-allowed bg-[var(--bg-muted)]')}
           tabIndex={-1} aria-readonly="true" />
         <p className="mt-1 text-xs text-[var(--text-muted)] font-heebo">
-          לשינוי כתובת אימייל יש לפנות למנהל המערכת
+          כתובת האימייל ניתנת לשינוי רק על-ידי מנהל המערכת
         </p>
       </div>
 
       <div>
         <label htmlFor="rabbi-phone" className={labelCls}>טלפון</label>
         <input id="rabbi-phone" type="tel" inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={(e) => handleChange('phone', e.target.value)}
+          onInput={(e) => e.target.value = e.target.value.replace(/[^0-9+\-\s]/g, '')}
           className={inputCls('phone')} autoComplete="tel" dir="ltr" placeholder="0500000000" />
         {errors.phone && <p className="mt-1 text-xs text-red-500 font-heebo" role="alert">{errors.phone}</p>}
       </div>

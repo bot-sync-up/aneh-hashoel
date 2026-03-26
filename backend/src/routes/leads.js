@@ -11,7 +11,6 @@
  */
 
 const express = require('express');
-const { stringify: csvStringify } = require('csv-stringify/sync');
 const { authenticate } = require('../middleware/auth');
 const { getLeads, getLeadById, updateLead, syncLeadsFromQuestions } = require('../services/leadsService');
 
@@ -56,29 +55,32 @@ router.get('/export', async (req, res, next) => {
     const result = await getLeads({ page: 1, limit: 10000, filter: 'all', search: '' });
     const leads = result.leads || [];
 
-    const rows = leads.map((l) => ({
-      name:             l.asker_name || '',
-      email:            l.email || '',
-      phone:            l.phone || '',
-      question_count:   l.question_count || 0,
-      is_hot:           l.is_hot ? 'כן' : 'לא',
-      contacted:        l.contacted ? 'כן' : 'לא',
-      last_question_at: l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
-    }));
+    // Build CSV manually — no external dependency needed
+    const headers = ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'טופל', 'שאלה אחרונה', 'הערות'];
 
-    const csv = csvStringify(rows, {
-      header: true,
-      columns: [
-        { key: 'name', header: 'שם' },
-        { key: 'email', header: 'אימייל' },
-        { key: 'phone', header: 'טלפון' },
-        { key: 'question_count', header: 'מספר שאלות' },
-        { key: 'is_hot', header: 'חם' },
-        { key: 'contacted', header: 'טופל' },
-        { key: 'last_question_at', header: 'שאלה אחרונה' },
-      ],
-      bom: true, // UTF-8 BOM for Excel compatibility
-    });
+    function escapeCsvField(val) {
+      const str = String(val ?? '');
+      if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }
+
+    const rows = leads.map((l) => [
+      l.asker_name || '',
+      l.email || '',
+      l.phone || '',
+      l.question_count || 0,
+      l.last_category_name || '',
+      l.is_hot ? 'כן' : 'לא',
+      l.contacted ? 'כן' : 'לא',
+      l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
+      l.contact_notes || '',
+    ].map(escapeCsvField).join(','));
+
+    // UTF-8 BOM for Excel compatibility
+    const BOM = '\uFEFF';
+    const csv = BOM + [headers.map(escapeCsvField).join(','), ...rows].join('\r\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="leads-${new Date().toISOString().split('T')[0]}.csv"`);

@@ -249,7 +249,8 @@ export default function LeadsPage() {
                 onClick={async () => {
                   try {
                     const response = await api.get('/leads/export', { responseType: 'blob' });
-                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+                    const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
                     link.setAttribute('download', `leads-${new Date().toISOString().split('T')[0]}.csv`);
@@ -257,7 +258,9 @@ export default function LeadsPage() {
                     link.click();
                     link.parentNode.removeChild(link);
                     window.URL.revokeObjectURL(url);
-                  } catch { /* ignore */ }
+                  } catch (err) {
+                    alert(err?.response?.data?.error || 'שגיאה בייצוא הלידים. נסה שוב.');
+                  }
                 }}
               >
                 ייצוא CSV

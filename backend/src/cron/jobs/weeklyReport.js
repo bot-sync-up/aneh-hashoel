@@ -87,11 +87,31 @@ async function runWeeklyReport() {
       : null,
   };
 
-  // TODO: שליחת הדו"ח בפועל (יוטמע ע"י סוכן ההתראות)
-  // const notificationService = require('../../services/notifications');
-  // for (const rabbi of rabbiStats) {
-  //   await notificationService.sendWeeklyReport(rabbi, reportData);
-  // }
+  // Send weekly report email to each rabbi
+  try {
+    const emailService = require('../../services/email');
+    for (const rabbi of rabbiStats) {
+      if (!rabbi.email) continue;
+      try {
+        await emailService.sendWeeklyReport(rabbi.email, {
+          rabbiName: rabbi.name,
+          answersCount: parseInt(rabbi.answers_count, 10) || 0,
+          avgResponseHours: rabbi.avg_response_hours || null,
+          urgentAnswered: parseInt(rabbi.urgent_answered, 10) || 0,
+          totalThanks: parseInt(rabbi.total_thanks, 10) || 0,
+          weekStart: reportData.weekStart,
+          weekEnd: reportData.weekEnd,
+          globalStats: reportData.global,
+          topRabbi: reportData.topRabbi,
+        });
+        console.info(`[weekly-report] דו"ח נשלח ל-${rabbi.name}`);
+      } catch (sendErr) {
+        console.warn(`[weekly-report] שגיאה בשליחת דו"ח ל-${rabbi.name}: ${sendErr.message}`);
+      }
+    }
+  } catch (importErr) {
+    console.warn('[weekly-report] לא ניתן לייבא שירות מייל:', importErr.message);
+  }
 
   console.info('[weekly-report] דו"ח שבועי הושלם בהצלחה.');
 }

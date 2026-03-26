@@ -116,6 +116,10 @@ router.get('/', authenticate, async (req, res, next) => {
       search:      req.query.search,
       page:        req.query.page,
       limit:       req.query.limit,
+      sort:        req.query.sort,
+      is_urgent:   req.query.is_urgent,
+      dateFrom:    req.query.date_from,
+      dateTo:      req.query.date_to,
     };
 
     // Non-admins: restrict to pending + own assigned questions

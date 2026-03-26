@@ -331,6 +331,11 @@ export default function CreateDiscussionModal({
                       />
                       <span className="text-[var(--text-primary)] flex-1">
                         {rabbi.name || rabbi.full_name}
+                        {rabbi.role && (
+                          <span className="text-xs text-[var(--text-muted)] mr-1">
+                            ({rabbi.role === 'admin' ? 'מנהל' : rabbi.role === 'customer_service' ? 'שירות לקוחות' : 'רב'})
+                          </span>
+                        )}
                       </span>
                       {isSelected && (
                         <Check size={14} className="text-[#1B2B5E] flex-shrink-0" />

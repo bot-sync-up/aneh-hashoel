@@ -45,9 +45,11 @@ import Spinner from '../components/ui/Spinner';
 
 function hebrewGreeting() {
   const h = new Date().getHours();
+  if (h < 5)  return 'לילה טוב';
   if (h < 12) return 'בוקר טוב';
-  if (h < 18) return 'צהריים טובים';
-  return 'ערב טוב';
+  if (h < 17) return 'צהריים טובים';
+  if (h < 21) return 'ערב טוב';
+  return 'לילה טוב';
 }
 
 /** Section heading with optional action link */
@@ -179,6 +181,13 @@ export default function DashboardPage() {
   // Pulse tracking for live stat updates
   const pulseTimerRef = useRef(null);
 
+  // Auto-update greeting every minute
+  const [greeting, setGreeting] = useState(hebrewGreeting());
+  useEffect(() => {
+    const timer = setInterval(() => setGreeting(hebrewGreeting()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // ── Fetch dashboard data ───────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -288,6 +297,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
+    // Auto-refresh every 30 seconds
+    const autoRefresh = setInterval(() => fetchDashboard(), 30_000);
+    return () => clearInterval(autoRefresh);
   }, [fetchDashboard]);
 
   // ── Claim question ─────────────────────────────────────────────────────
@@ -388,7 +400,6 @@ export default function DashboardPage() {
 
   // ── Derived values ─────────────────────────────────────────────────────
   const firstName  = rabbi?.name?.split(' ')[0] || 'הרב';
-  const greeting   = hebrewGreeting();
   const todayLabel = formatDate(new Date(), 'EEEE, d בMMMM yyyy');
 
   // Pending count for the alert banner
@@ -533,9 +544,9 @@ export default function DashboardPage() {
                   </Button>
                 }
               >
-                השאלות שלי{' '}
+                השאלות שלי
                 {myQuestions.length > 0 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1B2B5E] text-white text-xs font-bold font-heebo ms-2">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1B2B5E] text-white text-xs font-bold font-heebo mr-2">
                     {myQuestions.length}
                   </span>
                 )}
@@ -588,9 +599,9 @@ export default function DashboardPage() {
                   </Button>
                 }
               >
-                שאלות ממתינות{' '}
+                שאלות ממתינות
                 {pendingQ.length > 0 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold font-heebo ms-2">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold font-heebo mr-2">
                     {pendingQ.length}
                   </span>
                 )}

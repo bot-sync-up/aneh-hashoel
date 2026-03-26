@@ -135,7 +135,7 @@ export default function CategoryChart({ data = [], loading = false }) {
           פילוח לפי קטגוריה
         </h3>
         <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">
-          {total > 0 ? `סה"כ ${total} שאלות` : 'אין נתונים להצגה'}
+          {total > 0 ? `סה"כ ${total} ${total === 1 ? 'שאלה' : 'שאלות'}` : 'אין נתונים להצגה'}
         </p>
       </div>
 

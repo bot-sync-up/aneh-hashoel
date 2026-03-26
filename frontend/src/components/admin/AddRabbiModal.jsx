@@ -109,6 +109,7 @@ export default function AddRabbiModal({ isOpen, onClose, onSuccess }) {
             pattern="[0-9]*"
             value={form.phone}
             onChange={set('phone')}
+            onInput={(e) => e.target.value = e.target.value.replace(/[^0-9+\-\s]/g, '')}
             error={errors.phone}
             placeholder="0500000000"
           />

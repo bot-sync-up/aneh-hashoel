@@ -438,21 +438,23 @@ async function notifyAskerQuestionReceived(question) {
   const email = question.asker_email;
   if (!email) return;
 
-  const subject = 'קיבלנו את שאלתך — ענה את השואל';
-  const html = `
-    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1e3a5f;">שלום ${question.asker_name || 'שואל יקר'},</h2>
-      <p>קיבלנו את שאלתך ונענה בהקדם האפשרי.</p>
-      <div style="background: #f8f9fa; border-right: 4px solid #1e3a5f; padding: 16px; margin: 20px 0; border-radius: 4px;">
-        <strong>שאלתך:</strong><br/>
-        <p>${question.title || question.content || ''}</p>
-      </div>
-      <p style="color: #666; font-size: 14px;">המרכז למורשת מרן</p>
-      <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
-        פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
-      </div>
+  const { createEmailHTML } = require('../templates/emailBase');
+
+  const subject = 'קיבלנו את שאלתך — שאל את הרב';
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${question.asker_name || 'שואל יקר'},</p>
+    <p style="margin: 0 0 16px; font-size: 15px;">
+      קיבלנו את שאלתך ונענה בהקדם האפשרי.
+    </p>
+    <div style="background: #f8f9fa; border-right: 4px solid #1B2B5E; padding: 16px; margin: 16px 0; border-radius: 4px;">
+      <strong>נושא השאלה:</strong><br/>
+      <p style="margin: 8px 0 0;">${question.title || ''}</p>
     </div>
+    <p style="margin: 16px 0 0; color: #888; font-size: 13px;">
+      נשלח לך מייל נוסף כאשר תתקבל תשובה מהרב.
+    </p>
   `;
+  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent);
 
   await sendEmail(email, subject, html);
 }

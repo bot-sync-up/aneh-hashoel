@@ -78,9 +78,22 @@ function ConversationView({ request, onBack, onStatusUpdate }) {
           <ArrowRight size={18} />
         </button>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-[var(--text-primary)] font-heebo truncate">
-            {request.subject}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] font-heebo truncate">
+              {request.subject}
+            </h3>
+            {request.status === 'handled' ? (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-full px-1.5 py-0.5 font-heebo flex-shrink-0">
+                <CheckCircle2 size={9} />
+                טופל
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-1.5 py-0.5 font-heebo flex-shrink-0">
+                <Clock size={9} />
+                פתוח
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-heebo">
             <span className="flex items-center gap-1">
               <User size={11} />
@@ -103,7 +116,7 @@ function ConversationView({ request, onBack, onStatusUpdate }) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F8F6F1]">
         {/* Original request message */}
-        <div className="max-w-[80%] ml-auto rounded-xl px-4 py-2.5 shadow-sm bg-white text-[var(--text-primary)] border border-[var(--border-default)]">
+        <div className="max-w-[80%] ms-auto rounded-xl rounded-tr-sm px-4 py-2.5 shadow-sm bg-white text-[var(--text-primary)] border border-[var(--border-default)]">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold font-heebo text-[var(--text-muted)]">
               {request.rabbi_name}
@@ -130,8 +143,8 @@ function ConversationView({ request, onBack, onStatusUpdate }) {
                 className={clsx(
                   'max-w-[80%] rounded-xl px-4 py-2.5 shadow-sm',
                   msg.sender_role === 'admin'
-                    ? 'ml-auto bg-[#1B2B5E] text-white'
-                    : 'mr-auto bg-white text-[var(--text-primary)] border border-[var(--border-default)]'
+                    ? 'me-auto bg-[#1B2B5E] text-white rounded-tl-sm'
+                    : 'ms-auto bg-white text-[var(--text-primary)] border border-[var(--border-default)] rounded-tr-sm'
                 )}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -217,10 +230,15 @@ function RequestCard({ request, onClick }) {
             )}
           </div>
         </div>
-        {request.status === 'handled' && (
+        {request.status === 'handled' ? (
           <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5 font-heebo flex-shrink-0">
             <CheckCircle2 size={10} />
             טופל
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-2 py-0.5 font-heebo flex-shrink-0">
+            <Clock size={10} />
+            פתוח
           </span>
         )}
       </div>

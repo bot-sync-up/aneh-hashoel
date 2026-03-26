@@ -93,6 +93,10 @@ async function getQuestions(filters = {}) {
     params.push(filters.dateTo);
   }
 
+  if (filters.is_urgent === true || filters.is_urgent === 'true') {
+    conditions.push(`q.urgency IN ('urgent', 'critical', 'high')`);
+  }
+
   // Non-admin rabbis: hide in_process questions of other rabbis.
   // Exception: 'answered' status is a public feed — all rabbis may see it.
   if (filters.rabbiViewerId && filters.status !== 'answered') {
@@ -102,6 +106,16 @@ async function getQuestions(filters = {}) {
   const whereClause = conditions.length > 0
     ? `WHERE ${conditions.join(' AND ')}`
     : '';
+
+  // Determine sort order
+  let orderClause = 'ORDER BY q.created_at DESC';
+  if (filters.sort === 'created_at_asc') {
+    orderClause = 'ORDER BY q.created_at ASC';
+  } else if (filters.sort === 'urgent_first') {
+    orderClause = `ORDER BY CASE WHEN q.urgency IN ('urgent','critical','high') THEN 0 ELSE 1 END ASC, q.created_at DESC`;
+  } else if (filters.sort === 'answered_at_desc') {
+    orderClause = 'ORDER BY q.answered_at DESC NULLS LAST';
+  }
 
   // Count total
   const countResult = await query(
@@ -116,13 +130,14 @@ async function getQuestions(filters = {}) {
     `SELECT q.id, q.question_number, q.title, q.content, q.status, q.urgency, q.difficulty,
             q.category_id, q.assigned_rabbi_id, q.flagged, q.flag_reason,
             q.thank_count, q.attachment_url, q.created_at, q.updated_at,
+            q.answered_at, q.lock_timestamp,
             r.name AS rabbi_name,
             c.name AS category_name
      FROM   questions q
      LEFT JOIN rabbis     r ON r.id = q.assigned_rabbi_id
      LEFT JOIN categories c ON c.id = q.category_id
      ${whereClause}
-     ORDER BY q.created_at DESC
+     ${orderClause}
      LIMIT  $${paramIndex++}
      OFFSET $${paramIndex++}`,
     dataParams

@@ -184,8 +184,9 @@ export default function NotificationPreferences({ pushConfigured = false }) {
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center">
                     <ToggleSwitch
-                      checked={prefs[row.key]?.email ?? row.defaultEmail}
+                      checked={row.alwaysOn ? true : (prefs[row.key]?.email ?? row.defaultEmail)}
                       onChange={(val) => handleToggle(row.key, 'email', val)}
+                      disabled={row.alwaysOn}
                       label={`${row.label} — מייל`}
                     />
                   </div>
@@ -193,8 +194,9 @@ export default function NotificationPreferences({ pushConfigured = false }) {
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center">
                     <ToggleSwitch
-                      checked={prefs[row.key]?.whatsapp ?? row.defaultWhatsapp}
+                      checked={row.alwaysOn ? true : (prefs[row.key]?.whatsapp ?? row.defaultWhatsapp)}
                       onChange={(val) => handleToggle(row.key, 'whatsapp', val)}
+                      disabled={row.alwaysOn}
                       label={`${row.label} — ווטסאפ`}
                     />
                   </div>
@@ -202,9 +204,9 @@ export default function NotificationPreferences({ pushConfigured = false }) {
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center">
                     <ToggleSwitch
-                      checked={prefs[row.key]?.push ?? row.defaultPush}
+                      checked={row.alwaysOn ? true : (prefs[row.key]?.push ?? row.defaultPush)}
                       onChange={(val) => handleToggle(row.key, 'push', val)}
-                      disabled={!pushConfigured}
+                      disabled={!pushConfigured || row.alwaysOn}
                       label={`${row.label} — Push`}
                     />
                   </div>

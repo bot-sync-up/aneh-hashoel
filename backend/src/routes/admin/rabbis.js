@@ -27,7 +27,7 @@ const {
   createRabbi,
   getRabbiById,
 }                                      = require('../../services/rabbiService');
-const { createWPRabbi, getWPRabbis }   = require('../../services/wpService');
+const { createWPRabbi, updateWPRabbi, deleteWPRabbi, getWPRabbis } = require('../../services/wpService');
 
 const router = express.Router();
 
@@ -453,6 +453,36 @@ router.put('/:id', async (req, res, next) => {
       ).catch(() => {});
     });
 
+    // Sync rabbi name change to WordPress (fire-and-forget)
+    if (body.name && body.name.trim() !== oldRabbi.name) {
+      setImmediate(async () => {
+        try {
+          // Get wp_term_id
+          const { rows: wpRows } = await query(
+            `SELECT wp_term_id FROM rabbis WHERE id = $1`,
+            [targetId]
+          );
+          const wpTermId = wpRows[0]?.wp_term_id;
+
+          if (wpTermId) {
+            // Update existing WP term
+            await updateWPRabbi(wpTermId, body.name.trim());
+          } else {
+            // No WP term yet — create one
+            const wpResult = await createWPRabbi(body.name.trim());
+            if (wpResult.success && wpResult.data?.id) {
+              await query(
+                `UPDATE rabbis SET wp_term_id = $1 WHERE id = $2`,
+                [wpResult.data.id, targetId]
+              );
+            }
+          }
+        } catch (e) {
+          console.warn('[rabbis] WP rabbi sync failed:', e.message);
+        }
+      });
+    }
+
     return res.json({ rabbi: rows[0] });
   } catch (err) {
     return next(err);
@@ -543,9 +573,9 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'לא ניתן למחוק את החשבון הנוכחי' });
     }
 
-    // Verify rabbi exists
+    // Verify rabbi exists (include wp_term_id for WP sync after delete)
     const { rows: existing } = await query(
-      'SELECT id, name, email, role FROM rabbis WHERE id = $1',
+      'SELECT id, name, email, role, wp_term_id FROM rabbis WHERE id = $1',
       [targetId]
     );
     if (!existing[0]) {
@@ -600,6 +630,18 @@ router.delete('/:id', async (req, res, next) => {
         _clientIp(req)
       ).catch(() => {});
     });
+
+    // Delete rabbi term from WordPress (fire-and-forget)
+    // wp_term_id was captured before deletion from targetRabbi
+    if (targetRabbi.wp_term_id) {
+      setImmediate(async () => {
+        try {
+          await deleteWPRabbi(targetRabbi.wp_term_id);
+        } catch (e) {
+          console.warn('[rabbis] WP rabbi delete sync failed:', e.message);
+        }
+      });
+    }
 
     return res.json({ ok: true, message: `${targetRabbi.name} נמחק/ה מהמערכת לצמיתות` });
   } catch (err) {

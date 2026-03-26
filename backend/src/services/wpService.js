@@ -345,6 +345,11 @@ async function publishAnswer(wpPostId, answerData) {
     payload['ask-cat'] = [answerData.wpCategoryTermId];
   }
 
+  // If we have the WP rabbi term ID, set the rabi-add taxonomy
+  if (answerData.wpRabbiTermId) {
+    payload['rabi-add'] = [answerData.wpRabbiTermId];
+  }
+
   try {
     const client = buildClient();
 
@@ -908,6 +913,67 @@ async function createWPRabbi(name) {
   }
 }
 
+/**
+ * Update an existing rabi-add taxonomy term in WordPress (e.g. name change).
+ *
+ * Endpoint: POST /rabi-add/{id}
+ *
+ * @param {number} wpTermId  The WP term ID
+ * @param {string} newName   The updated rabbi name
+ * @returns {Promise<{ success: boolean, data?: object, error?: string }>}
+ */
+async function updateWPRabbi(wpTermId, newName) {
+  if (!wpTermId || !newName?.trim()) {
+    return { success: false, error: 'wpTermId ושם הרב נדרשים' };
+  }
+
+  try {
+    const client = buildClient();
+
+    const response = await withRateLimitRetry(
+      () => client.post(`/rabi-add/${wpTermId}`, { name: newName.trim() }),
+      `updateWPRabbi(${wpTermId})`
+    );
+
+    await logSync(null, 'update_wp_rabbi', 'success');
+    console.log(`[wpService] updateWPRabbi ✓ wpTermId=${wpTermId} newName=${newName}`);
+    return { success: true, data: response.data };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+    console.error(`[wpService] updateWPRabbi(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Delete a rabi-add taxonomy term from WordPress.
+ *
+ * Endpoint: DELETE /rabi-add/{id}?force=true
+ *
+ * @param {number} wpTermId
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+async function deleteWPRabbi(wpTermId) {
+  if (!wpTermId) return { success: false, error: 'wpTermId נדרש' };
+
+  try {
+    const client = buildClient();
+
+    await withRateLimitRetry(
+      () => client.delete(`/rabi-add/${wpTermId}`, { params: { force: true } }),
+      `deleteWPRabbi(${wpTermId})`
+    );
+
+    await logSync(null, 'delete_wp_rabbi', 'success');
+    console.log(`[wpService] deleteWPRabbi ✓ wpTermId=${wpTermId}`);
+    return { success: true };
+  } catch (err) {
+    const { httpStatus, message } = classifyError(err);
+    console.error(`[wpService] deleteWPRabbi(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    return { success: false, error: message };
+  }
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -930,4 +996,6 @@ module.exports = {
   // Rabbi taxonomy (rabi-add)
   getWPRabbis,
   createWPRabbi,
+  updateWPRabbi,
+  deleteWPRabbi,
 };

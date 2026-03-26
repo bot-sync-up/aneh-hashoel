@@ -279,6 +279,7 @@ async function syncAnswersToWP(options = {}) {
               a.published_at,
               r.name        AS rabbi_name,
               r.signature   AS rabbi_signature,
+              r.wp_term_id  AS wp_rabbi_term_id,
               c.wp_term_id  AS wp_category_term_id
        FROM   questions q
        JOIN   answers   a ON a.question_id = q.id
@@ -318,6 +319,7 @@ async function syncAnswersToWP(options = {}) {
         ? new Date(row.published_at).toISOString()
         : new Date().toISOString(),
       wpCategoryTermId:  row.wp_category_term_id || null,
+      wpRabbiTermId:     row.wp_rabbi_term_id || null,
     });
 
     if (publishResult.success) {

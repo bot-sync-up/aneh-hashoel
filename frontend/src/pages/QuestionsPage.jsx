@@ -362,6 +362,16 @@ export default function QuestionsPage() {
               <AnswerEditorAdvanced
                 questionId={answerTarget.id}
                 existingAnswer=""
+                hasCategory={!!answerTarget.category_id || !!answerTarget.category}
+                categoryId={answerTarget.category_id}
+                onCategorySet={() => {
+                  setQuestions((prev) =>
+                    prev.map((q) =>
+                      q.id === answerTarget.id ? { ...q, category: q.category || '__set__' } : q
+                    )
+                  );
+                  setAnswerTarget((prev) => prev ? { ...prev, category: '__set__' } : prev);
+                }}
                 onSave={({ publishNow }) => {
                   if (publishNow) {
                     setQuestions((prev) =>

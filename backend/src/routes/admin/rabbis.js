@@ -182,6 +182,7 @@ router.get('/', async (req, res, next) => {
          r.phone,
          r.signature,
          r.status,
+         r.is_active,
          r.is_vacation,
          r.notification_channel,
          r.preferred_categories,

@@ -132,6 +132,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/profile',       profileRoutes);
 app.use('/api/dashboard',  require('./routes/dashboard'));
 app.use('/api/admin',         adminRoutes);
+app.use('/api/admin/dashboard', require('./routes/admin/dashboard'));
 app.use('/api/admin/sync',   require('./routes/admin/sync'));
 app.use('/api/admin/support', require('./routes/support'));
 app.use('/api/support',      require('./routes/support'));

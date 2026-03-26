@@ -90,18 +90,7 @@ export default function PublishConfirmModal({
             dangerouslySetInnerHTML={{ __html: editorHtml }}
           />
 
-          {/* Signature */}
-          {signature && (
-            <>
-              <hr className="my-4 border-[var(--border-default)]" />
-              <p
-                className="text-sm text-[var(--text-secondary)] font-heebo whitespace-pre-wrap leading-relaxed"
-                dir="rtl"
-              >
-                {signature}
-              </p>
-            </>
-          )}
+          {/* Signature removed — handled by WordPress via rabbi taxonomy */}
         </div>
 
         {/* Error */}

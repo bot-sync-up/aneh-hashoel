@@ -252,6 +252,7 @@ async function notifyAskerNewAnswer(questionId) {
     <p style="margin: 16px 0 0; color: #888; font-size: 13px;">
       לצפייה בתשובה המלאה — לחץ על הכפתור למטה.
     </p>
+    <p style="margin: 16px 0 0;">בברכה,<br><strong>הרב ${data.rabbi_name}</strong></p>
   `;
 
   const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];
@@ -409,25 +410,26 @@ async function notifyAskerPrivateAnswer(questionId) {
 
   if (email) {
     try {
+      const { createEmailHTML } = require('../templates/emailBase');
+      const bodyContent = `
+        <p style="text-align:right; font-size:18px; font-weight:bold; margin:0 0 8px;">${greeting}</p>
+        <p style="text-align:right;">הרב <strong>${data.rabbi_name}</strong> ענה על שאלתך בתשובה אישית:</p>
+        <div style="background:#f8f9fa; border-right:4px solid #B8973A; padding:16px; margin:16px 0; border-radius:4px;">
+          <strong>שאלה:</strong> ${data.title}
+        </div>
+        <div style="background:#f0f7f0; border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 8px;"><strong>תשובה:</strong></p>
+          <div>${data.answer_content}</div>
+        </div>
+        <p style="color:#666; font-size:12px;">תשובה זו נשלחה אליך באופן אישי ואינה מפורסמת באתר.</p>
+        <p>בברכה,<br><strong>הרב ${data.rabbi_name}</strong></p>
+      `;
+      const html = createEmailHTML('תשובה אישית לשאלתך', bodyContent, [], { systemName: 'מערכת שאל את הרב' });
       await sendEmail(
         email,
-        `תשובה לשאלתך — ${data.title || 'ענה את השואל'}`,
-        `<div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1B2B5E;">${greeting}</h2>
-          <p>הרב <strong>${data.rabbi_name}</strong> ענה על שאלתך בתשובה אישית:</p>
-          <blockquote style="border-right: 4px solid #B8973A; padding-right: 16px; margin: 16px 0; color: #333;">
-            <strong>שאלה:</strong> ${data.title}
-          </blockquote>
-          <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
-            <p style="margin: 0;"><strong>תשובה:</strong></p>
-            <div style="margin-top: 8px;">${data.answer_content}</div>
-          </div>
-          <p style="color: #666; font-size: 12px;">תשובה זו נשלחה אליך באופן אישי ואינה מפורסמת באתר.</p>
-          <p>בברכה,<br>צוות ענה את השואל</p>
-          <div style="margin-top:16px; padding:12px; background:#f0f0f0; border-top:1px solid #ddd; text-align:center; font-family:Arial,sans-serif; font-size:11px; color:#888; direction:rtl;">
-            פותח ע"י <a href="https://syncup.co.il" style="color:#1B2B5E; text-decoration:none; font-weight:bold;">SyncUp</a> — טכנולוגיה שמניעה עסקים
-          </div>
-        </div>`
+        `תשובה לשאלתך — מערכת שאל את הרב`,
+        html,
+        { fromName: 'מערכת שאל את הרב' }
       );
       console.log(`[askerNotification] תשובה פרטית נשלחה במייל לשואל (שאלה ${questionId})`);
     } catch (err) {

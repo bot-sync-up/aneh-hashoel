@@ -95,6 +95,17 @@ function verifyWebhookSecret(req, res, next) {
   return next();
 }
 
+/**
+ * Return the first argument that is a non-empty string, or null.
+ * Handles WP sending "" instead of null/undefined.
+ */
+function _firstNonEmpty(...args) {
+  for (const v of args) {
+    if (v && typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
 // ─── Payload normaliser ───────────────────────────────────────────────────────
 
 /**
@@ -115,14 +126,17 @@ function normalisePayload(body) {
     try { vals = JSON.parse(vals); } catch { vals = {}; }
   }
 
-  // Debug log to trace where email comes from
+  // Debug log — show raw values for email to diagnose empty strings
   console.log('[wpWebhook] normalise:', JSON.stringify({
     body_keys: Object.keys(body),
     meta_keys: Object.keys(meta).slice(0, 15),
     vals_keys: Object.keys(vals).slice(0, 15),
-    vals_type: typeof (body.values || src.values),
-    resolved_email: meta.visitor_email || vals.visitor_email || meta.asker_email || vals.asker_email || src.visitor_email || src.asker_email || '(none)',
-    resolved_name:  meta.visitor_name  || vals.visitor_name  || meta.asker_name  || src.asker_name  || '(none)',
+    raw_asker_email: body.asker_email,
+    raw_asker_email_type: typeof body.asker_email,
+    raw_visitor_email: body.visitor_email,
+    src_asker_email: src.asker_email,
+    meta_visitor_email: meta.visitor_email,
+    vals_visitor_email: vals.visitor_email,
   }));
 
   return {
@@ -132,9 +146,10 @@ function normalisePayload(body) {
     wpStatus:       src.post_status   || src.status  || 'publish',
     modifiedGmt:    src.post_modified_gmt || src.modified_gmt || null,
     // ACF / meta / JetEngine form values — try all known field names
-    askerName:      meta.visitor_name  || vals.visitor_name  || meta.asker_name  || src.asker_name  || null,
-    askerEmail:     meta.visitor_email || vals.visitor_email || meta.asker_email || vals.asker_email || src.visitor_email || src.asker_email || null,
-    askerPhone:     meta.visitor_phone || vals.visitor_phone || meta.asker_phone || vals.asker_phone || src.visitor_phone || src.asker_phone || null,
+    // Use helper to skip empty strings (WP often sends "" instead of null)
+    askerName:      _firstNonEmpty(meta.visitor_name, vals.visitor_name, meta.asker_name, src.asker_name, body.asker_name),
+    askerEmail:     _firstNonEmpty(meta.visitor_email, vals.visitor_email, meta.asker_email, vals.asker_email, src.visitor_email, src.asker_email, body.asker_email, body.visitor_email, body.email),
+    askerPhone:     _firstNonEmpty(meta.visitor_phone, vals.visitor_phone, meta.asker_phone, vals.asker_phone, src.visitor_phone, src.asker_phone, body.asker_phone, body.visitor_phone, body.phone),
     categorySlug:   meta.question_category || vals.question_category || src.category    || null,
     urgency:        meta.urgency           || vals.urgency            || src.urgency     || 'normal',
     questionStatus: meta.status            || null,

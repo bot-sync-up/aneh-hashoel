@@ -38,14 +38,26 @@ const IV_LENGTH    = 16;
 function decrypt(encrypted) {
   if (!encrypted) return '';
 
+  // If value doesn't look encrypted (plaintext email/phone from WP enrichment),
+  // return as-is
+  const parts = encrypted.split(':');
+  if (parts.length < 2 || parts.length > 3) {
+    return encrypted; // plaintext
+  }
+
+  // Quick check: if it looks like an email or phone, it's plaintext
+  if (encrypted.includes('@') || /^\+?[\d\s\-()]{7,}$/.test(encrypted)) {
+    return encrypted;
+  }
+
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
     console.error('[askerNotification] ENCRYPTION_KEY לא מוגדר');
-    return '';
+    return encrypted; // return as-is instead of empty
   }
 
   try {
-    const [ivHex, cipherHex] = encrypted.split(':');
+    const [ivHex, cipherHex] = parts;
     const iv         = Buffer.from(ivHex, 'hex');
     const cipherText = Buffer.from(cipherHex, 'hex');
     const keyBuffer  = Buffer.from(key, 'hex');
@@ -56,7 +68,8 @@ function decrypt(encrypted) {
 
     return decrypted.toString('utf8');
   } catch (err) {
-    console.error('[askerNotification] שגיאה בפענוח נתונים:', err.message);
+    console.error('[askerNotification] שגיאה בפענוח, מחזיר כ-plaintext:', err.message);
+    return encrypted; // fallback: return as-is
     return '';
   }
 }

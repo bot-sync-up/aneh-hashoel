@@ -332,6 +332,8 @@ async function publishAnswer(wpPostId, answerData) {
   }
 
   const payload = {
+    // Change WP post_status from 'pending' to 'publish' when answer is submitted
+    status: 'publish',
     meta: {
       'ask-answ':        answerData.content,
       'ask-rabbi':       answerData.rabbiName   || '',

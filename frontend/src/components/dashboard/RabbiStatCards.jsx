@@ -4,11 +4,12 @@ import {
   Timer,
   Heart,
   Inbox,
+  BarChart2,
 } from 'lucide-react';
 import StatsCard from './StatsCard';
 
 /**
- * RabbiStatCards — 4-card stats row for the individual rabbi view.
+ * RabbiStatCards — 5-card stats row for the individual rabbi view.
  *
  * @param {object}  stats        — raw stats from API or local aggregation
  * @param {boolean} loading
@@ -16,7 +17,7 @@ import StatsCard from './StatsCard';
 export default function RabbiStatCards({ stats = {}, loading = false }) {
   const cards = [
     {
-      title: 'שאלות שעניתי',
+      title: 'שאלות שעניתי החודש',
       value: stats.answeredThisMonth ?? 0,
       subtitle: 'החודש הנוכחי',
       icon: <MessageCircle />,
@@ -24,11 +25,19 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
       trend: stats.answeredTrend ?? null,
     },
     {
+      title: 'סה"כ שאלות שעניתי',
+      value: stats.totalAnswered ?? 0,
+      subtitle: 'מתחילת הדרך',
+      icon: <BarChart2 />,
+      color: 'blue',
+      trend: null,
+    },
+    {
       title: 'ממוצע זמן תגובה',
       value: stats.avgResponseTimeLabel ?? '—',
       subtitle: 'שעות בממוצע',
       icon: <Timer />,
-      color: 'blue',
+      color: 'gold',
       trend: stats.responseTrend ?? null,
     },
     {
@@ -50,7 +59,7 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
       {cards.map((card) => (
         <StatsCard
           key={card.title}

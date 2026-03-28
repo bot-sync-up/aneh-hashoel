@@ -5,7 +5,7 @@ import { MessageSquarePlus, Eye, ChevronLeft, Paperclip } from 'lucide-react';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import CountdownTimer from './CountdownTimer';
-import { truncate, formatRelative, getCategoryLabel, colorFromCategory } from '../../lib/utils';
+import { truncate, formatRelative, formatDateTime, getCategoryLabel, colorFromCategory } from '../../lib/utils';
 
 /**
  * QuestionCard — mini card for dashboard question lists.
@@ -34,6 +34,7 @@ export default function QuestionCard({
     category,
     status,
     createdAt,
+    created_at,
     lockedAt,
     timeoutHours = 24,
     isUrgent,
@@ -48,7 +49,9 @@ export default function QuestionCard({
   const titleTruncated = truncate(title || 'שאלה ללא כותרת', 80);
   const categoryLabel   = getCategoryLabel(category);
   const categoryColor   = colorFromCategory(category);
-  const timeAgo         = formatRelative(createdAt);
+  const dateSource      = createdAt || created_at;
+  const timeAgo         = formatRelative(dateSource);
+  const dateTimeLabel   = formatDateTime(dateSource);
 
   const handleNavigate = () => navigate(`/questions/${questionId}`);
   const handleAnswer   = () => navigate(`/questions/${questionId}?answer=1`);
@@ -95,10 +98,11 @@ export default function QuestionCard({
             />
           </div>
 
-          {/* Time ago */}
-          {timeAgo && (
-            <span className="text-xs text-[var(--text-muted)] font-heebo flex-shrink-0">
-              {timeAgo}
+          {/* Date & time */}
+          {dateSource && (
+            <span className="text-xs text-[var(--text-muted)] font-heebo flex-shrink-0" title={dateTimeLabel}>
+              {dateTimeLabel}
+              {timeAgo && <span className="text-[var(--text-muted)]/60 mr-1">({timeAgo})</span>}
             </span>
           )}
         </div>

@@ -62,12 +62,11 @@ router.post('/contact', authenticate, async (req, res, next) => {
 
         const rabbiName = req.rabbi.name || 'רב';
         const subjectLine = `פנייה חדשה מ-${rabbiName}: ${subject.trim()}`;
-        const html = createEmailHTML({
-          title: `פנייה חדשה מ${rabbiName}`,
-          body: `<p><strong>נושא:</strong> ${subject.trim()}</p><p>${message.trim().replace(/\n/g, '<br>')}</p>`,
-          ctaText: 'צפה בפניות',
-          ctaUrl: `${process.env.APP_URL || 'https://aneh.syncup.co.il'}/admin/support`,
-        });
+        const html = createEmailHTML(
+          `פנייה חדשה מ${rabbiName}`,
+          `<p><strong>נושא:</strong> ${subject.trim()}</p><p>${message.trim().replace(/\n/g, '<br>')}</p>`,
+          [{ label: 'צפה בפניות', url: `${process.env.APP_URL || 'https://aneh.syncup.co.il'}/admin/support` }]
+        );
 
         // Collect all admin email addresses
         const adminEmails = new Set();

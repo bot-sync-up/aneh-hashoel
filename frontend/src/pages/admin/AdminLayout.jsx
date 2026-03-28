@@ -31,18 +31,18 @@ import {
 } from 'lucide-react';
 
 const TABS = [
+  { to: 'support',         label: 'פניות',          icon: Headphones },
   { to: 'rabbis',      label: 'רבנים',           icon: Users },
   { to: 'questions',   label: 'שאלות',           icon: HelpCircle },
   { to: 'categories',  label: 'קטגוריות',        icon: Tag },
   { to: 'leads',       label: 'לידים',           icon: UserCheck },
+  { to: 'leaderboard', label: 'לוח מצטיינים',   icon: Trophy },
   { to: 'settings',    label: 'הגדרות',          icon: Settings },
   { to: 'logs',        label: 'לוגים',           icon: ScrollText },
   { to: 'health',      label: 'בריאות המערכת',   icon: Activity },
-  { to: 'leaderboard', label: 'לוח מצטיינים',   icon: Trophy },
   { to: 'email-templates', label: 'תבניות אימייל', icon: Mail },
   { to: 'newsletter',      label: 'ניוזלטר',       icon: Newspaper },
   { to: 'emergency',       label: 'שידור חירום',   icon: AlertTriangle },
-  { to: 'support',         label: 'פניות',          icon: Headphones },
 ];
 
 export default function AdminLayout() {
@@ -102,7 +102,7 @@ export default function AdminLayout() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
         <Suspense fallback={<FullPageSpinner label="טוען..." />}>
           <Routes>
-            <Route index element={<Navigate to="rabbis" replace />} />
+            <Route index element={<Navigate to="support" replace />} />
             <Route path="rabbis"     element={<RabbisAdminPage />} />
             <Route path="questions"  element={<AdminQuestionsPage />} />
             <Route path="categories" element={<CategoriesAdminPage />} />

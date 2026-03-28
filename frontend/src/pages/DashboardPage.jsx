@@ -111,7 +111,8 @@ function extractRabbiStats(data) {
   // Backend may wrap in { ok, data: {...} }
   const s = data?.rabbi || data?.myStats || data?.data || data || {};
   return {
-    answeredThisMonth: s.answeredThisMonth ?? s.answeredThisWeek ?? s.weekAnswers ?? s.totalAnswered ?? 0,
+    answeredThisMonth: s.answeredThisMonth ?? s.answeredThisWeek ?? s.weekAnswers ?? 0,
+    totalAnswered: s.totalAnswered ?? s.total_answered ?? 0,
     avgResponseTimeLabel: s.avgResponseTimeLabel
       ?? (s.avgResponseTime ? `${s.avgResponseTime}ש'` : '—'),
     thanksReceived: s.thanksReceived ?? s.thanksThisWeek ?? s.totalThanks ?? 0,
@@ -507,29 +508,67 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* ══ Charts row ══ */}
-        <section aria-labelledby="charts-heading">
-          <h2 id="charts-heading" className="sr-only">גרפים</h2>
-          <div
-            className={clsx(
-              'grid gap-6',
-              isAdmin ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
-            )}
+        {/* ══ Pending questions — prominent position ══ */}
+        <section aria-labelledby="pending-questions-heading">
+          <SectionHeading
+            id="pending-questions-heading"
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/questions?status=pending')}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                כל השאלות הממתינות
+              </Button>
+            }
           >
-            <ActivityChart data={weeklyActivity} loading={loading} />
-            {isAdmin && (
-              <CategoryChart data={categoryBreakdown} loading={loading} />
+            שאלות ממתינות
+            {pendingQ.length > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold font-heebo mr-2">
+                {pendingQ.length}
+              </span>
             )}
-          </div>
+          </SectionHeading>
+
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="skeleton h-24 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : pendingQ.length === 0 ? (
+            <Card>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <MessageSquare
+                  className="w-10 h-10 text-[var(--text-muted)] mb-3"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-[var(--text-muted)] font-heebo">
+                  אין שאלות ממתינות לטיפול כרגע
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {pendingQ.map((q) => (
+                <QuestionCard
+                  key={q._id || q.id}
+                  question={q}
+                  mode="pending"
+                  onClaim={handleClaim}
+                  claimLoading={claimingId === (q._id || q.id)}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
-        {/* ══ Middle section: my questions + pending ══ */}
+        {/* ══ My questions + Activity feed row ══ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Left 2/3: question lists */}
+          {/* Left 2/3: my in-process questions */}
           <div className="lg:col-span-2 space-y-6">
-
-            {/* My in-process questions */}
             <section aria-labelledby="my-questions-heading">
               <SectionHeading
                 id="my-questions-heading"
@@ -583,65 +622,9 @@ export default function DashboardPage() {
                 </div>
               )}
             </section>
-
-            {/* Pending questions queue */}
-            <section aria-labelledby="pending-questions-heading">
-              <SectionHeading
-                id="pending-questions-heading"
-                action={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/questions?status=pending')}
-                    leftIcon={<ChevronLeft className="w-4 h-4" />}
-                  >
-                    כל השאלות הממתינות
-                  </Button>
-                }
-              >
-                שאלות ממתינות
-                {pendingQ.length > 0 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold font-heebo mr-2">
-                    {pendingQ.length}
-                  </span>
-                )}
-              </SectionHeading>
-
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="skeleton h-24 w-full rounded-xl" />
-                  ))}
-                </div>
-              ) : pendingQ.length === 0 ? (
-                <Card>
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <MessageSquare
-                      className="w-10 h-10 text-[var(--text-muted)] mb-3"
-                      aria-hidden="true"
-                    />
-                    <p className="text-sm text-[var(--text-muted)] font-heebo">
-                      אין שאלות ממתינות לטיפול כרגע
-                    </p>
-                  </div>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {pendingQ.map((q) => (
-                    <QuestionCard
-                      key={q._id || q.id}
-                      question={q}
-                      mode="pending"
-                      onClaim={handleClaim}
-                      claimLoading={claimingId === (q._id || q.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
           </div>
 
-          {/* Right 1/3: legacy activity feed */}
+          {/* Right 1/3: activity feed with real data */}
           <section aria-labelledby="activity-feed-heading">
             <Card
               header={
@@ -655,32 +638,35 @@ export default function DashboardPage() {
               noPadding
             >
               <div className="px-5 py-3">
-                <ActivityFeed initialItems={[]} />
+                <ActivityFeed initialItems={recentEvents} />
               </div>
             </Card>
           </section>
         </div>
 
-        {/* ══ Bottom row: RecentActivity + OnlineRabbis ══ */}
-        <section aria-labelledby="realtime-heading">
-          <h2 id="realtime-heading" className="sr-only">עדכוני זמן אמת</h2>
+        {/* ══ Charts row ══ */}
+        <section aria-labelledby="charts-heading">
+          <h2 id="charts-heading" className="sr-only">גרפים</h2>
           <div
             className={clsx(
               'grid gap-6',
-              isAdmin ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'
+              isAdmin ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
             )}
           >
-            {/* Recent activity — 2/3 width on admin */}
-            <div className={isAdmin ? 'lg:col-span-2' : ''}>
-              <RecentActivity initialEvents={recentEvents} loading={loading} />
-            </div>
-
-            {/* Online rabbis (admin only) */}
+            <ActivityChart data={weeklyActivity} loading={loading} />
             {isAdmin && (
-              <OnlineRabbis initialRabbis={onlineRabbisList} loading={loading} />
+              <CategoryChart data={categoryBreakdown} loading={loading} />
             )}
           </div>
         </section>
+
+        {/* ══ Online rabbis (admin) ══ */}
+        {isAdmin && (
+          <section aria-labelledby="realtime-heading">
+            <h2 id="realtime-heading" className="sr-only">רבנים מחוברים</h2>
+            <OnlineRabbis initialRabbis={onlineRabbisList} loading={loading} />
+          </section>
+        )}
 
         {/* ══ ROI Stats section (admin only) ══ */}
         {isAdmin && roiStats && (

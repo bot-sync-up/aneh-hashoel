@@ -69,7 +69,7 @@ function TransferModal({ isOpen, onClose, question, onTransferred }) {
 
     try {
       const data = await post(`/questions/transfer/${id}`, {
-        rabbi_id: selectedRabbi,
+        targetRabbiId: selectedRabbi,
         note: note.trim() || undefined,
       });
       onTransferred?.(data.question || data);

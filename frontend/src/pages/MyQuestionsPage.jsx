@@ -326,26 +326,15 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
           className="flex items-center gap-2 px-5 py-2.5 border-t border-[var(--border-default)] bg-[var(--bg-muted)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {canEditAnswer ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Pencil size={12} />}
-                onClick={() => navigate(`/questions/${id}`)}
-              >
-                ערוך תשובה
-              </Button>
-              <span className="text-xs text-amber-600 font-heebo flex items-center gap-1">
-                <Clock size={10} />
-                {minutesLeft} דק' נותרו
-              </span>
-            </>
-          ) : (
-            <span className="text-xs text-[var(--text-muted)] font-heebo flex items-center gap-1">
-              <Lock size={10} />
-              נעול לעריכה
-            </span>
+          {canEditAnswer && (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Pencil size={12} />}
+              onClick={() => navigate(`/questions/${id}?answer=1`)}
+            >
+              ערוך תשובה
+            </Button>
           )}
           <Button
             variant="ghost"
@@ -374,7 +363,7 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
           variant="primary"
           size="sm"
           leftIcon={<Pencil size={13} />}
-          onClick={(e) => { e.stopPropagation(); navigate(`/questions/${id}`); }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/questions/${id}?answer=1`); }}
         >
           המשך לענות
         </Button>

@@ -44,24 +44,6 @@ export default function MessageInput({
     }
   }, 2000);
 
-  const handleKeyDown = useCallback(
-    (e) => {
-      // Emit typing start
-      if (!isTypingRef.current) {
-        emit('discussion:typing', { discussionId, isTyping: true });
-        isTypingRef.current = true;
-      }
-      emitStopTyping();
-
-      // Enter = send; Shift+Enter = newline
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [discussionId, emit, emitStopTyping, handleSend]
-  );
-
   // Auto-resize textarea
   const handleChange = useCallback((e) => {
     setContent(e.target.value);
@@ -109,6 +91,26 @@ export default function MessageInput({
       textareaRef.current?.focus();
     }
   }, [content, discussionId, emit, onSend, replyTo, sending]);
+
+  // ── Key handler (must be after handleSend) ──────────────────────────────
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      // Emit typing start
+      if (!isTypingRef.current) {
+        emit('discussion:typing', { discussionId, isTyping: true });
+        isTypingRef.current = true;
+      }
+      emitStopTyping();
+
+      // Enter = send; Shift+Enter = newline
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [discussionId, emit, emitStopTyping, handleSend]
+  );
 
   // ── Insert emoji into textarea ────────────────────────────────────────────
 

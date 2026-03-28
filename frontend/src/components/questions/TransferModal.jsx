@@ -4,6 +4,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Select from '../ui/Select';
 import { get, post } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * TransferModal — transfer a question to another online rabbi.
@@ -15,6 +16,7 @@ import { get, post } from '../../lib/api';
  *   onTransferred — (updatedQuestion) => void   optional callback after success
  */
 function TransferModal({ isOpen, onClose, question, onTransferred }) {
+  const { rabbi: currentRabbi } = useAuth();
   const [rabbis, setRabbis] = useState([]);
   const [loadingRabbis, setLoadingRabbis] = useState(false);
   const [selectedRabbi, setSelectedRabbi] = useState('');
@@ -34,15 +36,18 @@ function TransferModal({ isOpen, onClose, question, onTransferred }) {
     const fetchRabbis = async () => {
       setLoadingRabbis(true);
       try {
+        const myId = currentRabbi?.id;
+        const filterSelf = (list) => list.filter((r) => String(r.id) !== String(myId));
+
         const data = await get('/rabbis/online');
-        const onlineRabbis = data.rabbis || [];
+        const onlineRabbis = filterSelf(data.rabbis || []);
         if (onlineRabbis.length > 0) {
           setRabbis(onlineRabbis);
         } else {
           // Fallback: load all active rabbis if none online
           const allData = await get('/rabbis');
           const allRabbis = allData.rabbis || allData || [];
-          setRabbis(Array.isArray(allRabbis) ? allRabbis : []);
+          setRabbis(filterSelf(Array.isArray(allRabbis) ? allRabbis : []));
         }
       } catch (err) {
         setFetchError('לא ניתן לטעון את רשימת הרבנים המחוברים.');

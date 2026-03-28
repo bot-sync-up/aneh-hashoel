@@ -158,13 +158,9 @@ export default function QuestionsPage() {
       }, 5000);
     });
 
-    const offClaimed = on('question:claimed', ({ id, assigned_rabbi, status }) => {
-      // Update status to in_process — keep in list but show as claimed
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.id === id ? { ...q, status: status || 'in_process', assigned_rabbi } : q
-        )
-      );
+    const offClaimed = on('question:claimed', ({ id }) => {
+      // Remove claimed question from the pending list
+      setQuestions((prev) => prev.filter((q) => q.id !== id));
     });
 
     const offReleased = on('question:released', ({ id }) => {

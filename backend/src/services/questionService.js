@@ -224,7 +224,7 @@ async function transferQuestion(questionId, fromRabbiId, toRabbiId) {
 
   // Verify target rabbi exists and is active
   const { rows: targetRows } = await dbQuery(
-    `SELECT id FROM rabbis WHERE id = $1 AND active = true`,
+    `SELECT id FROM rabbis WHERE id = $1 AND is_active = true`,
     [toRabbiId]
   );
 

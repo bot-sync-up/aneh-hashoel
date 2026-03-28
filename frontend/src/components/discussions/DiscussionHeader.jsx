@@ -406,7 +406,8 @@ export default function DiscussionHeader({
 
       {/* Action buttons */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {/* Add member */}
+        {/* Add member (creator or admin only) */}
+        {(String(discussion?.created_by) === String(rabbi?.id) || rabbi?.role === 'admin') && (
         <div className="relative">
           <Tooltip content="הוסף משתתף" placement="bottom">
             <button
@@ -500,6 +501,7 @@ export default function DiscussionHeader({
             </div>
           )}
         </div>
+        )}
 
         {/* Lock discussion (creator or admin) */}
         {(String(discussion?.created_by) === String(rabbi?.id) || rabbi?.role === 'admin') && (

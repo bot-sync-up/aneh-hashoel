@@ -254,6 +254,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         updateRabbi,
+        persistAuth,
       }}
     >
       {children}

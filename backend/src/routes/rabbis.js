@@ -675,7 +675,19 @@ router.get('/online', async (req, res, next) => {
   try {
     const io        = req.app.get('io');
     const onlineIds = getOnlineRabbiIds(io);
-    return res.json({ online: onlineIds, count: onlineIds.length });
+
+    // Fetch rabbi details for the online IDs
+    let rabbis = [];
+    if (onlineIds.length > 0) {
+      const placeholders = onlineIds.map((_, i) => `$${i + 1}`).join(',');
+      const { rows } = await db(
+        `SELECT id, name, display_name, email, role FROM rabbis WHERE id IN (${placeholders}) AND is_active = true`,
+        onlineIds
+      );
+      rabbis = rows.map((r) => ({ ...r, is_online: true }));
+    }
+
+    return res.json({ rabbis, online: onlineIds, count: onlineIds.length });
   } catch (err) {
     return next(err);
   }

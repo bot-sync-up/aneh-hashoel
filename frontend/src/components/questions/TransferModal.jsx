@@ -35,7 +35,15 @@ function TransferModal({ isOpen, onClose, question, onTransferred }) {
       setLoadingRabbis(true);
       try {
         const data = await get('/rabbis/online');
-        setRabbis(data.rabbis || data || []);
+        const onlineRabbis = data.rabbis || [];
+        if (onlineRabbis.length > 0) {
+          setRabbis(onlineRabbis);
+        } else {
+          // Fallback: load all active rabbis if none online
+          const allData = await get('/rabbis');
+          const allRabbis = allData.rabbis || allData || [];
+          setRabbis(Array.isArray(allRabbis) ? allRabbis : []);
+        }
       } catch (err) {
         setFetchError('לא ניתן לטעון את רשימת הרבנים המחוברים.');
       } finally {

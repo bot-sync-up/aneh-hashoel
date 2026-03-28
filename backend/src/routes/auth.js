@@ -389,7 +389,7 @@ router.get(
 
       if (isNewDevice) _newDeviceAlert(req, rabbi, device);
 
-      const params = new URLSearchParams({ accessToken, sessionId });
+      const params = new URLSearchParams({ accessToken, refreshToken, sessionId });
       return res.redirect(`${_frontendUrl()}/auth/callback?${params}`);
     } catch (err) {
       return res.redirect(

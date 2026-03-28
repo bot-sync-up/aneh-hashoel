@@ -14,9 +14,10 @@ export default function AuthCallbackPage() {
   const { login, persistAuth } = useAuth();
 
   useEffect(() => {
-    const accessToken = searchParams.get('accessToken');
-    const sessionId   = searchParams.get('sessionId');
-    const error       = searchParams.get('error');
+    const accessToken  = searchParams.get('accessToken');
+    const refreshToken = searchParams.get('refreshToken');
+    const sessionId    = searchParams.get('sessionId');
+    const error        = searchParams.get('error');
 
     if (error) {
       navigate(`/login?error=${encodeURIComponent(error)}`, { replace: true });
@@ -35,7 +36,7 @@ export default function AuthCallbackPage() {
       .then((data) => {
         const rabbi = data.rabbi || data;
         // Use persistAuth to save to localStorage AND update React state
-        persistAuth(rabbi, accessToken, null);
+        persistAuth(rabbi, accessToken, refreshToken);
         // Force page reload to re-initialize AuthContext with the new token
         window.location.href = '/';
       })

@@ -310,7 +310,8 @@ export default function DashboardPage() {
       try {
         await api.post(`/questions/claim/${questionId}`);
         setPendingQ((prev) => prev.filter((q) => (q._id || q.id) !== questionId));
-        navigate(`/questions/${questionId}?answer=1`);
+        // Add to my questions and refresh
+        fetchDashboard();
       } catch (err) {
         const msg =
           err.response?.data?.message ||
@@ -320,7 +321,7 @@ export default function DashboardPage() {
         setClaimingId(null);
       }
     },
-    [navigate]
+    [fetchDashboard]
   );
 
   const handleTimerExpired = useCallback(() => {

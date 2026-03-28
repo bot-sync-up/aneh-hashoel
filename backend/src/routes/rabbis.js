@@ -680,7 +680,7 @@ router.get('/online', async (req, res, next) => {
     let rabbis = [];
     if (onlineIds.length > 0) {
       const placeholders = onlineIds.map((_, i) => `$${i + 1}`).join(',');
-      const { rows } = await db(
+      const { rows } = await query(
         `SELECT id, name, display_name, email, role FROM rabbis WHERE id IN (${placeholders}) AND is_active = true`,
         onlineIds
       );

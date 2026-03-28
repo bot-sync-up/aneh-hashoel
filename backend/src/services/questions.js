@@ -656,7 +656,7 @@ async function getMyQuestions(rabbiId, status = null) {
 
   const result = await query(
     `SELECT q.id, q.title, q.content, q.status, q.urgency, q.difficulty,
-            q.category_id, q.assigned_rabbi_id,
+            q.category_id, q.assigned_rabbi_id, q.wp_post_id,
             q.flagged, q.flag_reason,
             q.thank_count, q.view_count,
             q.created_at, q.updated_at, q.answered_at,

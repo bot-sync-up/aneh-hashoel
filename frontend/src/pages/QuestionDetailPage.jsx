@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   Flame,
@@ -43,6 +43,7 @@ import {
 export default function QuestionDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { rabbi, isAdmin } = useAuth();
   const { on } = useSocket();
 
@@ -56,6 +57,9 @@ export default function QuestionDetailPage() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCreateDiscussion, setShowCreateDiscussion] = useState(false);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
+
+  // Auto-open answer modal if ?answer=1 is in URL
+  const answerParam = searchParams.get('answer');
 
   // UI state
   const [notesOpen, setNotesOpen] = useState(false);
@@ -102,6 +106,13 @@ export default function QuestionDetailPage() {
   useEffect(() => {
     fetchQuestion();
   }, [fetchQuestion]);
+
+  // Auto-open answer editor when ?answer=1 and question is loaded
+  useEffect(() => {
+    if (answerParam === '1' && question && !loading) {
+      setShowAnswerModal(true);
+    }
+  }, [answerParam, question, loading]);
 
   // ── Socket events ─────────────────────────────────────────────────────────
 

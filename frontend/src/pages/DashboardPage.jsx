@@ -200,7 +200,7 @@ export default function DashboardPage() {
       const requests = [
         api.get(endpoint),
         api.get('/dashboard/my-questions'),
-        api.get('/questions', { params: { status: 'pending', limit: 10 } }),
+        api.get('/questions/pending'),
         api.get('/dashboard/activity', { params: { limit: 20 } }),
       ];
       if (isAdmin) {

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import useApi from '../hooks/useApi';
 import { Spinner } from '../components/ui/Spinner';
@@ -12,14 +12,12 @@ import CreateDiscussionModal from '../components/discussions/CreateDiscussionMod
  * On mobile only one panel is shown at a time.
  */
 export default function DiscussionsPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // The active discussion id comes from ?d=<id> query param so deep-links work
   const activeId = searchParams.get('d') || null;
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [questionId, setQuestionId] = useState(null);
 
   const {
     data: discussions,
@@ -189,7 +187,6 @@ export default function DiscussionsPage() {
       <CreateDiscussionModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        questionId={questionId}
         onSuccess={handleCreateSuccess}
       />
     </div>

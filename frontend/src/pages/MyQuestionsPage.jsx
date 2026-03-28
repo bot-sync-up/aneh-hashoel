@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { Inbox, ClipboardEdit, CheckCircle2, Pencil, Clock, Eye, Lock } from 'lucide-react';
+import { Inbox, ClipboardEdit, CheckCircle2, Pencil, Clock, Eye, Lock, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatRelative } from '../lib/utils';
 import PageHeader from '../components/layout/PageHeader';
@@ -275,7 +275,8 @@ const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   const navigate = useNavigate();
-  const { id, title, category_name, answered_at, answer_content, created_at } = question;
+  const { id, title, category_name, answered_at, answer_content, created_at, wp_post_id } = question;
+  const wpUrl = wp_post_id ? `https://moreshet-maran.com/ask-rabai/${wp_post_id}` : null;
 
   const canEditAnswer = tab === 'answered' && !!answered_at &&
     (Date.now() - new Date(answered_at).getTime()) < EDIT_WINDOW_MS;
@@ -326,25 +327,49 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
           className="flex items-center gap-2 px-5 py-2.5 border-t border-[var(--border-default)] bg-[var(--bg-muted)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {canEditAnswer && (
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Pencil size={12} />}
-              onClick={() => navigate(`/questions/${id}?answer=1`)}
+          {canEditAnswer ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Pencil size={12} />}
+                onClick={() => navigate(`/questions/${id}?answer=1`)}
+              >
+                ערוך תשובה
+              </Button>
+              <span className="text-xs text-amber-600 font-heebo flex items-center gap-1">
+                <Clock size={10} />
+                {minutesLeft} דק' נותרו
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-[var(--text-muted)] font-heebo flex items-center gap-1">
+              <Lock size={10} />
+              נעול לעריכה
+            </span>
+          )}
+          {wpUrl ? (
+            <a
+              href={wpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mr-auto inline-flex items-center gap-1 text-xs font-medium font-heebo text-[var(--accent)] hover:underline px-2 py-1"
+              onClick={(e) => e.stopPropagation()}
             >
-              ערוך תשובה
+              <ExternalLink size={12} />
+              צפה באתר
+            </a>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Eye size={12} />}
+              className="mr-auto"
+              onClick={() => navigate(`/questions/${id}`)}
+            >
+              צפה
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Eye size={12} />}
-            className="mr-auto"
-            onClick={() => navigate(`/questions/${id}`)}
-          >
-            צפה
-          </Button>
         </div>
       </div>
     );

@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
-import { Flame, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Flame, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import Badge from '../ui/Badge';
 import { post } from '../../lib/api';
 import { getCategoryLabel, colorFromCategory } from '../../lib/utils';
 
@@ -18,7 +16,6 @@ import { getCategoryLabel, colorFromCategory } from '../../lib/utils';
  *   onClaimed — (updatedQuestion) => void   optional callback after success
  */
 function ClaimConfirmModal({ isOpen, onClose, question, onClaimed }) {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -34,7 +31,6 @@ function ClaimConfirmModal({ isOpen, onClose, question, onClaimed }) {
       const data = await post(`/questions/claim/${id}`);
       onClaimed?.(data.question || data);
       onClose();
-      navigate(`/questions/${id}`);
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -66,10 +62,10 @@ function ClaimConfirmModal({ isOpen, onClose, question, onClaimed }) {
             onClick={handleConfirm}
             loading={loading}
             disabled={loading}
-            leftIcon={<Flame size={15} />}
+            leftIcon={<CheckCircle2 size={15} />}
             className="bg-brand-gold hover:bg-brand-gold-dark text-white"
           >
-            כן, אני רוצה לענות
+            כן, תפוס שאלה
           </Button>
           <Button
             variant="ghost"

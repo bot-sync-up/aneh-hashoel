@@ -11,10 +11,11 @@ import { get } from '../../lib/api';
 export default function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { persistAuth } = useAuth();
+  const { login, persistAuth } = useAuth();
 
   useEffect(() => {
     const accessToken = searchParams.get('accessToken');
+    const sessionId   = searchParams.get('sessionId');
     const error       = searchParams.get('error');
 
     if (error) {
@@ -33,8 +34,10 @@ export default function AuthCallbackPage() {
     get('/auth/me')
       .then((data) => {
         const rabbi = data.rabbi || data;
+        // Use persistAuth to save to localStorage AND update React state
         persistAuth(rabbi, accessToken, null);
-        navigate('/dashboard', { replace: true });
+        // Force page reload to re-initialize AuthContext with the new token
+        window.location.href = '/';
       })
       .catch(() => {
         localStorage.removeItem('auth_token');

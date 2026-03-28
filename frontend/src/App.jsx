@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { FullPageSpinner } from './components/ui/Spinner';
 import Layout from './components/layout/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-loaded pages
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
@@ -10,7 +11,7 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const QuestionsPage = React.lazy(() => import('./pages/QuestionsPage'));
 const QuestionDetailPage = React.lazy(() => import('./pages/QuestionDetailPage'));
 const MyQuestionsPage = React.lazy(() => import('./pages/MyQuestionsPage'));
-const DiscussionsPage = React.lazy(() => import('./pages/DiscussionsPage'));
+import DiscussionsPage from './pages/DiscussionsPage';
 const DiscussionDetailPage = React.lazy(() => import('./pages/DiscussionDetailPage'));
 const TemplatesPage = React.lazy(() => import('./pages/TemplatesPage'));
 const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
@@ -108,6 +109,7 @@ export default function App() {
           element={
             <PrivateRoute>
               <Layout>
+                <ErrorBoundary>
                 <React.Suspense fallback={<FullPageSpinner label="טוען..." />}>
                   <Routes>
                     <Route index element={<DashboardPage />} />
@@ -143,6 +145,7 @@ export default function App() {
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </React.Suspense>
+                </ErrorBoundary>
               </Layout>
             </PrivateRoute>
           }

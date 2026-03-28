@@ -8,6 +8,18 @@ import { SocketProvider } from './contexts/SocketContext';
 import App from './App';
 import './styles/globals.css';
 
+// Auto-reload on stale chunk errors after deploy
+window.addEventListener('error', (event) => {
+  if (
+    event.message?.includes('Failed to fetch dynamically imported module') ||
+    event.message?.includes('Importing a module script failed') ||
+    event.message?.includes('Loading chunk')
+  ) {
+    console.warn('[main] Stale chunk detected, reloading...');
+    window.location.reload();
+  }
+});
+
 const container = document.getElementById('root');
 const root = createRoot(container);
 

@@ -308,7 +308,7 @@ export default function DashboardPage() {
     async (questionId) => {
       setClaimingId(questionId);
       try {
-        await api.post(`/questions/${questionId}/claim`);
+        await api.post(`/questions/claim/${questionId}`);
         setPendingQ((prev) => prev.filter((q) => (q._id || q.id) !== questionId));
         navigate(`/questions/${questionId}?answer=1`);
       } catch (err) {
@@ -372,6 +372,18 @@ export default function DashboardPage() {
           answeredThisMonth: (prev.answeredThisMonth ?? 0) + 1,
           openQuestions: Math.max(0, (prev.openQuestions ?? 0) - 1),
         }));
+      }),
+
+      on('question:transferred', (payload) => {
+        // A question was transferred — refresh my questions list
+        const qId = payload?.questionId || payload?.id;
+        if (qId) {
+          setMyQuestions((prev) => prev.filter((q) => (q._id || q.id) !== qId));
+        }
+        // If transferred TO me, add it
+        if (payload?.question && String(payload?.toRabbiId) === String(rabbi?.id)) {
+          setMyQuestions((prev) => [payload.question, ...prev]);
+        }
       }),
 
       on('rabbi:online', (payload) => {

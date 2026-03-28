@@ -28,6 +28,7 @@ router.get("/stats", async (req, res) => {
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - 7);
+    weekStart.setHours(0, 0, 0, 0);
 
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -60,7 +61,7 @@ router.get("/stats", async (req, res) => {
       weekAnswers: parseInt(weekAnswered.rows[0].count, 10),
       avgResponseTime: avgHours,
       avgResponseTimeLabel: avgHours != null
-        ? (avgHours < 1 ? `${Math.round(avgHours * 60)} דק'` : `${avgHours} שעות`)
+        ? (avgHours < 1 ? `${Math.round(avgHours * 60)} דק'` : avgHours === 1 ? 'שעה' : `${avgHours} שעות`)
         : '—',
       weeklyActivity: [],
       categoryBreakdown: [],

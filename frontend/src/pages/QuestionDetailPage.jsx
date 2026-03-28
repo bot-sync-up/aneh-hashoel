@@ -134,7 +134,7 @@ export default function QuestionDetailPage() {
       setQuestion((prev) => prev ? { ...prev, ...payload } : prev);
     });
 
-    const offThank = on('question:thanked', ({ id: qId, thank_count }) => {
+    const offThank = on('question:thankReceived', ({ questionId: qId, thankCount: thank_count }) => {
       if (String(qId) !== String(id)) return;
       setQuestion((prev) => prev ? { ...prev, thank_count } : prev);
     });

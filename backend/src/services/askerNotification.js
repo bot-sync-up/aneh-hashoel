@@ -333,15 +333,18 @@ async function notifyAskerFollowUp(questionId) {
   if (email) {
     try {
       const { createEmailHTML } = require('../templates/emailBase');
-      const followUpHtml = createEmailHTML(`
-        <p style="margin:0 0 12px; font-size:15px;">הרב ${data.rabbi_name} השיב לשאלת ההמשך שלך:</p>
+      const followUpHtml = createEmailHTML(
+        'תשובת המשך לשאלתך',
+        `<p style="margin:0 0 12px; font-size:15px;">הרב ${data.rabbi_name} השיב לשאלת ההמשך שלך:</p>
         <div style="background:#f8f6f0; border-right:3px solid #B8973A; padding:12px 16px; border-radius:4px; margin:12px 0;">
           <p style="font-weight:bold; margin:0 0 6px;">שאלה: ${data.title}</p>
         </div>
         <div style="background:#fff; border:1px solid #eee; padding:12px 16px; border-radius:4px; margin:12px 0;">
           ${data.follow_up_answer || ''}
-        </div>
-      `, { systemName: 'מערכת שאל את הרב' });
+        </div>`,
+        answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [],
+        { systemName: 'מערכת שאל את הרב' }
+      );
       await sendEmail(
         email,
         'תשובת המשך לשאלתך — ענה את השואל',

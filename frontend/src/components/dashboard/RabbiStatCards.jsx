@@ -37,7 +37,7 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
       value: stats.avgResponseTimeLabel ?? '—',
       subtitle: 'שעות בממוצע',
       icon: <Timer />,
-      color: 'gold',
+      color: 'blue',
       trend: stats.responseTrend ?? null,
     },
     {
@@ -45,7 +45,7 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
       value: stats.thanksReceived ?? 0,
       subtitle: 'מתחילת הדרך',
       icon: <Heart />,
-      color: 'gold',
+      color: 'rose',
       trend: stats.thanksTrend ?? null,
     },
     {
@@ -53,7 +53,7 @@ export default function RabbiStatCards({ stats = {}, loading = false }) {
       value: stats.openQuestions ?? 0,
       subtitle: 'ממתינות לתגובה',
       icon: <Inbox />,
-      color: stats.openQuestions > 0 ? 'amber' : 'emerald',
+      color: (stats.openQuestions ?? 0) > 0 ? 'amber' : 'emerald',
       trend: null,
     },
   ];

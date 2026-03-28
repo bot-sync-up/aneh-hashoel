@@ -681,7 +681,7 @@ router.get('/online', async (req, res, next) => {
     if (onlineIds.length > 0) {
       const placeholders = onlineIds.map((_, i) => `$${i + 1}`).join(',');
       const { rows } = await query(
-        `SELECT id, name, display_name, email, role FROM rabbis WHERE id IN (${placeholders}) AND is_active = true`,
+        `SELECT id, name, email, role FROM rabbis WHERE id IN (${placeholders}) AND is_active = true`,
         onlineIds
       );
       rabbis = rows.map((r) => ({ ...r, is_online: true }));

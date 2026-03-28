@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 import { Flame, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -31,6 +32,7 @@ function ClaimConfirmModal({ isOpen, onClose, question, onClaimed }) {
       const data = await post(`/questions/claim/${id}`);
       onClaimed?.(data.question || data);
       onClose();
+      toast.success(`השאלה "${title}" נתפסה בהצלחה! תוכל למצוא אותה ב"השאלות שלי".`);
     } catch (err) {
       const message =
         err.response?.data?.message ||

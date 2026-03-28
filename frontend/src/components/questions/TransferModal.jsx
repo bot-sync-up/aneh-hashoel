@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -85,8 +86,10 @@ function TransferModal({ isOpen, onClose, question, onTransferred }) {
         targetRabbiId: selectedRabbi,
         note: note.trim() || undefined,
       });
+      const targetName = rabbis.find((r) => String(r.id) === String(selectedRabbi))?.name || 'הרב';
       onTransferred?.(data.question || data);
       onClose();
+      toast.success(`השאלה הועברה בהצלחה להרב ${targetName}`);
     } catch (err) {
       const message =
         err.response?.data?.message ||

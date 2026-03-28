@@ -11,7 +11,7 @@ const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const QuestionsPage = React.lazy(() => import('./pages/QuestionsPage'));
 const QuestionDetailPage = React.lazy(() => import('./pages/QuestionDetailPage'));
 const MyQuestionsPage = React.lazy(() => import('./pages/MyQuestionsPage'));
-import DiscussionsPage from './pages/DiscussionsPage';
+const DiscussionsPage = React.lazy(() => import('./pages/DiscussionsPage'));
 const DiscussionDetailPage = React.lazy(() => import('./pages/DiscussionDetailPage'));
 const TemplatesPage = React.lazy(() => import('./pages/TemplatesPage'));
 const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));

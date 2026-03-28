@@ -22,6 +22,7 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../../middleware/authenticate');
 const analyticsService = require('../../services/analyticsService');
+const { getOnlineRabbiIds } = require('../../socket/helpers');
 
 const router = express.Router();
 
@@ -44,6 +45,11 @@ router.use(authenticate, requireAdmin);
 router.get('/stats', async (req, res) => {
   try {
     const stats = await analyticsService.getOverviewStats();
+    // Override onlineRabbis with real-time socket data
+    const io = req.app.get('io');
+    if (io) {
+      stats.onlineRabbis = getOnlineRabbiIds(io).length;
+    }
     return res.json({ ok: true, data: stats });
   } catch (err) {
     console.error('[dashboard] GET /stats error:', err.message);

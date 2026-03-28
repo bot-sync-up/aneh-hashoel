@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import useApi from '../hooks/useApi';
 import { Spinner } from '../components/ui/Spinner';
-import DiscussionList from '../components/discussions/DiscussionList';
-import DiscussionChat from '../components/discussions/DiscussionChat';
-import CreateDiscussionModal from '../components/discussions/CreateDiscussionModal';
+import api from '../lib/api';
+
+// Lazy-load heavy discussion components to avoid TDZ bundling issues
+const DiscussionList = React.lazy(() => import('../components/discussions/DiscussionList'));
+const DiscussionChat = React.lazy(() => import('../components/discussions/DiscussionChat'));
+const CreateDiscussionModal = React.lazy(() => import('../components/discussions/CreateDiscussionModal'));
 
 /**
  * /discussions — Two-panel layout: discussion list (right) + active chat (left).
@@ -18,22 +20,28 @@ export default function DiscussionsPage() {
   const activeId = searchParams.get('d') || null;
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [discussions, setDiscussions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const {
-    data: discussions,
-    loading,
-    error,
-    execute: refetch,
-    setData: setDiscussions,
-  } = useApi('/discussions', {
-    immediate: false,
-    transform: (d) => (Array.isArray(d) ? d : d?.discussions ?? []),
-  });
+  // Fetch discussions on mount
+  const fetchDiscussions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get('/discussions');
+      const list = Array.isArray(data) ? data : data?.discussions ?? [];
+      setDiscussions(list);
+    } catch (err) {
+      setError(err.message || 'שגיאה בטעינת הדיונים');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Fetch on mount
   React.useEffect(() => {
-    refetch();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchDiscussions();
+  }, [fetchDiscussions]);
 
   const handleSelectDiscussion = useCallback(
     (id) => {
@@ -52,7 +60,7 @@ export default function DiscussionsPage() {
       setShowCreateModal(false);
       setSearchParams({ d: newDiscussion.id });
     },
-    [setDiscussions, setSearchParams]
+    [setSearchParams]
   );
 
   // Update unread count when a message is received
@@ -66,7 +74,7 @@ export default function DiscussionsPage() {
         )
       );
     },
-    [setDiscussions]
+    []
   );
 
   // Mark discussion read in the list
@@ -78,7 +86,7 @@ export default function DiscussionsPage() {
         )
       );
     },
-    [setDiscussions]
+    []
   );
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -132,7 +140,7 @@ export default function DiscussionsPage() {
                 שגיאה בטעינת הדיונים.{' '}
                 <button
                   className="underline"
-                  onClick={() => refetch()}
+                  onClick={() => fetchDiscussions()}
                 >
                   נסה שוב
                 </button>
@@ -140,11 +148,13 @@ export default function DiscussionsPage() {
             </div>
           )}
           {!loading && !error && (
-            <DiscussionList
-              discussions={discussions || []}
-              activeId={activeId}
-              onSelect={handleSelectDiscussion}
-            />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><Spinner size="md" /></div>}>
+              <DiscussionList
+                discussions={discussions || []}
+                activeId={activeId}
+                onSelect={handleSelectDiscussion}
+              />
+            </Suspense>
           )}
         </div>
       )}
@@ -153,13 +163,15 @@ export default function DiscussionsPage() {
       {showChat && (
         <div className="flex-1 flex flex-col min-w-0 bg-[#F8F6F1]">
           {activeId ? (
-            <DiscussionChat
-              key={activeId}
-              discussionId={activeId}
-              onBack={handleBackToList}
-              onUnreadUpdate={handleUnreadUpdate}
-              onMarkRead={handleMarkRead}
-            />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center"><Spinner size="md" /></div>}>
+              <DiscussionChat
+                key={activeId}
+                discussionId={activeId}
+                onBack={handleBackToList}
+                onUnreadUpdate={handleUnreadUpdate}
+                onMarkRead={handleMarkRead}
+              />
+            </Suspense>
           ) : (
             /* Empty state when no discussion selected */
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
@@ -184,11 +196,15 @@ export default function DiscussionsPage() {
       )}
 
       {/* ── Create discussion modal ───────────────────────── */}
-      <CreateDiscussionModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleCreateSuccess}
-      />
+      {showCreateModal && (
+        <Suspense fallback={null}>
+          <CreateDiscussionModal
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={handleCreateSuccess}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

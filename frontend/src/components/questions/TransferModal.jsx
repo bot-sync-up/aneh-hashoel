@@ -40,16 +40,15 @@ function TransferModal({ isOpen, onClose, question, onTransferred }) {
         const myId = currentRabbi?.id;
         const filterSelf = (list) => list.filter((r) => String(r.id) !== String(myId));
 
-        const data = await get('/rabbis/online');
-        const onlineRabbis = filterSelf(data.rabbis || []);
-        if (onlineRabbis.length > 0) {
-          setRabbis(onlineRabbis);
-        } else {
-          // Fallback: load all active rabbis if none online
-          const allData = await get('/rabbis');
-          const allRabbis = allData.rabbis || allData || [];
-          setRabbis(filterSelf(Array.isArray(allRabbis) ? allRabbis : []));
-        }
+        // Load all active rabbis + mark who is online
+        const [allData, onlineData] = await Promise.all([
+          get('/rabbis'),
+          get('/rabbis/online').catch(() => ({ online: [] })),
+        ]);
+        const onlineIds = new Set((onlineData.online || []).map(String));
+        const allRabbis = allData.rabbis || allData || [];
+        const list = filterSelf(Array.isArray(allRabbis) ? allRabbis : []);
+        setRabbis(list.map((r) => ({ ...r, is_online: onlineIds.has(String(r.id)) })));
       } catch (err) {
         setFetchError('לא ניתן לטעון את רשימת הרבנים המחוברים.');
       } finally {

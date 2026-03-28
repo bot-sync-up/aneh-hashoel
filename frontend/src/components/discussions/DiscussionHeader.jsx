@@ -424,17 +424,18 @@ export default function DiscussionHeader({
             </button>
           </Tooltip>
 
-          {/* Add member dropdown */}
+          {/* Members toggle board */}
           {showAddMember && (
             <div
               className="
                 absolute left-0 top-full mt-1 z-30
-                w-56 bg-[var(--bg-surface)] border border-[var(--border-default)]
+                w-72 bg-[var(--bg-surface)] border border-[var(--border-default)]
                 rounded-lg shadow-lg overflow-hidden
               "
               dir="rtl"
             >
-              <div className="p-2 border-b border-[var(--border-default)]">
+              <div className="px-3 py-2 border-b border-[var(--border-default)] bg-[var(--bg-muted)]">
+                <p className="text-xs font-bold font-heebo text-[var(--text-primary)] mb-1.5">ניהול משתתפים</p>
                 <input
                   type="search"
                   value={addSearch}
@@ -444,7 +445,7 @@ export default function DiscussionHeader({
                   dir="rtl"
                   className="
                     w-full px-2.5 py-1.5 text-sm font-heebo rounded-md
-                    bg-[var(--bg-muted)] border border-transparent
+                    bg-[var(--bg-surface)] border border-[var(--border-default)]
                     focus:outline-none focus:border-[#1B2B5E]
                     text-right direction-rtl
                   "
@@ -458,35 +459,48 @@ export default function DiscussionHeader({
               )}
 
               {!addLoading && filteredRabbis.length > 0 && (
-                <ul className="max-h-52 overflow-y-auto">
+                <ul className="max-h-64 overflow-y-auto divide-y divide-[var(--border-default)]">
                   {filteredRabbis.map((r) => {
-                    const alreadyMember = members.some((m) => m.id === r.id);
+                    const isMember = members.some((m) => m.id === r.id);
+                    const isDiscussionCreator = String(r.id) === String(discussion?.created_by);
                     return (
                       <li key={r.id}>
-                        <button
-                          type="button"
-                          disabled={alreadyMember}
-                          onClick={() => handleAddMember(r)}
+                        <label
                           className={clsx(
-                            'w-full flex items-center gap-2 px-3 py-2 text-sm font-heebo text-right',
-                            'hover:bg-[var(--bg-muted)] transition-colors duration-100',
-                            alreadyMember && 'opacity-50 cursor-not-allowed'
+                            'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-heebo text-right',
+                            'transition-colors duration-100',
+                            isDiscussionCreator ? 'cursor-default' : 'cursor-pointer hover:bg-[var(--bg-muted)]',
+                            isMember && 'bg-[#1B2B5E]/5'
                           )}
                         >
+                          <input
+                            type="checkbox"
+                            checked={isMember}
+                            disabled={isDiscussionCreator}
+                            onChange={() => {
+                              if (isMember && !isDiscussionCreator) {
+                                handleRemoveMember(r.id);
+                              } else if (!isMember) {
+                                handleAddMember(r);
+                              }
+                            }}
+                            className="rounded border-[var(--border-default)] text-[#1B2B5E] focus:ring-[#1B2B5E]/20 w-4 h-4 flex-shrink-0"
+                          />
                           <Avatar
                             src={r.avatar_url}
                             name={r.name || r.full_name}
                             size="xs"
                           />
-                          <span className="truncate text-[var(--text-primary)]">
+                          <span className="truncate text-[var(--text-primary)] flex-1">
                             {r.name || r.full_name}
                           </span>
-                          {alreadyMember && (
-                            <span className="text-xs text-[var(--text-muted)] mr-auto">
-                              משתתף
-                            </span>
+                          {isDiscussionCreator && (
+                            <span className="text-[10px] text-[#B8973A] font-medium mr-auto">יוצר</span>
                           )}
-                        </button>
+                          {onlineIds.has(r.id) && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                          )}
+                        </label>
                       </li>
                     );
                   })}
@@ -494,10 +508,16 @@ export default function DiscussionHeader({
               )}
 
               {!addLoading && filteredRabbis.length === 0 && (
-                <p className="text-xs text-[var(--text-muted)] font-heebo px-3 py-2">
+                <p className="text-xs text-[var(--text-muted)] font-heebo px-3 py-3 text-center">
                   לא נמצאו רבנים
                 </p>
               )}
+
+              <div className="px-3 py-2 border-t border-[var(--border-default)] bg-[var(--bg-muted)]">
+                <p className="text-[10px] text-[var(--text-muted)] font-heebo text-center">
+                  {members.length} משתתפים בדיון
+                </p>
+              </div>
             </div>
           )}
         </div>

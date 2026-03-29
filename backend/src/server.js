@@ -26,6 +26,9 @@ const morgan         = require('morgan');
 const { createServer }  = require('http');
 const { Server }        = require('socket.io');
 
+const { logger, morganStream } = require('./utils/logger');
+const log = logger.child({ module: 'server' });
+
 // ─── Infrastructure ───────────────────────────────────────────────────────────
 
 const { closePool }        = require('./db/pool');
@@ -98,10 +101,8 @@ app.use(
   })
 );
 
-// HTTP request logging
-// Use 'dev' format in development for colourised, concise output;
-// use 'combined' (Apache format) in production for structured log ingestion.
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// HTTP request logging — pipe Morgan output through pino
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: morganStream }));
 
 // JSON body parsing (10 MB limit to accept rich question content)
 app.use(express.json({ limit: '10mb' }));
@@ -175,7 +176,7 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('[server] Unhandled error:', err.stack || err.message);
+  log.error({ err }, 'Unhandled error');
   res.status(err.status || 500).json({
     error: err.message || 'שגיאת שרת פנימית',
   });
@@ -190,38 +191,38 @@ app.use((err, req, res, next) => {
  * @param {NodeJS.Signals} signal
  */
 async function shutdown(signal) {
-  console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+  log.info({ signal }, 'Shutting down gracefully...');
 
   // Stop accepting new HTTP connections
   httpServer.close(async () => {
-    console.log('[server] HTTP server closed');
+    log.info('HTTP server closed');
 
     // Close Socket.io (disconnect all clients cleanly)
     io.close(() => {
-      console.log('[server] Socket.io server closed');
+      log.info('Socket.io server closed');
     });
 
     try {
       await closeRedis();
-      console.log('[server] Redis closed');
+      log.info('Redis closed');
     } catch (err) {
-      console.error('[server] Error closing Redis:', err.message);
+      log.error({ err }, 'Error closing Redis');
     }
 
     try {
       await closePool();
-      console.log('[server] DB pool closed');
+      log.info('DB pool closed');
     } catch (err) {
-      console.error('[server] Error closing DB pool:', err.message);
+      log.error({ err }, 'Error closing DB pool');
     }
 
-    console.log('[server] Shutdown complete');
+    log.info('Shutdown complete');
     process.exit(0);
   });
 
   // Force exit after 15 s if graceful shutdown stalls
   setTimeout(() => {
-    console.error('[server] Graceful shutdown timed out — forcing exit');
+    log.fatal('Graceful shutdown timed out — forcing exit');
     process.exit(1);
   }, 15_000).unref();
 }
@@ -246,18 +247,18 @@ async function start() {
   // Verify DB connectivity on startup
   try {
     await pool.query('SELECT 1');
-    console.log('[server] PostgreSQL connected');
+    log.info('PostgreSQL connected');
   } catch (err) {
-    console.error('[server] PostgreSQL connection failed:', err.message);
+    log.fatal({ err }, 'PostgreSQL connection failed');
     process.exit(1);
   }
 
   // Connect Redis (non-fatal: degrade gracefully if unavailable)
   try {
     await connectRedis();
-    console.log('[server] Redis connected');
+    log.info('Redis connected');
   } catch (err) {
-    console.warn('[server] Redis unavailable — continuing without Redis:', err.message);
+    log.warn({ err }, 'Redis unavailable — continuing without Redis');
   }
 
   // Wire Socket.io authentication + event handlers
@@ -269,15 +270,17 @@ async function start() {
   const PORT = parseInt(process.env.PORT || '3001', 10);
 
   httpServer.listen(PORT, () => {
-    console.log(`[server] Listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
-    console.log(`[server] Frontend: ${FRONTEND_URL}`);
+    log.info({ port: PORT, env: process.env.NODE_ENV || 'development', frontendUrl: FRONTEND_URL }, `Listening on port ${PORT}`);
   });
 }
 
-start().catch((err) => {
-  console.error('[server] Fatal startup error:', err.stack || err.message);
-  process.exit(1);
-});
+// Skip startup when imported for testing (NODE_ENV=test)
+if (process.env.NODE_ENV !== 'test') {
+  start().catch((err) => {
+    log.fatal({ err }, 'Fatal startup error');
+    process.exit(1);
+  });
+}
 
 // ─── Exports (for testing) ────────────────────────────────────────────────────
 

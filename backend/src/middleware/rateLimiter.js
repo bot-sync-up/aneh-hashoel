@@ -49,15 +49,13 @@ async function getRedis() {
   try {
     const client = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
     client.on('error', (err) => {
-      logger.warn('thankLimiter Redis error', { message: err.message });
+      logger.warn({ err }, 'thankLimiter Redis error');
     });
     await client.connect();
     _redis = client;
     return _redis;
   } catch (err) {
-    logger.warn('thankLimiter could not connect to Redis — falling back to allow', {
-      message: err.message,
-    });
+    logger.warn({ err }, 'thankLimiter could not connect to Redis — falling back to allow');
     return null;
   }
 }
@@ -242,9 +240,7 @@ async function thankRateLimitPerQuestion(req, res, next) {
 
     return next();
   } catch (err) {
-    logger.warn('thankRateLimitPerQuestion Redis error — allowing request', {
-      message: err.message,
-    });
+    logger.warn({ err }, 'thankRateLimitPerQuestion Redis error — allowing request');
     return next();
   }
 }

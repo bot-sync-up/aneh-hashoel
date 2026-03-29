@@ -18,6 +18,7 @@ import {
   Pencil,
   Send,
   Paperclip,
+  History,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import Card from '../components/ui/Card';
@@ -27,6 +28,7 @@ import { BlockSpinner } from '../components/ui/Spinner';
 import ClaimConfirmModal from '../components/questions/ClaimConfirmModal';
 import AnswerEditorAdvanced from '../components/answer/AnswerEditor';
 import EditAnswerEditor from '../components/answer/EditAnswerEditor';
+import AnswerVersionsModal from '../components/answer/AnswerVersionsModal';
 import ReleaseConfirmModal from '../components/questions/ReleaseConfirmModal';
 import TransferModal from '../components/questions/TransferModal';
 import { get, post, put, patch } from '../lib/api';
@@ -58,6 +60,7 @@ export default function QuestionDetailPage() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showCreateDiscussion, setShowCreateDiscussion] = useState(false);
   const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
 
   // Auto-open answer modal if ?answer=1 is in URL
   const answerParam = searchParams.get('answer');
@@ -250,6 +253,7 @@ export default function QuestionDetailPage() {
     discussion_count = 0,
     attachment_url,
     question_number,
+    answer_id,
   } = question;
 
   const isMyAnswer = rabbi && answer_rabbi_id && String(answer_rabbi_id) === String(rabbi?.id);
@@ -629,6 +633,14 @@ export default function QuestionDetailPage() {
           </div>
         )}
 
+        {/* Answer version history modal */}
+        {showVersions && answer_id && (
+          <AnswerVersionsModal
+            answerId={answer_id}
+            onClose={() => setShowVersions(false)}
+          />
+        )}
+
         {/* IN PROCESS — by another rabbi */}
         {isInProcessByOther && (
           <div className="flex items-center gap-3 p-5 bg-blue-50 border border-blue-200 rounded-card dark:bg-blue-900/20 dark:border-blue-700">
@@ -665,6 +677,17 @@ export default function QuestionDetailPage() {
                 <span className="text-xs text-[var(--text-muted)] font-heebo">
                   {formatDate(answered_at)}
                 </span>
+                {answer_id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<History size={13} />}
+                    onClick={() => setShowVersions(true)}
+                    className="text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                  >
+                    היסטוריית גרסאות
+                  </Button>
+                )}
                 {canEditAnswer && (
                   <Button
                     variant="ghost"

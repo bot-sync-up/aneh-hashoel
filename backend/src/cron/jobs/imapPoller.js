@@ -28,8 +28,9 @@
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const { query: db } = require('../../db/pool');
+const { logger } = require('../../utils/logger');
 
-const TAG = '[imapPoller]';
+const log = logger.child({ module: 'imapPoller' });
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ async function sendConfirmation(rabbiEmail, type, questionTitle, questionId) {
 
     await sendEmail(rabbiEmail, subject, html);
   } catch (err) {
-    console.warn(TAG, 'Failed to send confirmation email:', err.message);
+    log.warn({ err, rabbiEmail, type, questionId }, 'Failed to send confirmation email');
   }
 }
 
@@ -157,7 +158,7 @@ async function processEmail(parsed) {
   const textBody = parsed.text || '';
 
   if (!from) {
-    console.log(TAG, 'Skipping email with no sender');
+    log.debug('Skipping email with no sender');
     return false;
   }
 
@@ -181,7 +182,7 @@ async function processEmail(parsed) {
   // Extract question ID from subject
   const questionId = extractQuestionId(subject);
   if (!questionId) {
-    console.log(TAG, `Skipping email from ${from} — no question ID in subject: "${subject}"`);
+    log.debug({ from, subject }, 'Skipping email — no question ID in subject');
     return false;
   }
 
@@ -192,7 +193,7 @@ async function processEmail(parsed) {
   );
 
   if (rabbiRows.length === 0) {
-    console.log(TAG, `Skipping email from ${from} — no matching active rabbi`);
+    log.debug({ from }, 'Skipping email — no matching active rabbi');
     return false;
   }
 
@@ -205,7 +206,7 @@ async function processEmail(parsed) {
   );
 
   if (questionRows.length === 0) {
-    console.log(TAG, `Question ${questionId} not found`);
+    log.warn({ questionId }, 'Question not found');
     return false;
   }
 
@@ -216,7 +217,7 @@ async function processEmail(parsed) {
   if (question.status === 'answered') {
     const emailDate = parsed.date ? new Date(parsed.date).getTime() : 0;
     const isRecent = emailDate && (Date.now() - emailDate) < 10 * 60 * 1000;
-    console.log(TAG, `Question ${questionId} already answered — skipping`);
+    log.debug({ questionId }, 'Question already answered — skipping');
     if (isRecent) {
       await sendConfirmation(from, 'already_answered', questionTitle, questionId);
     }
@@ -230,7 +231,7 @@ async function processEmail(parsed) {
   if (isClaimOnly(rawText)) {
     // Already claimed by someone else?
     if (question.status === 'in_process' && question.assigned_rabbi_id && String(question.assigned_rabbi_id) !== String(rabbi.id)) {
-      console.log(TAG, `Q:${questionId} already claimed by another rabbi — notifying ${from}`);
+      log.info({ questionId, from }, 'Question already claimed by another rabbi');
       await sendConfirmation(from, 'already_claimed', questionTitle, questionId);
       return false;
     }
@@ -241,20 +242,20 @@ async function processEmail(parsed) {
         `UPDATE questions SET status = 'in_process', assigned_rabbi_id = $1, lock_timestamp = NOW() WHERE id = $2`,
         [rabbi.id, questionId]
       );
-      console.log(TAG, `Claim-only via email: Q:${questionId} by ${rabbi.name}`);
+      log.info({ questionId, rabbiName: rabbi.name }, 'Claim-only via email');
       await sendConfirmation(from, 'claimed', questionTitle, questionId);
       return true;
     }
 
     // Already claimed by me
-    console.log(TAG, `Q:${questionId} already claimed by ${rabbi.name}`);
+    log.debug({ questionId, rabbiName: rabbi.name }, 'Question already claimed by this rabbi');
     await sendConfirmation(from, 'claimed', questionTitle, questionId);
     return false;
   }
 
   // This is an answer
   if (!rawText || rawText.length < 5) {
-    console.log(TAG, `Email from ${from} for Q:${questionId} — body too short after stripping`);
+    log.debug({ from, questionId }, 'Email body too short after stripping');
     return false;
   }
 
@@ -266,14 +267,14 @@ async function processEmail(parsed) {
 
   // Auto-claim if question is pending
   if (question.status === 'pending' || !question.assigned_rabbi_id) {
-    console.log(TAG, `Auto-claiming Q:${questionId} for rabbi ${rabbi.name}`);
+    log.info({ questionId, rabbiName: rabbi.name }, 'Auto-claiming question for rabbi');
     await db(
       `UPDATE questions SET status = 'in_process', assigned_rabbi_id = $1, lock_timestamp = NOW() WHERE id = $2`,
       [rabbi.id, questionId]
     );
   } else if (String(question.assigned_rabbi_id) !== String(rabbi.id)) {
     if (rabbi.role !== 'admin') {
-      console.log(TAG, `Q:${questionId} assigned to another rabbi — notifying ${from}`);
+      log.info({ questionId, from }, 'Question assigned to another rabbi');
       await sendConfirmation(from, 'already_claimed', questionTitle, questionId);
       return false;
     }
@@ -303,7 +304,7 @@ async function processEmail(parsed) {
     [rabbi.id, questionId]
   );
 
-  console.log(TAG, `Answer submitted via email: Q:${questionId} by ${rabbi.name} (${from})`);
+  log.info({ questionId, rabbiName: rabbi.name, from }, 'Answer submitted via email');
   await sendConfirmation(from, 'answered', questionTitle, questionId);
   return true;
 }
@@ -314,7 +315,7 @@ async function runImapPoller() {
   const config = getImapConfig();
 
   if (!config.host || !config.user || !config.password) {
-    console.log(TAG, 'IMAP not configured — skipping');
+    log.debug('IMAP not configured — skipping');
     return;
   }
 
@@ -326,7 +327,7 @@ async function runImapPoller() {
     imap.once('ready', () => {
       imap.openBox('INBOX', false, (err) => {
         if (err) {
-          console.error(TAG, 'Failed to open INBOX:', err.message);
+          log.error({ err }, 'Failed to open INBOX');
           imap.end();
           return resolve();
         }
@@ -334,7 +335,7 @@ async function runImapPoller() {
         // Search for unread emails
         imap.search(['UNSEEN'], (err, uids) => {
           if (err) {
-            console.error(TAG, 'Search failed:', err.message);
+            log.error({ err }, 'IMAP search failed');
             imap.end();
             return resolve();
           }
@@ -344,7 +345,7 @@ async function runImapPoller() {
             return resolve();
           }
 
-          console.log(TAG, `Found ${uids.length} unread emails`);
+          log.info({ count: uids.length }, 'Found unread emails');
 
           // markSeen: true automatically marks emails as \Seen on fetch,
           // so they won't appear in the next UNSEEN search.
@@ -370,7 +371,7 @@ async function runImapPoller() {
                   })
                   .catch((err) => {
                     errors++;
-                    console.error(TAG, `Error processing email UID ${currentUid}:`, err.message);
+                    log.error({ err, uid: currentUid }, 'Error processing email');
                   })
               );
             });
@@ -380,12 +381,12 @@ async function runImapPoller() {
             try {
               await Promise.all(emailPromises);
             } catch { /* ignore */ }
-            console.log(TAG, `Done — processed: ${processed}, errors: ${errors}, total: ${uids.length}`);
+            log.info({ processed, errors, total: uids.length }, 'IMAP poll complete');
             imap.end();
           });
 
           fetch.once('error', (err) => {
-            console.error(TAG, 'Fetch error:', err.message);
+            log.error({ err }, 'IMAP fetch error');
             imap.end();
           });
         });
@@ -393,7 +394,7 @@ async function runImapPoller() {
     });
 
     imap.once('error', (err) => {
-      console.error(TAG, 'IMAP connection error:', err.message);
+      log.error({ err }, 'IMAP connection error');
       resolve();
     });
 

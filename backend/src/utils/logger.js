@@ -1,140 +1,89 @@
+'use strict';
+
 /**
- * Application Logger  –  src/utils/logger.js
+ * Application Logger  --  src/utils/logger.js
  *
- * Winston-based logger with environment-aware transports:
+ * Pino-based structured logger with environment-aware configuration:
  *
- *   development  → pretty-printed console output only
- *   production   → structured JSON to console + rotating file transports
- *                  (error.log  – ERROR level and above)
- *                  (combined.log – all levels)
+ *   development  -> pretty-printed console output via pino-pretty
+ *   production   -> JSON output for log aggregation (Datadog, CloudWatch, Loki, etc.)
+ *
+ * Log levels (in order): trace, debug, info, warn, error, fatal
  *
  * All log entries include:
- *   timestamp   ISO-8601 timestamp
- *   level       info | warn | error | debug
- *   message     the log message
- *   ...meta     any additional metadata passed by the caller
+ *   time        ISO-8601 timestamp
+ *   level       numeric + string level
+ *   pid         process ID
+ *   service     service name (aneh-hashoel-backend)
+ *   env         current NODE_ENV
+ *   msg         the log message
+ *   ...context  any additional structured data
  *
  * Usage:
  *   const { logger } = require('../utils/logger');
  *
- *   logger.info('Server started', { port: 3001 });
- *   logger.warn('Rate limit approaching', { ip, endpoint });
- *   logger.error('DB query failed', { message: err.message, stack: err.stack });
- *   logger.debug('Cache miss', { key });
+ *   logger.info('Server started');
+ *   logger.info({ port: 3001 }, 'Server started');
+ *   logger.warn({ ip, endpoint }, 'Rate limit approaching');
+ *   logger.error({ err }, 'DB query failed');
+ *   logger.debug({ key }, 'Cache miss');
+ *
+ * Child loggers (recommended for modules):
+ *   const log = require('../utils/logger').logger.child({ module: 'imapPoller' });
+ *   log.info('Polling started');                    // includes module: 'imapPoller'
+ *   log.error({ err }, 'IMAP connection failed');
+ *
+ * Morgan stream:
+ *   const { morganStream } = require('./utils/logger');
+ *   app.use(morgan('combined', { stream: morganStream }));
  */
 
-const { createLogger, format, transports } = require('winston');
-const path = require('path');
+const pino = require('pino');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
-// ─── Log directory ────────────────────────────────────────────────────────────
+// -- Logger configuration ---------------------------------------------------
 
-/** Logs are written next to the project root, not inside src/. */
-const LOG_DIR = path.resolve(__dirname, '../../logs');
+const transportConfig = isDev
+  ? {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
+        ignore: 'pid,hostname',
+      },
+    }
+  : undefined; // In production, use default JSON output to stdout
 
-// ─── Custom formats ───────────────────────────────────────────────────────────
-
-/**
- * Timestamp format used by all transports.
- * Example: 2026-03-16T08:00:00.000Z
- */
-const timestampFmt = format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' });
-
-/**
- * Development format: colourised, human-readable single line.
- * Example:  2026-03-16 08:00:00 [info]: Server started {"port":3001}
- */
-const devFormat = format.combine(
-  timestampFmt,
-  format.colorize({ all: true }),
-  format.printf(({ timestamp, level, message, ...meta }) => {
-    const metaStr = Object.keys(meta).length
-      ? ` ${JSON.stringify(meta)}`
-      : '';
-    return `${timestamp} [${level}]: ${message}${metaStr}`;
-  })
-);
-
-/**
- * Production format: compact JSON — one structured log object per line.
- * Easy to ingest by log aggregators (Datadog, CloudWatch, Loki, etc.).
- */
-const prodFormat = format.combine(
-  timestampFmt,
-  format.errors({ stack: true }),  // Promote err.stack into the log entry
-  format.json()
-);
-
-// ─── Transports ───────────────────────────────────────────────────────────────
-
-/** Always present: console transport (pretty in dev, JSON in prod). */
-const consoleTransport = new transports.Console({
-  format: isDev ? devFormat : prodFormat,
-  // In production, suppress debug from the console; debug is file-only
+const logger = pino({
   level: isDev ? 'debug' : 'info',
+
+  // Default fields included in every log entry
+  base: {
+    service: 'aneh-hashoel-backend',
+    env: process.env.NODE_ENV || 'development',
+    pid: process.pid,
+  },
+
+  // ISO timestamp
+  timestamp: pino.stdTimeFunctions.isoTime,
+
+  // In production, format errors with stack traces
+  serializers: {
+    err: pino.stdSerializers.err,
+    req: pino.stdSerializers.req,
+    res: pino.stdSerializers.res,
+  },
+
+  // Pretty-print in development via pino-pretty transport
+  transport: transportConfig,
 });
 
-/** Production-only: ERROR and above → error.log */
-const errorFileTransport = new transports.File({
-  filename: path.join(LOG_DIR, 'error.log'),
-  level:    'error',
-  format:   prodFormat,
-  // Rotate when the file exceeds 20 MB; keep 14 days of archives
-  maxsize:  20 * 1024 * 1024,
-  maxFiles: 14,
-  tailable: true,
-});
-
-/** Production-only: all levels → combined.log */
-const combinedFileTransport = new transports.File({
-  filename: path.join(LOG_DIR, 'combined.log'),
-  level:    'debug',
-  format:   prodFormat,
-  maxsize:  50 * 1024 * 1024,
-  maxFiles: 7,
-  tailable: true,
-});
-
-// ─── Logger instance ──────────────────────────────────────────────────────────
-
-const logger = createLogger({
-  // Base level: debug lets transports apply their own per-transport levels
-  level: 'debug',
-
-  // In development: console only (no log files to clutter the workspace)
-  transports: isDev
-    ? [consoleTransport]
-    : [consoleTransport, errorFileTransport, combinedFileTransport],
-
-  // Prevent Winston from crashing the process on unhandled exceptions /
-  // promise rejections — log them instead
-  exceptionHandlers: isDev
-    ? [consoleTransport]
-    : [
-        new transports.File({
-          filename: path.join(LOG_DIR, 'exceptions.log'),
-          format:   prodFormat,
-        }),
-      ],
-
-  rejectionHandlers: isDev
-    ? [consoleTransport]
-    : [
-        new transports.File({
-          filename: path.join(LOG_DIR, 'rejections.log'),
-          format:   prodFormat,
-        }),
-      ],
-
-  exitOnError: false,
-});
-
-// ─── Stream for Morgan HTTP logging ──────────────────────────────────────────
+// -- Morgan stream for HTTP logging -----------------------------------------
 
 /**
  * A writable stream compatible with Morgan's `stream` option.
- * Morgan writes a trailing newline; we trim it before passing to Winston.
+ * Morgan writes a trailing newline; we trim it before passing to pino.
  *
  * Usage in server.js:
  *   const morgan = require('morgan');
@@ -143,7 +92,7 @@ const logger = createLogger({
  */
 const morganStream = {
   write(message) {
-    logger.http(message.trimEnd());
+    logger.info(message.trimEnd());
   },
 };
 

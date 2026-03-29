@@ -22,6 +22,9 @@
 
 const nodemailer = require('nodemailer');
 const { createEmailHTML, BRAND_NAVY, BRAND_GOLD } = require('../templates/emailBase');
+const { logger } = require('../utils/logger');
+
+const log = logger.child({ module: 'email' });
 
 // ─── Email Template Defaults & Resolution ────────────────────────────────────
 
@@ -84,7 +87,7 @@ async function getEmailTemplates() {
       _templateCache = { ...EMAIL_TEMPLATE_DEFAULTS };
     }
   } catch (err) {
-    console.error('[email] Failed to load email templates from DB:', err.message);
+    log.error({ err }, 'Failed to load email templates from DB');
     _templateCache = { ...EMAIL_TEMPLATE_DEFAULTS };
   }
 
@@ -216,10 +219,10 @@ async function sendEmail(to, subject, htmlContent, options = {}) {
 
     const result = await getTransporter().sendMail(mailOptions);
 
-    console.info(`[email] נשלח אימייל אל ${to} — נושא: ${subject}`);
+    log.info({ to, subject }, 'Email sent');
     return result;
   } catch (err) {
-    console.error(`[email] שגיאה בשליחת אימייל אל ${to}:`, err.message);
+    log.error({ err, to, subject }, 'Error sending email');
     throw err;
   }
 }

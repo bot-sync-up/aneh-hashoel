@@ -29,6 +29,9 @@
  */
 
 const { query } = require('../db/pool');
+const { logger } = require('../utils/logger');
+
+const log = logger.child({ module: 'notificationRouter' });
 
 // ─── Availability hours check ─────────────────────────────────────────────────
 
@@ -144,7 +147,7 @@ async function _loadRabbi(rabbiId) {
     );
     return rows[0] || null;
   } catch (err) {
-    console.error(`[notificationRouter] שגיאה בטעינת רב ${rabbiId}:`, err.message);
+    log.error({ err, rabbiId }, "Error loading rabbi");
     return null;
   }
 }
@@ -166,7 +169,7 @@ async function _loadAllActiveRabbis() {
     );
     return rows;
   } catch (err) {
-    console.error('[notificationRouter] שגיאה בטעינת רבנים פעילים:', err.message);
+    log.error({ err }, "Error loading active rabbis");
     return [];
   }
 }
@@ -184,7 +187,7 @@ async function _loadAllActiveRabbis() {
 async function _dispatchEmail(rabbi, type, data) {
   const svc = _emailService();
   if (!svc) {
-    console.warn('[notificationRouter] שירות אימייל לא זמין');
+    log.warn("Email service not available");
     return;
   }
 
@@ -235,14 +238,14 @@ async function _dispatchEmail(rabbi, type, data) {
       case 'daily_digest':
       case 'emergency':
         // אין תבנית אימייל ייעודית — לא שולחים (ניתן להרחיב בעתיד)
-        console.debug(`[notificationRouter] אין תבנית אימייל לסוג '${type}' — דילוג`);
+        log.debug({ type }, "No email template for notification type");
         break;
 
       default:
-        console.warn(`[notificationRouter] סוג התראה לא מוכר לאימייל: ${type}`);
+        log.warn({ type }, "Unknown email notification type");
     }
   } catch (err) {
-    console.error(`[notificationRouter] שגיאת אימייל לרב ${rabbi.id} (${type}):`, err.message);
+    log.error({ err, rabbiId: rabbi.id, type }, "Email dispatch error");
   }
 }
 
@@ -257,13 +260,13 @@ async function _dispatchEmail(rabbi, type, data) {
 async function _dispatchWhatsApp(rabbi, type, data) {
   const svc = _whatsappService();
   if (!svc) {
-    console.warn('[notificationRouter] שירות WhatsApp לא זמין');
+    log.warn("WhatsApp service not available");
     return;
   }
 
   const phone = rabbi.whatsapp_number || rabbi.phone;
   if (!phone) {
-    console.debug(`[notificationRouter] אין מספר WhatsApp לרב ${rabbi.id} — דילוג`);
+    log.debug({ rabbiId: rabbi.id }, "No WhatsApp number for rabbi");
     return;
   }
 
@@ -322,15 +325,15 @@ async function _dispatchWhatsApp(rabbi, type, data) {
 
       case 'answer_published': {
         // answer_published רלוונטי לשואל, לא לרב — לא פעולה כאן
-        console.debug(`[notificationRouter] '${type}' לא רלוונטי לרב ב-WhatsApp`);
+        log.debug({ type }, "Notification type not relevant for rabbi via WhatsApp");
         break;
       }
 
       default:
-        console.warn(`[notificationRouter] סוג התראה לא מוכר ל-WhatsApp: ${type}`);
+        log.warn({ type }, "Unknown WhatsApp notification type");
     }
   } catch (err) {
-    console.error(`[notificationRouter] שגיאת WhatsApp לרב ${rabbi.id} (${type}):`, err.message);
+    log.error({ err, rabbiId: rabbi.id, type }, "WhatsApp dispatch error");
   }
 }
 
@@ -347,7 +350,7 @@ async function _dispatchWhatsApp(rabbi, type, data) {
 async function notify(rabbiId, type, data) {
   const rabbi = await _loadRabbi(rabbiId);
   if (!rabbi) {
-    console.warn(`[notificationRouter] notify: רב ${rabbiId} לא נמצא או לא פעיל`);
+    log.warn({ rabbiId }, "Rabbi not found or inactive");
     return { rabbiId, channels: [] };
   }
 
@@ -361,13 +364,13 @@ async function notify(rabbiId, type, data) {
   ];
 
   if (rabbi.is_vacation && BROADCAST_TYPES.includes(type)) {
-    console.info(`[notificationRouter] notify: רב ${rabbiId} בחופשה — דילוג על '${type}'`);
+    log.info({ rabbiId, type }, "Rabbi on vacation — skipping");
     return { rabbiId, channels: [] };
   }
 
   // Check availability hours — skip broadcast-type notifications outside hours
   if (BROADCAST_TYPES.includes(type) && !_isWithinAvailabilityHours(rabbi.availability_hours)) {
-    console.info(`[notificationRouter] notify: רב ${rabbiId} מחוץ לשעות זמינות — דילוג על '${type}'`);
+    log.info({ rabbiId, type }, "Rabbi outside availability hours — skipping");
     return { rabbiId, channels: [] };
   }
 
@@ -390,7 +393,7 @@ async function notify(rabbiId, type, data) {
     tasks.push(
       _dispatchEmail(rabbi, type, data)
         .then(() => channels.push('email'))
-        .catch((err) => console.error(`[notificationRouter] email dispatch error rabbi ${rabbiId}:`, err.message))
+        .catch((err) => log.error({ err, rabbiId }, "Email dispatch error in notify"))
     );
   }
 
@@ -398,19 +401,19 @@ async function notify(rabbiId, type, data) {
     tasks.push(
       _dispatchWhatsApp(rabbi, type, data)
         .then(() => channels.push('whatsapp'))
-        .catch((err) => console.error(`[notificationRouter] whatsapp dispatch error rabbi ${rabbiId}:`, err.message))
+        .catch((err) => log.error({ err, rabbiId }, "WhatsApp dispatch error in notify"))
     );
   }
 
   if (pref.push) {
     // Push notifications — ממומש על ידי socket / FCM בנפרד
-    console.debug(`[notificationRouter] push preference detected for rabbi ${rabbiId} (${type}) — handled by socket layer`);
+    log.debug({ rabbiId, type }, "Push preference detected — handled by socket layer");
     channels.push('push');
   }
 
   await Promise.allSettled(tasks);
 
-  console.info(`[notificationRouter] notify: רב ${rabbiId} — סוג: ${type} — ערוצים: ${channels.join(', ') || 'אין'}`);
+  log.info({ rabbiId, type, channels }, "Notification sent");
   return { rabbiId, channels };
 }
 
@@ -446,11 +449,11 @@ async function notifyAll(type, data) {
   const rabbis = await _loadAllActiveRabbis();
 
   if (!rabbis.length) {
-    console.info('[notificationRouter] notifyAll: אין רבנים פעילים');
+    log.info("notifyAll: no active rabbis");
     return [];
   }
 
-  console.info(`[notificationRouter] notifyAll: שליחת '${type}' ל-${rabbis.length} רבנים פעילים`);
+  log.info({ type, count: rabbis.length }, "notifyAll: broadcasting to active rabbis");
 
   // Filter out rabbis outside their availability hours for broadcast-type notifications
   const BROADCAST_TYPES_ALL = ['question_broadcast', 'urgent_question', 'question_released', 'daily_digest', 'weekly_report'];
@@ -459,7 +462,7 @@ async function notifyAll(type, data) {
     : rabbis;
 
   if (availableRabbis.length < rabbis.length) {
-    console.info(`[notificationRouter] notifyAll: ${rabbis.length - availableRabbis.length} רבנים מסוננים עקב שעות זמינות`);
+    log.info({ filtered: rabbis.length - availableRabbis.length }, "notifyAll: rabbis filtered by availability hours");
   }
 
   // עבור שידורים — ניתן לשלוח ב-batch דרך sendQuestionBroadcast/sendUrgentBroadcast
@@ -470,7 +473,7 @@ async function notifyAll(type, data) {
   if (type === 'question_broadcast' && whatsappSvc) {
     // שלח WA בבת אחת לכל הרבנים המתאימים (מנגנון ה-throttling מובנה בשירות)
     const waResults = await whatsappSvc.sendQuestionBroadcast(data.question, availableRabbis).catch((err) => {
-      console.error('[notificationRouter] שגיאה בשידור WA:', err.message);
+      log.error({ err }, "notifyAll: WA broadcast error");
       return [];
     });
 
@@ -494,7 +497,7 @@ async function notifyAll(type, data) {
 
   if (type === 'urgent_question' && whatsappSvc) {
     const waResults = await whatsappSvc.sendUrgentBroadcast(data.question, availableRabbis).catch((err) => {
-      console.error('[notificationRouter] שגיאה בשידור דחוף WA:', err.message);
+      log.error({ err }, "notifyAll: urgent WA broadcast error");
       return [];
     });
 

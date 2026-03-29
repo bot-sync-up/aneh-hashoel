@@ -19,6 +19,7 @@
  * POST   /transfer/:id        – transfer to another rabbi { targetRabbiId }
  * POST   /answer/:id          – submit answer { content, publishNow: bool }
  * PUT    /answer/:id          – edit answer after publish
+ * GET    /answer/:id/versions – answer version history
  * POST   /followup-answer/:id – rabbi answers follow-up question
  * POST   /:id/wp-follow-up    – WP: asker submits follow-up (public, email-verified, rate-limited)
  * POST   /:id/wp-thank        – WP: visitor thanks a rabbi (public, rate-limited, visitor_id dedup)
@@ -51,6 +52,8 @@ const {
   getQuestionById,
   getMyQuestions,
 } = require('../services/questions');
+
+const { getAnswerVersions } = require('../services/answers');
 
 // Socket broadcast helpers
 const { emitToAll, emitToRabbi }      = require('../socket/helpers');
@@ -639,6 +642,21 @@ router.put(
     }
   }
 );
+
+// ─── GET /answer/:id/versions — answer version history ────────────────────────
+
+/**
+ * Return all saved content versions for an answer.
+ * Requires authentication (any logged-in rabbi can view).
+ */
+router.get('/answer/:id/versions', authenticate, async (req, res, next) => {
+  try {
+    const data = await getAnswerVersions(req.params.id);
+    return res.json(data);
+  } catch (err) {
+    return next(err);
+  }
+});
 
 // ─── WordPress public endpoints ──────────────────────────────────────────────
 // These are called from the WordPress frontend (no auth), so they use

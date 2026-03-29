@@ -33,6 +33,9 @@
 
 const axios = require('axios');
 const { query } = require('../db/pool');
+const { logger } = require('../utils/logger');
+
+const log = logger.child({ module: 'wpService' });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -116,9 +119,7 @@ async function withRateLimitRetry(fn, label) {
       const delay = retryAfterSec > 0
         ? retryAfterSec * 1000
         : RETRY_DELAY_BASE_MS;
-      console.warn(
-        `[wpService] 429 על ${label} — ממתין ${delay}ms לפני ניסיון נוסף`
-      );
+      log.warn({ label, delay }, '429 rate limited — retrying after delay');
       await sleep(delay);
       return fn(); // one retry; if this also throws, bubble up
     }
@@ -151,7 +152,7 @@ async function logSync(wpPostId, action, status, error = null) {
     );
   } catch (dbErr) {
     // Never let a logging failure surface to callers
-    console.error('[wpService] logSync DB error:', dbErr.message);
+    log.error({ err: dbErr }, 'logSync DB error');
   }
 }
 
@@ -161,7 +162,7 @@ async function logSync(wpPostId, action, status, error = null) {
  * @param {string} message
  */
 function alertAdmin(message) {
-  console.error(`[wpService][ADMIN ALERT] ${message}`);
+  log.fatal({ alert: true }, `ADMIN ALERT: ${message}`);
 }
 
 // ─── Exported API functions ───────────────────────────────────────────────────
@@ -221,10 +222,7 @@ async function getNewQuestions() {
     ]);
     const newQuestions = wpQuestions.filter((q) => !existingSet.has(q.id));
 
-    console.log(
-      `[wpService] getNewQuestions: ${wpQuestions.length} מ-WP, ` +
-      `${newQuestions.length} חדשות (לא בDB)`
-    );
+    log.info({ wpTotal: wpQuestions.length, newCount: newQuestions.length }, 'getNewQuestions complete');
 
     return { success: true, data: newQuestions };
   } catch (err) {
@@ -237,7 +235,7 @@ async function getNewQuestions() {
       await logSync(null, 'get_new_questions', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] getNewQuestions שגיאה (${httpStatus}):`, message);
+    log.error({ httpStatus, message }, "getNewQuestions failed");
     return { success: false, error: message };
   }
 }
@@ -270,12 +268,12 @@ async function getQuestionById(wpPostId) {
     if (httpStatus === 401) {
       alertAdmin(`WP REST API החזיר 401 ב-getQuestionById(${wpPostId})`);
     } else if (httpStatus === 404) {
-      console.warn(`[wpService] getQuestionById: wpPostId=${wpPostId} לא נמצא ב-WP`);
+      log.warn({ wpPostId }, "getQuestionById: not found in WP");
     } else if (isRetryable) {
       await logSync(wpPostId, 'get_question_by_id', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] getQuestionById(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "getQuestionById failed");
     return { success: false, error: message };
   }
 }
@@ -305,7 +303,7 @@ async function updateQuestionStatus(wpPostId, status) {
     );
 
     await logSync(wpPostId, 'update_status', 'success');
-    console.log(`[wpService] updateQuestionStatus: wpPostId=${wpPostId} → status=${status}`);
+    log.info({ wpPostId, status }, "updateQuestionStatus success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);
@@ -317,7 +315,7 @@ async function updateQuestionStatus(wpPostId, status) {
       await logSync(wpPostId, 'update_status', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] updateQuestionStatus(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "updateQuestionStatus failed");
     return { success: false, error: message };
   }
 }
@@ -372,7 +370,7 @@ async function publishAnswer(wpPostId, answerData) {
     );
 
     await logSync(wpPostId, 'publish_answer', 'success');
-    console.log(`[wpService] publishAnswer ✓ wpPostId=${wpPostId} rabbi=${answerData.rabbiName}`);
+    log.info({ wpPostId, rabbi: answerData.rabbiName }, "publishAnswer success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);
@@ -384,7 +382,7 @@ async function publishAnswer(wpPostId, answerData) {
       await logSync(wpPostId, 'publish_answer', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] publishAnswer(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "publishAnswer failed");
     return { success: false, error: message };
   }
 }
@@ -423,7 +421,7 @@ async function publishFollowUpAnswer(wpPostId, followUpAnswer) {
     );
 
     await logSync(wpPostId, 'publish_followup_answer', 'success');
-    console.log(`[wpService] publishFollowUpAnswer ✓ wpPostId=${wpPostId}`);
+    log.info({ wpPostId }, "publishFollowUpAnswer success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);
@@ -435,7 +433,7 @@ async function publishFollowUpAnswer(wpPostId, followUpAnswer) {
       await logSync(wpPostId, 'publish_followup_answer', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] publishFollowUpAnswer(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "publishFollowUpAnswer failed");
     return { success: false, error: message };
   }
 }
@@ -469,7 +467,7 @@ async function notifyAskerEmail(wpPostId, askerEmail, answerUrl) {
     );
 
     await logSync(wpPostId, 'notify_asker_email', 'success');
-    console.log(`[wpService] notifyAskerEmail ✓ wpPostId=${wpPostId} email=${askerEmail}`);
+    log.info({ wpPostId, askerEmail }, "notifyAskerEmail success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);
@@ -481,7 +479,7 @@ async function notifyAskerEmail(wpPostId, askerEmail, answerUrl) {
       await logSync(wpPostId, 'notify_asker_email', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] notifyAskerEmail(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "notifyAskerEmail failed");
     return { success: false, error: message };
   }
 }
@@ -521,7 +519,7 @@ async function getAskerPhone(wpPostId) {
       await logSync(wpPostId, 'get_asker_phone', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] getAskerPhone(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "getAskerPhone failed");
     return { success: false, error: message };
   }
 }
@@ -563,7 +561,7 @@ async function postRabbiOfWeek(rabbiName, stats = {}) {
     );
 
     await logSync(null, 'post_rabbi_of_week', 'success');
-    console.log(`[wpService] postRabbiOfWeek ✓ rabbi=${rabbiName} week=${weekLabel}`);
+    log.info({ rabbiName, weekLabel }, "postRabbiOfWeek success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message, isRetryable } = classifyError(err);
@@ -575,7 +573,7 @@ async function postRabbiOfWeek(rabbiName, stats = {}) {
       await logSync(null, 'post_rabbi_of_week', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] postRabbiOfWeek(${rabbiName}) שגיאה (${httpStatus}):`, message);
+    log.error({ rabbiName, httpStatus, message }, "postRabbiOfWeek failed");
     return { success: false, error: message };
   }
 }
@@ -607,11 +605,11 @@ async function syncRetryFailed() {
     );
 
     if (rows.length === 0) {
-      console.info('[wpService] syncRetryFailed: אין ערכים כושלים לסנכרון חוזר');
+      log.info('syncRetryFailed: no failed entries to retry');
       return { success: true, total: 0, succeeded: 0, failed: 0 };
     }
 
-    console.info(`[wpService] syncRetryFailed: נמצאו ${rows.length} שאלות לניסיון חוזר`);
+    log.info({ count: rows.length }, 'syncRetryFailed: retrying failed syncs');
 
     let succeeded = 0;
     let failed    = 0;
@@ -633,10 +631,7 @@ async function syncRetryFailed() {
            WHERE  id = $1`,
           [row.id]
         ).catch((dbErr) => {
-          console.error(
-            `[wpService] syncRetryFailed: שגיאה בעדכון wp_synced_at עבור ${row.id}:`,
-            dbErr.message
-          );
+          log.error({ err: dbErr, questionId: row.id }, 'syncRetryFailed: error updating wp_synced_at');
         });
         succeeded++;
       } else {
@@ -644,13 +639,11 @@ async function syncRetryFailed() {
       }
     }
 
-    console.info(
-      `[wpService] syncRetryFailed: ${succeeded} הצליחו, ${failed} נכשלו מתוך ${rows.length}`
-    );
+    log.info({ succeeded, failed, total: rows.length }, 'syncRetryFailed complete');
 
     return { success: true, total: rows.length, succeeded, failed };
   } catch (err) {
-    console.error('[wpService] syncRetryFailed שגיאה כללית:', err.message);
+    log.error({ err }, "syncRetryFailed general error");
     return { success: false, total: 0, succeeded: 0, failed: 0, error: err.message };
   }
 }
@@ -717,11 +710,11 @@ async function syncThankCount(wpPostId, thankCount) {
       `syncThankCount(${wpPostId})`
     );
 
-    console.log(`[wpService] syncThankCount ✓ wpPostId=${wpPostId} thankCount=${thankCount}`);
+    log.info({ wpPostId, thankCount }, "syncThankCount success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
-    console.error(`[wpService] syncThankCount(${wpPostId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpPostId, httpStatus, message }, "syncThankCount failed");
     return { success: false, error: message };
   }
 }
@@ -755,7 +748,7 @@ async function getWPCategories() {
       return { success: true, data: [] };
     }
 
-    console.log(`[wpService] getWPCategories: ${terms.length} קטגוריות מ-WP`);
+    log.info({ count: terms.length }, "getWPCategories success");
     return { success: true, data: terms };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
@@ -764,7 +757,7 @@ async function getWPCategories() {
       alertAdmin('WP REST API החזיר 401 ב-getWPCategories');
     }
 
-    console.error(`[wpService] getWPCategories שגיאה (${httpStatus}):`, message);
+    log.error({ httpStatus, message }, "getWPCategories failed");
     return { success: false, error: message };
   }
 }
@@ -791,7 +784,7 @@ async function createWPCategory(name) {
     );
 
     await logSync(null, 'create_wp_category', 'success');
-    console.log(`[wpService] createWPCategory ✓ name=${name} wpTermId=${response.data?.id}`);
+    log.info({ name, wpTermId: response.data?.id }, "createWPCategory success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
@@ -803,7 +796,7 @@ async function createWPCategory(name) {
       await logSync(null, 'create_wp_category', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] createWPCategory(${name}) שגיאה (${httpStatus}):`, message);
+    log.error({ name, httpStatus, message }, "createWPCategory failed");
     return { success: false, error: message };
   }
 }
@@ -830,7 +823,7 @@ async function deleteWPCategory(wpTermId) {
     );
 
     await logSync(null, 'delete_wp_category', 'success');
-    console.log(`[wpService] deleteWPCategory ✓ wpTermId=${wpTermId}`);
+    log.info({ wpTermId }, "deleteWPCategory success");
     return { success: true };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
@@ -839,7 +832,7 @@ async function deleteWPCategory(wpTermId) {
       alertAdmin(`WP REST API 401 ב-deleteWPCategory(${wpTermId})`);
     }
 
-    console.error(`[wpService] deleteWPCategory(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpTermId, httpStatus, message }, "deleteWPCategory failed");
     return { success: false, error: message };
   }
 }
@@ -873,7 +866,7 @@ async function getWPRabbis() {
       return { success: true, data: [] };
     }
 
-    console.log(`[wpService] getWPRabbis: ${terms.length} רבנים מ-WP`);
+    log.info({ count: terms.length }, "getWPRabbis success");
     return { success: true, data: terms };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
@@ -882,7 +875,7 @@ async function getWPRabbis() {
       alertAdmin('WP REST API החזיר 401 ב-getWPRabbis');
     }
 
-    console.error(`[wpService] getWPRabbis שגיאה (${httpStatus}):`, message);
+    log.error({ httpStatus, message }, "getWPRabbis failed");
     return { success: false, error: message };
   }
 }
@@ -909,7 +902,7 @@ async function createWPRabbi(name) {
     );
 
     await logSync(null, 'create_wp_rabbi', 'success');
-    console.log(`[wpService] createWPRabbi ✓ name=${name} wpTermId=${response.data?.id}`);
+    log.info({ name, wpTermId: response.data?.id }, "createWPRabbi success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
@@ -921,7 +914,7 @@ async function createWPRabbi(name) {
       await logSync(null, 'create_wp_rabbi', 'failed', `${httpStatus ?? 'network'}: ${message}`);
     }
 
-    console.error(`[wpService] createWPRabbi(${name}) שגיאה (${httpStatus}):`, message);
+    log.error({ name, httpStatus, message }, "createWPRabbi failed");
     return { success: false, error: message };
   }
 }
@@ -949,11 +942,11 @@ async function updateWPRabbi(wpTermId, newName) {
     );
 
     await logSync(null, 'update_wp_rabbi', 'success');
-    console.log(`[wpService] updateWPRabbi ✓ wpTermId=${wpTermId} newName=${newName}`);
+    log.info({ wpTermId, newName }, "updateWPRabbi success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
-    console.error(`[wpService] updateWPRabbi(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpTermId, httpStatus, message }, "updateWPRabbi failed");
     return { success: false, error: message };
   }
 }
@@ -978,11 +971,11 @@ async function deleteWPRabbi(wpTermId) {
     );
 
     await logSync(null, 'delete_wp_rabbi', 'success');
-    console.log(`[wpService] deleteWPRabbi ✓ wpTermId=${wpTermId}`);
+    log.info({ wpTermId }, "deleteWPRabbi success");
     return { success: true };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);
-    console.error(`[wpService] deleteWPRabbi(${wpTermId}) שגיאה (${httpStatus}):`, message);
+    log.error({ wpTermId, httpStatus, message }, "deleteWPRabbi failed");
     return { success: false, error: message };
   }
 }

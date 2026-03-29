@@ -34,6 +34,9 @@
  */
 
 const { query }              = require('../db/pool');
+const { logger }             = require('../utils/logger');
+
+const log = logger.child({ module: 'questionSync' });
 const { createFromWebhook }  = require('./questions');
 const {
   getNewQuestions,
@@ -72,13 +75,13 @@ const { upsertLead }  = require('./leadsService');
  * }>}
  */
 async function syncPendingQuestions(io = null) {
-  console.log('[questionSync] syncPendingQuestions: מתחיל סנכרון שאלות ממתינות מ-WordPress');
+  log.info('syncPendingQuestions: starting sync from WordPress');
 
   // ── 1. Fetch from WordPress ───────────────────────────────────────────────
   const wpResult = await getNewQuestions();
 
   if (!wpResult.success) {
-    console.error('[questionSync] syncPendingQuestions: שגיאה בשליפה מ-WP:', wpResult.error);
+    log.error({ error: wpResult.error }, 'syncPendingQuestions: WP fetch error');
     return {
       success:  false,
       fetched:  0,
@@ -92,13 +95,11 @@ async function syncPendingQuestions(io = null) {
   const wpQuestions = wpResult.data;
 
   if (!wpQuestions.length) {
-    console.info('[questionSync] syncPendingQuestions: אין שאלות חדשות מ-WordPress');
+    log.info('syncPendingQuestions: no new questions from WordPress');
     return { success: true, fetched: 0, imported: 0, skipped: 0, failed: 0 };
   }
 
-  console.info(
-    `[questionSync] syncPendingQuestions: ${wpQuestions.length} שאלות חדשות מ-WP לייבוא`
-  );
+  log.info({ count: wpQuestions.length }, 'syncPendingQuestions: new questions from WP to import');
 
   let imported = 0;
   let skipped  = 0;
@@ -132,12 +133,7 @@ async function syncPendingQuestions(io = null) {
     };
 
     if (!questionData.title || !questionData.content) {
-      console.warn(
-        `[questionSync] syncPendingQuestions: wpPostId=${wpPostId} ` +
-        `חסרים title/content — מדלג ` +
-        `(title=${!!questionData.title}, content=${!!questionData.content}, ` +
-        `meta_keys=${Object.keys(meta).join(',')}, acf_keys=${Object.keys(acf).join(',')})`
-      );
+      log.warn({ wpPostId, hasTitle: !!questionData.title, hasContent: !!questionData.content }, 'syncPendingQuestions: missing title/content — skipping');
       skipped++;
       continue;
     }
@@ -164,10 +160,7 @@ async function syncPendingQuestions(io = null) {
         continue;
       }
     } catch (checkErr) {
-      console.warn(
-        `[questionSync] syncPendingQuestions: idempotency check שגיאה wpPostId=${wpPostId}:`,
-        checkErr.message
-      );
+      log.warn({ err: checkErr, wpPostId }, 'syncPendingQuestions: idempotency check error');
       // Fall through — createFromWebhook will fail on UNIQUE constraint
     }
 
@@ -187,16 +180,10 @@ async function syncPendingQuestions(io = null) {
     try {
       question = await createFromWebhook(questionData);
       imported++;
-      console.info(
-        `[questionSync] syncPendingQuestions: ✓ יובאה שאלה id=${question.id} ` +
-        `wpPostId=${wpPostId}`
-      );
+      log.info({ questionId: question.id, wpPostId }, 'syncPendingQuestions: question imported');
     } catch (createErr) {
       failed++;
-      console.error(
-        `[questionSync] syncPendingQuestions: שגיאה ביצירת שאלה wpPostId=${wpPostId}:`,
-        createErr.message
-      );
+      log.error({ err: createErr, wpPostId }, 'syncPendingQuestions: error creating question');
       await logSync(wpPostId, 'poll_import_question', 'failed', createErr.message);
       continue;
     }
@@ -218,11 +205,7 @@ async function syncPendingQuestions(io = null) {
       : 'question_broadcast';
 
     notifyAll(notifType, { question, actionTokens: {} }).catch((err) => {
-      console.error(
-        `[questionSync] syncPendingQuestions: שגיאה בשליחת התראות לרבנים ` +
-        `(id=${question.id}):`,
-        err.message
-      );
+      log.error({ err, questionId: question.id }, 'syncPendingQuestions: error sending notifications');
     });
 
     // ── CRM: upsert lead for this asker (fire-and-forget) ─────────────────
@@ -235,7 +218,7 @@ async function syncPendingQuestions(io = null) {
       asker_email: questionData.asker_email || null,
       asker_phone: questionData.asker_phone || null,
     }).catch((err) => {
-      console.error(`[questionSync] upsertLead error (questionId=${question.id}):`, err.message);
+      log.error({ err, questionId: question.id }, 'upsertLead error');
     });
   }
 
@@ -247,11 +230,7 @@ async function syncPendingQuestions(io = null) {
     failed,
   };
 
-  console.info(
-    `[questionSync] syncPendingQuestions: הושלם — ` +
-    `ייובאו ${imported}, דולגו ${skipped}, נכשלו ${failed} ` +
-    `מתוך ${wpQuestions.length} שנמשכו`
-  );
+  log.info({ imported, skipped, failed, fetched: wpQuestions.length }, 'syncPendingQuestions complete');
 
   return result;
 }
@@ -280,7 +259,7 @@ async function syncPendingQuestions(io = null) {
 async function syncAnswersToWP(options = {}) {
   const batchLimit = options.limit ?? 50;
 
-  console.log('[questionSync] syncAnswersToWP: מחפש תשובות שלא סונכרנו ל-WordPress');
+  log.info('syncAnswersToWP: searching for un-synced answers');
 
   // ── 1. Find un-synced answered questions ──────────────────────────────────
   let rows;
@@ -308,16 +287,16 @@ async function syncAnswersToWP(options = {}) {
 
     rows = result.rows;
   } catch (dbErr) {
-    console.error('[questionSync] syncAnswersToWP: שגיאת DB בשליפת תשובות:', dbErr.message);
+    log.error({ err: dbErr }, 'syncAnswersToWP: DB error fetching answers');
     return { success: false, total: 0, succeeded: 0, failed: 0, error: dbErr.message };
   }
 
   if (rows.length === 0) {
-    console.info('[questionSync] syncAnswersToWP: אין תשובות ממתינות לסנכרון');
+    log.info('syncAnswersToWP: no answers pending sync');
     return { success: true, total: 0, succeeded: 0, failed: 0 };
   }
 
-  console.info(`[questionSync] syncAnswersToWP: נמצאו ${rows.length} תשובות לסנכרון`);
+  log.info({ count: rows.length }, 'syncAnswersToWP: answers found for sync');
 
   let succeeded = 0;
   let failed    = 0;
@@ -337,10 +316,10 @@ async function syncAnswersToWP(options = {}) {
             `UPDATE rabbis SET wp_term_id = $1 WHERE name = $2 AND wp_term_id IS NULL`,
             [rabbiTermId, row.rabbi_name]
           );
-          console.log(`[questionSync] created WP rabbi "${row.rabbi_name}" → termId=${rabbiTermId}`);
+          log.info({ rabbiName: row.rabbi_name, termId: rabbiTermId }, 'Created WP rabbi');
         }
       } catch (e) {
-        console.warn(`[questionSync] failed to create WP rabbi "${row.rabbi_name}":`, e.message);
+        log.warn({ err: e, rabbiName: row.rabbi_name }, 'Failed to create WP rabbi');
       }
     }
 
@@ -365,19 +344,12 @@ async function syncAnswersToWP(options = {}) {
           [row.id]
         );
         succeeded++;
-        console.info(
-          `[questionSync] syncAnswersToWP: ✓ סונכרן id=${row.id} ` +
-          `wpPostId=${row.wp_post_id}`
-        );
+        log.info({ questionId: row.id, wpPostId: row.wp_post_id }, 'syncAnswersToWP: answer synced');
       } catch (markErr) {
         // Sync succeeded in WP but DB update failed — log and count as failed
         // so next run will retry (answer will be re-pushed to WP idempotently)
         failed++;
-        console.error(
-          `[questionSync] syncAnswersToWP: שגיאה בסימון wp_synced_at ` +
-          `id=${row.id}:`,
-          markErr.message
-        );
+        log.error({ err: markErr, questionId: row.id }, 'syncAnswersToWP: error marking wp_synced_at');
         await logSync(
           row.wp_post_id,
           'sync_answer_mark_synced',
@@ -387,10 +359,7 @@ async function syncAnswersToWP(options = {}) {
       }
     } else {
       failed++;
-      console.error(
-        `[questionSync] syncAnswersToWP: נכשל id=${row.id} ` +
-        `wpPostId=${row.wp_post_id}: ${publishResult.error}`
-      );
+      log.error({ questionId: row.id, wpPostId: row.wp_post_id, error: publishResult.error }, 'syncAnswersToWP: publish failed');
       // logSync already called inside publishAnswer for retryable failures
     }
   }
@@ -402,10 +371,7 @@ async function syncAnswersToWP(options = {}) {
     failed,
   };
 
-  console.info(
-    `[questionSync] syncAnswersToWP: הושלם — ` +
-    `${succeeded} הצליחו, ${failed} נכשלו מתוך ${rows.length}`
-  );
+  log.info({ succeeded, failed, total: rows.length }, 'syncAnswersToWP complete');
 
   return result;
 }
@@ -433,7 +399,7 @@ async function syncAnswersToWP(options = {}) {
 async function backfillAttachmentUrls(options = {}) {
   const batchLimit = options.limit ?? 200;
 
-  console.log('[questionSync] backfillAttachmentUrls: מתחיל backfill של attachment_url');
+  log.info('backfillAttachmentUrls: starting backfill');
 
   // Find questions that have a WP post but no attachment URL yet
   let rows;
@@ -449,16 +415,16 @@ async function backfillAttachmentUrls(options = {}) {
     );
     rows = result.rows;
   } catch (dbErr) {
-    console.error('[questionSync] backfillAttachmentUrls: שגיאת DB בשליפה:', dbErr.message);
+    log.error({ err: dbErr }, 'backfillAttachmentUrls: DB error');
     return { success: false, checked: 0, updated: 0, noImage: 0, failed: 0, error: dbErr.message };
   }
 
   if (rows.length === 0) {
-    console.info('[questionSync] backfillAttachmentUrls: אין שאלות לעדכון');
+    log.info('backfillAttachmentUrls: no questions to update');
     return { success: true, checked: 0, updated: 0, noImage: 0, failed: 0 };
   }
 
-  console.info(`[questionSync] backfillAttachmentUrls: בודק ${rows.length} שאלות`);
+  log.info({ count: rows.length }, 'backfillAttachmentUrls: checking questions');
 
   const { getQuestionById, getAttachmentUrl } = require('./wpService');
 
@@ -498,24 +464,14 @@ async function backfillAttachmentUrls(options = {}) {
       );
 
       updated++;
-      console.info(
-        `[questionSync] backfillAttachmentUrls: ✓ id=${row.id} ` +
-        `wpPostId=${row.wp_post_id} url=${url}`
-      );
+      log.info({ questionId: row.id, wpPostId: row.wp_post_id, url }, 'backfillAttachmentUrls: updated');
     } catch (err) {
       failed++;
-      console.error(
-        `[questionSync] backfillAttachmentUrls: שגיאה ב-id=${row.id}:`,
-        err.message
-      );
+      log.error({ err, questionId: row.id }, 'backfillAttachmentUrls: error');
     }
   }
 
-  console.info(
-    `[questionSync] backfillAttachmentUrls: הושלם — ` +
-    `עודכנו ${updated}, ללא תמונה ${noImage}, נכשלו ${failed} ` +
-    `מתוך ${rows.length} שנבדקו`
-  );
+  log.info({ updated, noImage, failed, checked: rows.length }, 'backfillAttachmentUrls complete');
 
   return { success: true, checked: rows.length, updated, noImage, failed };
 }

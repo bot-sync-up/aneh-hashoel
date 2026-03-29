@@ -11,9 +11,11 @@ const SystemHealthPage     = React.lazy(() => import('./SystemHealthPage'));
 const LeaderboardPage      = React.lazy(() => import('./LeaderboardPage'));
 const AdminLeadsPage       = React.lazy(() => import('./LeadsPage'));
 const EmailSettingsPage    = React.lazy(() => import('./EmailSettingsPage'));
-const NewsletterPage       = React.lazy(() => import('./NewsletterPage'));
-const EmergencyPage        = React.lazy(() => import('./EmergencyPage'));
+const NewsletterPage        = React.lazy(() => import('./NewsletterPage'));
+const NewsletterArchivePage = React.lazy(() => import('./NewsletterArchivePage'));
+const EmergencyPage         = React.lazy(() => import('./EmergencyPage'));
 const SupportAdminPage     = React.lazy(() => import('./SupportAdminPage'));
+const DonationsPage        = React.lazy(() => import('./DonationsPage'));
 import { clsx } from 'clsx';
 import {
   Users,
@@ -26,8 +28,10 @@ import {
   UserCheck,
   Mail,
   Newspaper,
+  Archive,
   AlertTriangle,
   Headphones,
+  Heart,
 } from 'lucide-react';
 
 const TABS = [
@@ -42,6 +46,8 @@ const TABS = [
   { to: 'health',      label: 'בריאות המערכת',   icon: Activity },
   { to: 'email-templates', label: 'תבניות אימייל', icon: Mail },
   { to: 'newsletter',      label: 'ניוזלטר',       icon: Newspaper },
+  { to: 'newsletter-archive', label: 'ארכיון ניוזלטרים', icon: Archive },
+  { to: 'donations',       label: 'תרומות',         icon: Heart },
   { to: 'emergency',       label: 'שידור חירום',   icon: AlertTriangle },
 ];
 
@@ -113,6 +119,8 @@ export default function AdminLayout() {
             <Route path="leads"       element={<AdminLeadsPage />} />
             <Route path="email-templates" element={<EmailSettingsPage />} />
             <Route path="newsletter"      element={<NewsletterPage />} />
+            <Route path="newsletter-archive" element={<NewsletterArchivePage />} />
+            <Route path="donations"       element={<DonationsPage />} />
             <Route path="emergency"       element={<EmergencyPage />} />
             <Route path="support"         element={<SupportAdminPage />} />
           </Routes>

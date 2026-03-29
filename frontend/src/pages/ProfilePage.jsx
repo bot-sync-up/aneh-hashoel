@@ -34,6 +34,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import NotificationPreferences from '../components/profile/NotificationPreferences';
 import VacationMode from '../components/profile/VacationMode';
+import AvailabilityHours from '../components/profile/AvailabilityHours';
 
 // ── Categories (loaded from DB) ────────────────────────────────────────────
 
@@ -419,7 +420,13 @@ export default function ProfilePage() {
   const tabContent = {
     personal:      <PersonalTab rabbi={rabbi} />,
     categories:    <CategoriesTab rabbi={rabbi} />,
-    vacation:      <VacationMode />,
+    vacation:      (
+      <div className="space-y-8">
+        <VacationMode />
+        <hr className="border-[var(--border-default)]" />
+        <AvailabilityHours />
+      </div>
+    ),
     security:      <SecurityTab />,
     notifications: (
       <Card header={<Card.Title>העדפות התראות</Card.Title>}>

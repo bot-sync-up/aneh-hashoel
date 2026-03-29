@@ -30,6 +30,55 @@
 
 const { query } = require('../db/pool');
 
+// ─── Availability hours check ─────────────────────────────────────────────────
+
+/**
+ * Checks whether the current time in Israel (Asia/Jerusalem) falls within
+ * the rabbi's configured availability hours for today's day of the week.
+ *
+ * @param {object|null} availabilityHours  JSONB from rabbis.availability_hours
+ * @returns {boolean}  true if the rabbi is currently available (or has no hours configured)
+ */
+function _isWithinAvailabilityHours(availabilityHours) {
+  if (!availabilityHours || typeof availabilityHours !== 'object') {
+    // No availability hours configured — treat as always available
+    return true;
+  }
+
+  const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+  // If the object is empty or has the old default format with all nulls, treat as always available
+  const hasAnyConfig = Object.values(availabilityHours).some(
+    (v) => v !== null && typeof v === 'object' && v.enabled !== undefined
+  );
+  if (!hasAnyConfig) return true;
+
+  // Current time in Israel
+  const nowInIsrael = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })
+  );
+  const dayIndex = nowInIsrael.getDay(); // 0=Sunday
+  const dayKey = DAY_KEYS[dayIndex];
+  const dayConfig = availabilityHours[dayKey];
+
+  // Day not configured or disabled — rabbi is unavailable
+  if (!dayConfig || dayConfig.enabled === false) {
+    return false;
+  }
+
+  // Day enabled but no specific hours — treat as available all day
+  if (!dayConfig.start || !dayConfig.end) {
+    return true;
+  }
+
+  const currentMinutes = nowInIsrael.getHours() * 60 + nowInIsrael.getMinutes();
+  const [startH, startM] = dayConfig.start.split(':').map(Number);
+  const [endH, endM] = dayConfig.end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+}
 
 // ─── Lazy service loaders (avoid circular dep and gracefully handle missing modules)
 
@@ -86,7 +135,7 @@ async function _loadRabbi(rabbiId) {
   try {
     const { rows } = await query(
       `SELECT id, name, email, whatsapp_number, notification_pref,
-              is_vacation
+              is_vacation, availability_hours
        FROM rabbis
        WHERE id = $1
          AND status = 'active'
@@ -109,7 +158,7 @@ async function _loadAllActiveRabbis() {
   try {
     const { rows } = await query(
       `SELECT id, name, email, whatsapp_number, notification_pref,
-              is_vacation
+              is_vacation, availability_hours
        FROM rabbis
        WHERE status = 'active'
          AND is_vacation = false
@@ -316,6 +365,12 @@ async function notify(rabbiId, type, data) {
     return { rabbiId, channels: [] };
   }
 
+  // Check availability hours — skip broadcast-type notifications outside hours
+  if (BROADCAST_TYPES.includes(type) && !_isWithinAvailabilityHours(rabbi.availability_hours)) {
+    console.info(`[notificationRouter] notify: רב ${rabbiId} מחוץ לשעות זמינות — דילוג על '${type}'`);
+    return { rabbiId, channels: [] };
+  }
+
   const pref     = _parsePreferences(rabbi.notification_pref);
   const channels = [];
 
@@ -397,6 +452,16 @@ async function notifyAll(type, data) {
 
   console.info(`[notificationRouter] notifyAll: שליחת '${type}' ל-${rabbis.length} רבנים פעילים`);
 
+  // Filter out rabbis outside their availability hours for broadcast-type notifications
+  const BROADCAST_TYPES_ALL = ['question_broadcast', 'urgent_question', 'question_released', 'daily_digest', 'weekly_report'];
+  const availableRabbis = BROADCAST_TYPES_ALL.includes(type)
+    ? rabbis.filter((r) => _isWithinAvailabilityHours(r.availability_hours))
+    : rabbis;
+
+  if (availableRabbis.length < rabbis.length) {
+    console.info(`[notificationRouter] notifyAll: ${rabbis.length - availableRabbis.length} רבנים מסוננים עקב שעות זמינות`);
+  }
+
   // עבור שידורים — ניתן לשלוח ב-batch דרך sendQuestionBroadcast/sendUrgentBroadcast
   // כדי לנצל את ה-throttling המובנה. נסנן ונחלק לפי ערוץ.
   const whatsappSvc = _whatsappService();
@@ -404,13 +469,13 @@ async function notifyAll(type, data) {
 
   if (type === 'question_broadcast' && whatsappSvc) {
     // שלח WA בבת אחת לכל הרבנים המתאימים (מנגנון ה-throttling מובנה בשירות)
-    const waResults = await whatsappSvc.sendQuestionBroadcast(data.question, rabbis).catch((err) => {
+    const waResults = await whatsappSvc.sendQuestionBroadcast(data.question, availableRabbis).catch((err) => {
       console.error('[notificationRouter] שגיאה בשידור WA:', err.message);
       return [];
     });
 
     // שלח אימייל לכל רב שבחר email
-    for (const rabbi of rabbis) {
+    for (const rabbi of availableRabbis) {
       const pref     = _parsePreferences(rabbi.notification_pref);
       const channels = [];
 
@@ -428,12 +493,12 @@ async function notifyAll(type, data) {
   }
 
   if (type === 'urgent_question' && whatsappSvc) {
-    const waResults = await whatsappSvc.sendUrgentBroadcast(data.question, rabbis).catch((err) => {
+    const waResults = await whatsappSvc.sendUrgentBroadcast(data.question, availableRabbis).catch((err) => {
       console.error('[notificationRouter] שגיאה בשידור דחוף WA:', err.message);
       return [];
     });
 
-    for (const rabbi of rabbis) {
+    for (const rabbi of availableRabbis) {
       const pref     = _parsePreferences(rabbi.notification_pref);
       const channels = [];
 
@@ -452,7 +517,7 @@ async function notifyAll(type, data) {
 
   // כל שאר הסוגים — שלח לכל רב בנפרד לפי העדפות
   const settled = await Promise.allSettled(
-    rabbis.map((rabbi) => notify(rabbi.id, type, data))
+    availableRabbis.map((rabbi) => notify(rabbi.id, type, data))
   );
 
   return settled.map((r) => (r.status === 'fulfilled' ? r.value : { rabbiId: null, channels: [] }));
@@ -467,4 +532,5 @@ module.exports = {
 
   // Exported for tests
   _parsePreferences,
+  _isWithinAvailabilityHours,
 };

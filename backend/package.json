@@ -5,7 +5,11 @@
     "dev": "nodemon --watch src src/server.js",
     "start": "node src/server.js",
     "migrate": "node src/db/migrate.js",
-    "migrate:rollback": "node src/db/migrate.js rollback"
+    "migrate:rollback": "node src/db/migrate.js rollback",
+    "test": "node --test tests/auth.test.js tests/questions.test.js tests/discussions.test.js",
+    "test:auth": "node --test tests/auth.test.js",
+    "test:questions": "node --test tests/questions.test.js",
+    "test:discussions": "node --test tests/discussions.test.js"
   },
   "dependencies": {
     "express": "^4.19.0",

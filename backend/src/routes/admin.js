@@ -1163,6 +1163,69 @@ router.get('/newsletter/status', async (req, res) => {
 });
 
 // =============================================================================
+// NEWSLETTER ARCHIVE
+// =============================================================================
+
+/**
+ * GET /admin/newsletter/archive
+ * Returns paginated list of archived newsletters.
+ * Query params: page (default 1), limit (default 20)
+ */
+router.get('/newsletter/archive', async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const [{ rows }, countResult] = await Promise.all([
+      dbQuery(
+        `SELECT id, title, sent_at, recipient_count, created_at
+         FROM   newsletter_archive
+         ORDER BY sent_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      dbQuery('SELECT COUNT(*)::int AS total FROM newsletter_archive'),
+    ]);
+
+    const total = countResult.rows[0]?.total || 0;
+
+    return res.json({
+      ok: true,
+      newsletters: rows,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error('[admin] GET /newsletter/archive error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * GET /admin/newsletter/archive/:id
+ * Returns a single archived newsletter with full HTML content.
+ */
+router.get('/newsletter/archive/:id', async (req, res) => {
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, title, content_html, sent_at, recipient_count, created_at
+       FROM   newsletter_archive
+       WHERE  id = $1`,
+      [req.params.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'ניוזלטר לא נמצא' });
+    }
+
+    return res.json({ ok: true, newsletter: rows[0] });
+  } catch (err) {
+    console.error('[admin] GET /newsletter/archive/:id error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+// =============================================================================
 // Private helpers
 // =============================================================================
 

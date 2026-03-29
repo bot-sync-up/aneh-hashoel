@@ -66,18 +66,40 @@ async function getRedis() {
 
 /**
  * General API rate limiter.
- * 100 requests per 15 minutes, keyed by IP address.
- * Applied to all /api/* routes that do not have a stricter limiter.
+ * 100 requests per 1 minute per IP.
+ * Applied to all /api/* routes as a blanket limiter.
+ * Route-specific limiters (auth, claim, thank) are stricter and stack on top.
  */
 const apiLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000, // 15 minutes
-  max:             500,
+  windowMs:        60 * 1000, // 1 minute
+  max:             100,
   standardHeaders: true,
   legacyHeaders:   false,
   keyGenerator:    clientIp,
   message: {
     ok:    false,
-    error: 'חרגת ממגבלת הבקשות. נסה שוב בעוד 15 דקות.',
+    error: 'חרגת ממגבלת הבקשות. נסה שוב בעוד דקה.',
+  },
+});
+
+// ─── writeLimiter ─────────────────────────────────────────────────────────────
+
+/**
+ * Write-operation rate limiter.
+ * 30 requests per 1 minute per IP for POST, PUT, DELETE methods.
+ * Applied to all /api/* routes but only triggers on mutating HTTP methods.
+ * Stacks with apiLimiter (both must pass for the request to proceed).
+ */
+const writeLimiter = rateLimit({
+  windowMs:        60 * 1000, // 1 minute
+  max:             30,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator:    clientIp,
+  skip:            (req) => !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method),
+  message: {
+    ok:    false,
+    error: 'חרגת ממגבלת הבקשות לפעולות כתיבה. נסה שוב בעוד דקה.',
   },
 });
 
@@ -252,6 +274,7 @@ const emailLimiter = authLimiter;
 
 module.exports = {
   apiLimiter,
+  writeLimiter,
   authLimiter,
   loginLimiter,
   forgotPasswordLimiter,

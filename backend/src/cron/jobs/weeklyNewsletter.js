@@ -209,6 +209,18 @@ async function runWeeklyNewsletter() {
     console.info(`[weekly-newsletter] נושא: ${subject}`);
   }
 
+  // Archive the newsletter regardless of send success
+  try {
+    await query(
+      `INSERT INTO newsletter_archive (title, content_html, sent_at, recipient_count)
+       VALUES ($1, $2, NOW(), $3)`,
+      [subject, htmlBody, result.recipientCount || 0]
+    );
+    console.info('[weekly-newsletter] ניוזלטר נשמר בארכיון');
+  } catch (archiveErr) {
+    console.error('[weekly-newsletter] שגיאה בשמירת ארכיון:', archiveErr.message);
+  }
+
   // Clear the admin selection after sending
   try {
     await systemSettings.setSetting('newsletter_selected_questions', [], null);

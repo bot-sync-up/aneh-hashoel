@@ -23,7 +23,6 @@ const express        = require('express');
 const cors           = require('cors');
 const helmet         = require('helmet');
 const morgan         = require('morgan');
-const rateLimit      = require('express-rate-limit');
 const { createServer }  = require('http');
 const { Server }        = require('socket.io');
 
@@ -54,6 +53,7 @@ const wpWebhook       = require('./routes/wpWebhook');
 const emailWebhook    = require('./routes/emailWebhook');
 const emailInbound    = require('./routes/emailInbound');
 const whatsappWebhook = require('./routes/whatsappWebhook');
+const donationsWebhook = require('./routes/donationsWebhook');
 
 // ─── App + HTTP server ────────────────────────────────────────────────────────
 
@@ -104,14 +104,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
+// Import centralized rate limiters from middleware/rateLimiter.js.
+// apiLimiter:   100 req/min per IP — blanket limiter for all /api/* routes
+// writeLimiter: 30 req/min per IP  — additional cap on POST/PUT/PATCH/DELETE
+// authLimiter:  stricter limiter for auth endpoints (stacks on top of the above)
 
-const authLimiter = rateLimit({
-  windowMs:         15 * 60 * 1_000, // 15 minutes
-  max:              10,
-  standardHeaders:  true,
-  legacyHeaders:    false,
-  message:          { error: 'יותר מדי ניסיונות כניסה. נסה שוב בעוד 15 דקות.' },
-});
+const { apiLimiter, writeLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 // ─── Webhook routes (BEFORE auth middleware) ──────────────────────────────────
 // These endpoints are called by external services (WordPress, SendGrid, GreenAPI).
@@ -121,6 +119,15 @@ app.use('/webhook/wordpress', wpWebhook);
 app.use('/webhook/email',     emailWebhook);
 app.use('/api/email',         emailInbound);    // Mailgun inbound webhook
 app.use('/webhook/whatsapp',  whatsappWebhook);
+app.use('/webhook/nedarim',  donationsWebhook);
+
+// ─── API rate limiting (applied to ALL /api/* routes) ────────────────────────
+// General limiter: 100 requests per minute per IP (all methods)
+// Write limiter:   30 requests per minute per IP (POST/PUT/PATCH/DELETE only)
+// These stack with route-specific limiters (auth, claim, thank) which are stricter.
+
+app.use('/api', apiLimiter);
+app.use('/api', writeLimiter);
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 
@@ -137,6 +144,7 @@ app.use('/api/admin/system',  require('./routes/admin/system'));
 app.use('/api/admin',         adminRoutes);
 app.use('/api/admin/dashboard', require('./routes/admin/dashboard'));
 app.use('/api/admin/sync',   require('./routes/admin/sync'));
+app.use('/api/admin/donations', require('./routes/admin/donations'));
 app.use('/api/admin/support', require('./routes/support'));
 app.use('/api/support',      require('./routes/support'));
 app.use('/api/action',        actionLinksRoute);

@@ -260,6 +260,72 @@ router.put('/profile/vacation', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
+// ─── GET /profile/availability ──────────────────────────────────────────────
+
+router.get('/profile/availability', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT availability_hours FROM rabbis WHERE id = $1`,
+      [req.rabbi.id]
+    );
+    return res.json({
+      availability_hours: rows[0]?.availability_hours ?? {},
+    });
+  } catch (err) { return next(err); }
+});
+
+// ─── PUT /profile/availability ──────────────────────────────────────────────
+
+/**
+ * Update the rabbi's weekly availability hours.
+ *
+ * Body: { availability_hours: { sun: { enabled, start, end }, mon: ..., ... } }
+ *
+ * Each day key (sun–sat) maps to an object with:
+ *   enabled {boolean}  — whether the rabbi is available on this day
+ *   start   {string}   — HH:MM start time (e.g. "08:00")
+ *   end     {string}   — HH:MM end time   (e.g. "22:00")
+ *
+ * If a day key is missing or enabled is false, the rabbi is unavailable that day.
+ */
+router.put('/profile/availability', async (req, res, next) => {
+  try {
+    const { availability_hours } = req.body ?? {};
+    if (!availability_hours || typeof availability_hours !== 'object') {
+      return res.status(400).json({ error: 'availability_hours חייב להיות אובייקט' });
+    }
+
+    const VALID_DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+    // Validate structure
+    for (const [day, val] of Object.entries(availability_hours)) {
+      if (!VALID_DAYS.includes(day)) {
+        return res.status(400).json({ error: `יום לא תקין: ${day}` });
+      }
+      if (val === null) continue;
+      if (typeof val !== 'object') {
+        return res.status(400).json({ error: `ערך לא תקין ליום ${day}` });
+      }
+      if (val.enabled && val.start && !TIME_RE.test(val.start)) {
+        return res.status(400).json({ error: `שעת התחלה לא תקינה ליום ${day}` });
+      }
+      if (val.enabled && val.end && !TIME_RE.test(val.end)) {
+        return res.status(400).json({ error: `שעת סיום לא תקינה ליום ${day}` });
+      }
+    }
+
+    const { rows } = await query(
+      `UPDATE rabbis
+       SET availability_hours = $1::jsonb, updated_at = NOW()
+       WHERE id = $2
+       RETURNING availability_hours`,
+      [JSON.stringify(availability_hours), req.rabbi.id]
+    );
+    return res.json({ availability_hours: rows[0].availability_hours });
+  } catch (err) { return next(err); }
+});
+
 // ─── GET /profile/notifications ───────────────────────────────────────────────
 
 router.get('/profile/notifications', async (req, res, next) => {

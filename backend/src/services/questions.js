@@ -241,6 +241,51 @@ async function createFromWebhook(data) {
     throw err;
   }
 
+  const trimmedTitle = data.title.trim();
+
+  // ── Duplicate detection: wp_post_id ────────────────────────────────────────
+  // The DB has a UNIQUE constraint on wp_post_id, but we check here first to
+  // return a clear, non-error result instead of letting the INSERT blow up.
+  if (data.wp_post_id) {
+    const wpDup = await query(
+      'SELECT id FROM questions WHERE wp_post_id = $1 LIMIT 1',
+      [data.wp_post_id]
+    );
+    if (wpDup.rowCount > 0) {
+      console.warn(
+        `[questions] createFromWebhook: כפילות wp_post_id=${data.wp_post_id} — ` +
+        `שאלה קיימת id=${wpDup.rows[0].id}, מדלג`
+      );
+      // Return the existing row so callers can proceed without error
+      const existing = await query('SELECT * FROM questions WHERE id = $1', [wpDup.rows[0].id]);
+      return existing.rows[0];
+    }
+  }
+
+  // ── Duplicate detection: same title + same asker_email within 24 hours ─────
+  // Prevents the same person from accidentally submitting the same question
+  // twice (e.g. double-click, browser retry, WP caching plugin replay).
+  // We encrypt the email first because the DB stores encrypted values.
+  if (data.asker_email) {
+    const encryptedEmailForCheck = encryptField(data.asker_email);
+    const titleDup = await query(
+      `SELECT id FROM questions
+       WHERE  title       = $1
+         AND  asker_email = $2
+         AND  created_at >= NOW() - INTERVAL '24 hours'
+       LIMIT 1`,
+      [trimmedTitle, encryptedEmailForCheck]
+    );
+    if (titleDup.rowCount > 0) {
+      console.warn(
+        `[questions] createFromWebhook: כפילות כותרת+אימייל תוך 24 שעות — ` +
+        `title="${trimmedTitle}" שאלה קיימת id=${titleDup.rows[0].id}, מדלג`
+      );
+      const existing = await query('SELECT * FROM questions WHERE id = $1', [titleDup.rows[0].id]);
+      return existing.rows[0];
+    }
+  }
+
   const sanitizedContent = sanitizeRichText(data.content);
   const encryptedEmail   = encryptField(data.asker_email || null);
   const encryptedPhone   = encryptField(data.asker_phone || null);
@@ -253,7 +298,7 @@ async function createFromWebhook(data) {
        ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11)
      RETURNING *`,
     [
-      data.title.trim(),
+      trimmedTitle,
       sanitizedContent,
       data.asker_name || null,
       encryptedEmail,

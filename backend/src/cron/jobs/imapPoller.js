@@ -48,13 +48,21 @@ function getImapConfig() {
 
 // ── Extract question ID from subject ─────────────────────────────────────────
 
-const QUESTION_ID_PATTERN = /\[Q[:\-]?\s*([a-f0-9\-]{36})\]/i;
-const FOLLOWUP_PATTERN    = /\[FOLLOWUP[:\-]?\s*(\d+)[:\-]?\s*(\d+)\]/i;
+// Match [Q:uuid], [ID:uuid], [CLAIM:uuid], or Re: versions of these
+const QUESTION_ID_PATTERNS = [
+  /\[Q[:\-]?\s*([a-f0-9\-]{36})\]/i,
+  /\[ID[:\-]?\s*([a-f0-9\-]{36})\]/i,
+  /\[CLAIM[:\-]?\s*([a-f0-9\-]{36})\]/i,
+];
+const FOLLOWUP_PATTERN = /\[FOLLOWUP[:\-]?\s*(\d+)[:\-]?\s*(\d+)\]/i;
 
 function extractQuestionId(subject) {
   if (!subject) return null;
-  const match = subject.match(QUESTION_ID_PATTERN);
-  return match ? match[1] : null;
+  for (const pattern of QUESTION_ID_PATTERNS) {
+    const match = subject.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 function extractFollowUpId(subject) {

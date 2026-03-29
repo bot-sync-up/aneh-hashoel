@@ -274,10 +274,14 @@ async function syncFollowUpAnswerToWP(questionId, followUpContent) {
     `SELECT q.wp_post_id,
             r.name AS rabbi_name
      FROM   questions q
-     LEFT JOIN answers a ON a.question_id = q.id
+     LEFT JOIN LATERAL (
+       SELECT rabbi_id FROM answers
+       WHERE  question_id = q.id
+       ORDER  BY created_at DESC
+       LIMIT  1
+     ) a ON true
      LEFT JOIN rabbis  r ON r.id = a.rabbi_id
-     WHERE  q.id = $1
-     LIMIT  1`,
+     WHERE  q.id = $1`,
     [questionId]
   );
 

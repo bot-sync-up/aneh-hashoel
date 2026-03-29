@@ -37,18 +37,24 @@ router.get('/', async (req, res, next) => {
     let rows;
     if (isAdmin) {
       ({ rows } = await query(
-        `SELECT id, name, parent_id, sort_order, status, suggested_by, wp_term_id, created_at
-         FROM   categories
-         WHERE  status IN ('approved','pending')
-         ORDER  BY sort_order, name`
+        `SELECT c.id, c.name, c.parent_id, c.sort_order, c.status, c.suggested_by, c.wp_term_id, c.created_at,
+                COUNT(q.id)::int AS "questionCount"
+         FROM   categories c
+         LEFT JOIN questions q ON q.category_id = c.id
+         WHERE  c.status IN ('approved','pending')
+         GROUP BY c.id
+         ORDER  BY c.sort_order, c.name`
       ));
     } else {
       ({ rows } = await query(
-        `SELECT id, name, parent_id, sort_order, status, suggested_by, wp_term_id, created_at
-         FROM   categories
-         WHERE  status = 'approved'
-            OR (status = 'pending' AND suggested_by = $1)
-         ORDER  BY sort_order, name`,
+        `SELECT c.id, c.name, c.parent_id, c.sort_order, c.status, c.suggested_by, c.wp_term_id, c.created_at,
+                COUNT(q.id)::int AS "questionCount"
+         FROM   categories c
+         LEFT JOIN questions q ON q.category_id = c.id
+         WHERE  c.status = 'approved'
+            OR (c.status = 'pending' AND c.suggested_by = $1)
+         GROUP BY c.id
+         ORDER  BY c.sort_order, c.name`,
         [req.rabbi.id]
       ));
     }

@@ -182,6 +182,10 @@ export default function DashboardPage() {
   // Pulse tracking for live stat updates
   const pulseTimerRef = useRef(null);
 
+  // Track whether initial load has completed to avoid showing
+  // skeleton shimmer on subsequent re-fetches (e.g. theme toggle, auto-refresh)
+  const hasLoadedOnce = useRef(false);
+
   // Auto-update greeting every minute
   const [greeting, setGreeting] = useState(hebrewGreeting());
   useEffect(() => {
@@ -191,7 +195,12 @@ export default function DashboardPage() {
 
   // ── Fetch dashboard data ───────────────────────────────────────────────
   const fetchDashboard = useCallback(async () => {
-    setLoading(true);
+    // Only show skeleton loading on the initial fetch.
+    // Subsequent refreshes (auto-refresh, theme toggle re-render) update
+    // data silently so the UI doesn't flash skeleton placeholders.
+    if (!hasLoadedOnce.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       // Try the admin endpoint first, fall back to general
@@ -207,9 +216,11 @@ export default function DashboardPage() {
         requests.push(api.get('/admin/dashboard/activity'));
         requests.push(api.get('/admin/dashboard/categories/breakdown'));
         requests.push(api.get('/admin/dashboard/roi'));
+        // Also fetch personal rabbi stats for the logged-in admin
+        requests.push(api.get('/dashboard/stats'));
       }
 
-      const [statsRes, myQRes, pendingRes, activityRes, adminActivityRes, catRes, roiRes] =
+      const [statsRes, myQRes, pendingRes, activityRes, adminActivityRes, catRes, roiRes, rabbiStatsRes] =
         await Promise.allSettled(requests);
 
       if (statsRes.status === 'fulfilled') {
@@ -217,7 +228,12 @@ export default function DashboardPage() {
 
         if (isAdmin) {
           setAdminStats(extractAdminStats(d));
-          setRabbiStats(extractRabbiStats(d));
+          // Use personal rabbi stats from the dedicated endpoint
+          if (rabbiStatsRes?.status === 'fulfilled') {
+            setRabbiStats(extractRabbiStats(rabbiStatsRes.value.data));
+          } else {
+            setRabbiStats(extractRabbiStats(d));
+          }
         } else {
           setRabbiStats(extractRabbiStats(d));
           // non-admin: chart data may be in stats response
@@ -293,6 +309,7 @@ export default function DashboardPage() {
       );
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [isAdmin]);
 

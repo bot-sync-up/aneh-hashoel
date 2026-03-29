@@ -1280,7 +1280,12 @@ async function _broadcastEmergencyEmail(message, targetRabbiIds) {
 router.get('/categories', requireAdmin, async (req, res) => {
   try {
     const { rows } = await dbQuery(
-      'SELECT id, name, parent_id, sort_order, color, description, created_at FROM categories ORDER BY sort_order, name'
+      `SELECT c.id, c.name, c.parent_id, c.sort_order, c.color, c.description, c.created_at,
+              COUNT(q.id)::int AS "questionCount"
+       FROM   categories c
+       LEFT JOIN questions q ON q.category_id = c.id
+       GROUP BY c.id
+       ORDER BY c.sort_order, c.name`
     );
     return res.json({ ok: true, categories: rows });
   } catch (err) {

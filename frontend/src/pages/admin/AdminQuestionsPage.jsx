@@ -195,7 +195,7 @@ export default function AdminQuestionsPage() {
         get('/categories').catch(() => ({ categories: [] })),
         get('/admin/rabbis').catch(() => ({ rabbis: [] })),
       ]);
-      const rawQuestions = Array.isArray(qData) ? qData : qData.questions ?? DEMO_QUESTIONS;
+      const rawQuestions = Array.isArray(qData) ? qData : qData.questions ?? [];
       setQuestions(rawQuestions.map((q) => ({
         ...q,
         createdAt:      q.createdAt      ?? q.created_at,
@@ -207,7 +207,7 @@ export default function AdminQuestionsPage() {
       setCategories(Array.isArray(catData) ? catData : catData.categories ?? []);
       setRabbis(Array.isArray(rabbiData) ? rabbiData : rabbiData.rabbis ?? []);
     } catch {
-      setQuestions(DEMO_QUESTIONS);
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
@@ -563,11 +563,3 @@ export default function AdminQuestionsPage() {
   );
 }
 
-// ─── Demo data ─────────────────────────────────────────────────────────────
-const DEMO_QUESTIONS = [
-  { id: 1001, title: 'האם מותר לאכול גבינה אחרי בשר בשעה אחת?', category: 'כשרות', status: 'pending', assignedRabbi: null, createdAt: '2026-03-15', isUrgent: true, categoryId: 1 },
-  { id: 1002, title: 'שאלה בענין ברכת המזון בשבת', category: 'שבת', status: 'in_process', assignedRabbi: 'הרב אברהם כהן', createdAt: '2026-03-14', isUrgent: false, categoryId: 2 },
-  { id: 1003, title: 'כיצד מתפללים ביחידות כשאין מניין', category: 'תפילה', status: 'answered', assignedRabbi: 'הרב יוסף לוי', createdAt: '2026-03-13', isUrgent: false, categoryId: 3 },
-  { id: 1004, title: 'הלכות פסח - ביטול חמץ בשישים', category: 'פסח', status: 'pending', assignedRabbi: null, createdAt: '2026-03-12', isUrgent: true, categoryId: 4 },
-  { id: 1005, title: 'שאלה על מזוזה בדירה שכורה', category: 'מזוזה', status: 'hidden', assignedRabbi: null, createdAt: '2026-03-10', isUrgent: false, categoryId: 5 },
-];

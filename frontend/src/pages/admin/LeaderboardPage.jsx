@@ -103,9 +103,9 @@ export default function LeaderboardPage() {
     try {
       const data = await get('/admin/leaderboard', { period });
       const list = Array.isArray(data) ? data : data.leaderboard ?? data.rabbis;
-      setRabbis(Array.isArray(list) && list.length > 0 ? list : DEMO_RABBIS);
+      setRabbis(Array.isArray(list) ? list : []);
     } catch {
-      setRabbis(DEMO_RABBIS);
+      setRabbis([]);
     } finally {
       setLoading(false);
     }
@@ -241,14 +241,3 @@ export default function LeaderboardPage() {
   );
 }
 
-// ─── Demo data ─────────────────────────────────────────────────────────────
-const DEMO_RABBIS = [
-  { id: 1, name: 'הרב אברהם כהן',     answers: 18, avgTimeHours: 2.3, thanks: 14, totalAnswers: 124 },
-  { id: 5, name: 'הרב משה הורוויץ',   answers: 15, avgTimeHours: 3.1, thanks: 11, totalAnswers: 87 },
-  { id: 2, name: 'הרב יוסף לוי',      answers: 12, avgTimeHours: 4.0, thanks:  8, totalAnswers: 65 },
-  { id: 4, name: 'הרב דוד פרידמן',    answers:  9, avgTimeHours: 5.5, thanks:  6, totalAnswers: 38 },
-  { id: 3, name: 'הרב שמואל גרינברג', answers:  3, avgTimeHours: 8.0, thanks:  2, totalAnswers: 12 },
-];
-
-// Attach weeklyData for top card
-DEMO_RABBIS[0].answersThisWeek = DEMO_RABBIS[0].answers;

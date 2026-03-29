@@ -183,7 +183,13 @@ async function getQuestionById(id, requestingRabbiId = null) {
      FROM   questions q
      LEFT JOIN rabbis        r  ON r.id  = q.assigned_rabbi_id
      LEFT JOIN categories    c  ON c.id  = q.category_id
-     LEFT JOIN answers       a  ON a.question_id = q.id
+     LEFT JOIN LATERAL (
+       SELECT id, content, is_private, rabbi_id, created_at, updated_at
+       FROM   answers
+       WHERE  question_id = q.id
+       ORDER  BY created_at DESC
+       LIMIT  1
+     ) a ON true
      LEFT JOIN LATERAL (
        SELECT content FROM private_notes
        WHERE question_id = q.id AND rabbi_id = $2
@@ -721,7 +727,13 @@ async function getMyQuestions(rabbiId, status = null) {
             CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS has_answer
      FROM   questions q
      LEFT JOIN categories c ON c.id = q.category_id
-     LEFT JOIN answers    a ON a.question_id = q.id
+     LEFT JOIN LATERAL (
+       SELECT id, content, created_at
+       FROM   answers
+       WHERE  question_id = q.id
+       ORDER  BY created_at DESC
+       LIMIT  1
+     ) a ON true
      WHERE  1=1
        ${statusClause}
      ORDER BY
@@ -784,9 +796,8 @@ async function getSimilarQuestions(questionId) {
               ) AS rank
        FROM   questions q
        LEFT JOIN categories c ON c.id = q.category_id
-       LEFT JOIN answers    a ON a.question_id = q.id
        WHERE  q.id != $1
-         AND  a.id IS NOT NULL
+         AND  EXISTS (SELECT 1 FROM answers WHERE question_id = q.id)
          AND  to_tsvector('simple', COALESCE(q.title, '') || ' ' || COALESCE(q.content, ''))
               @@ to_tsquery('simple', $2)
        ORDER BY rank DESC
@@ -812,9 +823,8 @@ async function getSimilarQuestions(questionId) {
               c.name AS category_name
        FROM   questions q
        LEFT JOIN categories c ON c.id = q.category_id
-       LEFT JOIN answers    a ON a.question_id = q.id
        WHERE  q.id != $1
-         AND  a.id IS NOT NULL
+         AND  EXISTS (SELECT 1 FROM answers WHERE question_id = q.id)
          AND  (${likeConditions})
        ORDER BY q.created_at DESC
        LIMIT 10`,

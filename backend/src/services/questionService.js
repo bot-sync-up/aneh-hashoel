@@ -789,7 +789,12 @@ async function getStats(filters = {}) {
          1
        )                                                               AS avg_response_minutes
      FROM   questions q
-     LEFT JOIN answers a ON a.question_id = q.id
+     LEFT JOIN LATERAL (
+       SELECT created_at FROM answers
+       WHERE  question_id = q.id
+       ORDER  BY created_at ASC
+       LIMIT  1
+     ) a ON true
      ${whereClause}`,
     params
   );

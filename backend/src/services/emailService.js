@@ -216,7 +216,7 @@ async function sendNewQuestionBroadcast(rabbis, question) {
   const submitTime      = formatDate(question.created_at);
 
   const subjectPrefix   = isUrgent ? '[דחוף] ' : '';
-  const subject         = `${subjectPrefix}שאלה חדשה ממתינה לתשובה — ${titleTruncated}`;
+  const subject         = `${subjectPrefix}[Q:${question.id}] שאלה חדשה ממתינה לתשובה — ${titleTruncated}`;
 
   // Send individually so each token is scoped (future: per-rabbi claim token)
   const promises = rabbis.map((rabbi) => {
@@ -672,7 +672,7 @@ async function sendUrgentQuestionAlert(rabbis, question) {
 
   const { createEmailHTML, BRAND_NAVY, BRAND_GOLD } = require('../templates/emailBase');
 
-  const subject       = `[דחוף] שאלה דחופה ממתינה לתשובה מיידית — ${truncate(question.title || '', 60)}`;
+  const subject       = `[דחוף] [Q:${question.id}] שאלה דחופה ממתינה לתשובה מיידית — ${truncate(question.title || '', 60)}`;
   const categoryLabel = question.category_name || 'כללי';
   const preview       = truncate(question.content || '', 250);
   const submitTime    = formatDate(question.created_at);

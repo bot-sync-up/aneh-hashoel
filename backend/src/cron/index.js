@@ -26,6 +26,7 @@ const { runWpSyncRetry }        = require('./jobs/wpSyncRetry');
 const { runSheetsSyncLeads }    = require('./jobs/sheetsSyncLeads');
 const { runWeeklyNewsletter }   = require('./jobs/weeklyNewsletter');
 const { runHolidayGreetings }   = require('./jobs/holidayGreetings');
+const { runImapPoller }         = require('./jobs/imapPoller');
 const {
   syncPendingQuestions,
   syncAnswersToWP,
@@ -124,6 +125,11 @@ function startCronJobs(io = null) {
 
   // ─── Weekly Friday 10:00 — send שו"ת השבוע newsletter ─────────────────────
   cron.schedule('0 10 * * 5', safeJob('sendWeeklyNewsletter', runWeeklyNewsletter), {
+    timezone: TIMEZONE,
+  });
+
+  // ─── Every 2 min — poll IMAP mailbox for rabbi email replies ──────────────
+  cron.schedule('*/2 * * * *', safeJob('imapPoller', runImapPoller), {
     timezone: TIMEZONE,
   });
 

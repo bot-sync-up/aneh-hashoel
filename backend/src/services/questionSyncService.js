@@ -108,26 +108,35 @@ async function syncPendingQuestions(io = null) {
   for (const wpQ of wpQuestions) {
     const wpPostId = wpQ.id;
     const meta     = wpQ.meta || {};
+    const acf      = wpQ.acf  || {};
+    // Merge meta and acf so fields are found regardless of where WP exposes them
+    const allFields = { ...meta, ...acf };
 
-    // Extract and normalise fields from the WP REST API response structure
+    // Extract and normalise fields from the WP REST API response structure.
+    // Content can live in meta['ask-quest'], acf['ask-quest'], or the standard
+    // WP content.rendered field — try all sources.
     const questionData = {
       title:       _stripHtml(wpQ.title?.rendered || wpQ.title || '').trim(),
-      content:     meta['ask-quest']      || '',
-      asker_name:  meta.visitor_name      || null,
-      asker_email: meta.asker_email       || null,
-      asker_phone: meta.visitor_phone     || meta.asker_phone || null,
-      urgency:        meta.urgency           || 'normal',
+      content:     allFields['ask-quest']
+                     || _stripHtml(wpQ.content?.rendered || '').trim()
+                     || '',
+      asker_name:  allFields.visitor_name  || allFields.asker_name  || null,
+      asker_email: allFields.visitor_email || allFields.asker_email || null,
+      asker_phone: allFields.visitor_phone || allFields.asker_phone || null,
+      urgency:        allFields.urgency        || 'normal',
       source:         'wordpress_poll',
       wp_post_id:     wpPostId,
       attachment_url: null, // resolved below from attachment ID if present
-      _attachmentId:  meta['ask-visitor-img'] || null,
+      _attachmentId:  allFields['ask-visitor-img'] || null,
       wp_link:        wpQ.link || null,
     };
 
     if (!questionData.title || !questionData.content) {
       console.warn(
         `[questionSync] syncPendingQuestions: wpPostId=${wpPostId} ` +
-        'חסרים title/content — מדלג'
+        `חסרים title/content — מדלג ` +
+        `(title=${!!questionData.title}, content=${!!questionData.content}, ` +
+        `meta_keys=${Object.keys(meta).join(',')}, acf_keys=${Object.keys(acf).join(',')})`
       );
       skipped++;
       continue;

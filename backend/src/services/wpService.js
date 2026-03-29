@@ -182,7 +182,7 @@ async function getNewQuestions() {
       () => client.get('/ask-rabai', {
         params: {
           status:   'pending',
-          _fields:  'id,title,meta,date,acf',
+          _fields:  'id,title,content,meta,date,acf,link',
           per_page: 50,
           orderby:  'date',
           order:    'desc',

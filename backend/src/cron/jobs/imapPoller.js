@@ -346,36 +346,52 @@ async function runImapPoller() {
 
           console.log(TAG, `Found ${uids.length} unread emails`);
 
-          const fetch = imap.fetch(uids, { bodies: '', markSeen: false });
+          const fetch = imap.fetch(uids, { bodies: '', markSeen: false, struct: true });
 
           const emailPromises = [];
 
           fetch.on('message', (msg, seqno) => {
             let buffer = '';
+            let uid = null;
 
             msg.on('body', (stream) => {
               stream.on('data', (chunk) => { buffer += chunk.toString('utf8'); });
             });
 
+            msg.on('attributes', (attrs) => {
+              uid = attrs.uid;
+            });
+
             msg.on('end', () => {
-              const uid = uids[seqno - 1];
+              if (!uid) {
+                console.warn(TAG, `Could not determine UID for message #${seqno} — skipping`);
+                errors++;
+                return;
+              }
+
               emailPromises.push(
                 simpleParser(buffer)
                   .then((parsed) => processEmail(parsed))
                   .then((success) => {
                     if (success) processed++;
-                    // Mark ALL processed emails as seen (not just successful ones)
+                    // Mark ALL processed/skipped emails as seen
                     // to prevent re-processing on next poll cycle
-                    imap.addFlags(uid, ['\\Seen'], (err) => {
-                      if (err) console.warn(TAG, `Failed to mark ${uid} as seen:`, err.message);
+                    return new Promise((res) => {
+                      imap.addFlags(uid, ['\\Seen'], (err) => {
+                        if (err) console.warn(TAG, `Failed to mark UID ${uid} as seen:`, err.message);
+                        res();
+                      });
                     });
                   })
                   .catch((err) => {
                     errors++;
-                    console.error(TAG, `Error processing email #${seqno}:`, err.message);
+                    console.error(TAG, `Error processing email #${seqno} (UID ${uid}):`, err.message);
                     // Still mark as seen to avoid infinite retry loop
-                    imap.addFlags(uid, ['\\Seen'], (flagErr) => {
-                      if (flagErr) console.warn(TAG, `Failed to mark ${uid} as seen:`, flagErr.message);
+                    return new Promise((res) => {
+                      imap.addFlags(uid, ['\\Seen'], (flagErr) => {
+                        if (flagErr) console.warn(TAG, `Failed to mark UID ${uid} as seen:`, flagErr.message);
+                        res();
+                      });
                     });
                   })
               );

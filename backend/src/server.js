@@ -86,10 +86,14 @@ app.set('trust proxy', 1);
 // Security headers
 app.use(helmet());
 
-// CORS — allow the React frontend to call the API with credentials
+// CORS — allow the React frontend + WordPress site to call the API
 app.use(
   cors({
-    origin:      FRONTEND_URL,
+    origin: [
+      FRONTEND_URL,
+      'https://moreshet-maran.com',
+      'https://www.moreshet-maran.com',
+    ].filter(Boolean),
     credentials: true,
   })
 );

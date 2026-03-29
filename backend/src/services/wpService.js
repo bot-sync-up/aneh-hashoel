@@ -198,7 +198,7 @@ async function getNewQuestions() {
       return { success: true, data: [] };
     }
 
-    // Find which wp_post_ids are already in our DB
+    // Find which wp_post_ids are already in our DB or blocklist
     const wpIds = wpQuestions.map((q) => q.id).filter(Boolean);
 
     const { rows: existingRows } = await query(
@@ -208,7 +208,17 @@ async function getNewQuestions() {
       [wpIds]
     );
 
-    const existingSet = new Set(existingRows.map((r) => r.wp_post_id));
+    const { rows: blockedRows } = await query(
+      `SELECT wp_post_id
+       FROM   wp_post_blocklist
+       WHERE  wp_post_id = ANY($1::int[])`,
+      [wpIds]
+    );
+
+    const existingSet = new Set([
+      ...existingRows.map((r) => r.wp_post_id),
+      ...blockedRows.map((r) => r.wp_post_id),
+    ]);
     const newQuestions = wpQuestions.filter((q) => !existingSet.has(q.id));
 
     console.log(

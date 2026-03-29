@@ -9,6 +9,7 @@
  */
 
 const { query } = require('../../db/pool');
+const { notify } = require('../../services/notificationRouter');
 
 /**
  * מאתר שאלות שחרגו מהזמן המוגדר ב-sla_config ומאפס אותן.
@@ -66,9 +67,17 @@ async function runTimeoutCheck() {
     );
   }
 
-  // TODO: שליחת התראה לרב שהשאלה נלקחה ממנו (יוטמע ע"י סוכן ההתראות)
-  // const notificationService = require('../../services/notifications');
-  // await notificationService.notifyTimeoutReset(result.rows);
+  // שליחת התראה לרב שהשאלה נלקחה ממנו
+  for (const row of result.rows) {
+    if (row.previous_rabbi_id) {
+      await notify(row.previous_rabbi_id, 'timeout_reset', {
+        question: { id: row.id, title: row.title },
+        message: `השאלה ${row.title} הוחזרה לתור — עבר זמן המענה המוגדר.`,
+      }).catch((err) =>
+        console.error(`[timeout-check] שגיאה בשליחת התראה לרב ${row.previous_rabbi_id}:`, err.message)
+      );
+    }
+  }
 }
 
 module.exports = { runTimeoutCheck };

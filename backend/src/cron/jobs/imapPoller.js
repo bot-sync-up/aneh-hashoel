@@ -167,8 +167,14 @@ async function processEmail(parsed) {
     return false; // silently skip our own outgoing emails
   }
 
-  // Also ignore mailer-daemon / bounce emails
-  if (from.includes('mailer-daemon') || from.includes('postmaster')) {
+  // Also ignore mailer-daemon / bounce / system emails
+  const systemSenders = [
+    'mailer-daemon', 'postmaster', 'noreply', 'no-reply',
+    'bounce', 'undeliverable', 'system', 'notifications',
+    'auto-reply', 'autoresponder',
+  ];
+  const fromLocal = from.split('@')[0];
+  if (systemSenders.some((s) => fromLocal === s || from.includes(s + '@'))) {
     return false;
   }
 

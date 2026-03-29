@@ -161,6 +161,17 @@ async function processEmail(parsed) {
     return false;
   }
 
+  // Ignore emails sent by our own system (same mailbox)
+  const systemEmail = (process.env.SMTP_FROM || process.env.SMTP_USER || '').toLowerCase();
+  if (systemEmail && from === systemEmail) {
+    return false; // silently skip our own outgoing emails
+  }
+
+  // Also ignore mailer-daemon / bounce emails
+  if (from.includes('mailer-daemon') || from.includes('postmaster')) {
+    return false;
+  }
+
   // Extract question ID from subject
   const questionId = extractQuestionId(subject);
   if (!questionId) {

@@ -483,6 +483,22 @@ router.get('/health', async (req, res) => {
     checks.greenApi = { status: 'error', error: err.message };
   }
 
+  // ── Queue / DB counts ───────────────────────────────────────────────────
+  let counts = {};
+  try {
+    const { rows } = await dbQuery(`
+      SELECT
+        (SELECT COUNT(*) FROM questions WHERE status = 'pending')::int    AS pending_questions,
+        (SELECT COUNT(*) FROM questions WHERE status = 'in_process')::int AS active_questions,
+        (SELECT COUNT(*) FROM questions WHERE status = 'answered' AND wp_synced_at IS NULL)::int AS pending_wp_sync,
+        (SELECT COUNT(*) FROM rabbis WHERE is_active = true)::int         AS active_rabbis,
+        (SELECT COUNT(*) FROM discussions WHERE is_open = true)::int      AS open_discussions
+    `);
+    counts = rows[0] || {};
+  } catch {
+    // counts stay empty — non-critical
+  }
+
   // ── Overall status ────────────────────────────────────────────────────────
   const allOk      = Object.values(checks).every((c) => c.status === 'ok' || c.status === 'unconfigured');
   const anyError   = Object.values(checks).some((c)  => c.status === 'error');
@@ -492,6 +508,9 @@ router.get('/health', async (req, res) => {
     ok: allOk,
     status: overallStatus,
     checks,
+    uptime: Math.floor(process.uptime()),
+    memory: process.memoryUsage(),
+    counts,
     timestamp: new Date().toISOString(),
   });
 });

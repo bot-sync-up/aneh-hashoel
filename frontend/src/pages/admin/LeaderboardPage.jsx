@@ -102,7 +102,8 @@ export default function LeaderboardPage() {
     setLoading(true);
     try {
       const data = await get('/admin/leaderboard', { period });
-      setRabbis(Array.isArray(data) ? data : data.rabbis ?? DEMO_RABBIS);
+      const list = Array.isArray(data) ? data : data.leaderboard ?? data.rabbis;
+      setRabbis(Array.isArray(list) && list.length > 0 ? list : DEMO_RABBIS);
     } catch {
       setRabbis(DEMO_RABBIS);
     } finally {

@@ -1336,25 +1336,51 @@ router.get('/system/health', requireAdmin, async (req, res) => {
 router.get('/leaderboard', requireAdmin, async (req, res) => {
   try {
     const period = req.query.period || 'month';
-    const intervals = { week: '7 days', month: '30 days', year: '365 days' };
-    const interval = intervals[period] || '30 days';
+    const intervals = { week: '7 days', month: '30 days', alltime: null, year: '365 days' };
+    const interval = intervals[period] ?? '30 days';
+
+    // Date filter for period-scoped aggregates
+    const dateCond = interval
+      ? `AND a.published_at >= NOW() - INTERVAL '${interval}'`
+      : '';
 
     const { rows } = await dbQuery(`
       SELECT
-        r.id, r.name, r.role, r.photo_url,
-        COUNT(q.id)::int                                                          AS answered,
-        COALESCE(SUM(q.thanks_count), 0)::int                                     AS total_thanks,
-        ROUND(AVG(EXTRACT(EPOCH FROM (q.answered_at - q.created_at)) / 3600)::numeric, 2) AS avg_hours
+        r.id,
+        r.name,
+        r.role,
+        r.photo_url,
+        COUNT(a.id) FILTER (WHERE a.published_at IS NOT NULL ${dateCond})::int       AS answers,
+        COUNT(a.id) FILTER (WHERE a.published_at IS NOT NULL)::int                   AS "totalAnswers",
+        COALESCE(
+          SUM(q.thank_count) FILTER (WHERE a.published_at IS NOT NULL ${dateCond}),
+          0
+        )::int                                                                       AS thanks,
+        ROUND(
+          AVG(
+            EXTRACT(EPOCH FROM (a.published_at - q.lock_timestamp)) / 3600
+          ) FILTER (
+            WHERE a.published_at IS NOT NULL
+              AND q.lock_timestamp IS NOT NULL
+              ${dateCond}
+          )::numeric,
+          1
+        )                                                                            AS "avgTimeHours"
       FROM rabbis r
-      LEFT JOIN questions q
-        ON  q.assigned_rabbi_id = r.id
-        AND q.status            = 'answered'
-        AND q.answered_at      >= NOW() - INTERVAL '${interval}'
+      LEFT JOIN answers   a ON a.rabbi_id = r.id
+      LEFT JOIN questions q ON q.id       = a.question_id
       WHERE r.is_active = true
       GROUP BY r.id
-      ORDER BY answered DESC, total_thanks DESC
+      HAVING COUNT(a.id) FILTER (WHERE a.published_at IS NOT NULL ${dateCond}) > 0
+      ORDER BY answers DESC, thanks DESC
       LIMIT 20
     `);
+
+    // Attach answersThisWeek for the top-rabbi card when period=week
+    if (period === 'week' && rows.length > 0) {
+      rows[0].answersThisWeek = rows[0].answers;
+    }
+
     return res.json({ ok: true, leaderboard: rows, period });
   } catch (err) {
     return res.status(500).json({ error: err.message });

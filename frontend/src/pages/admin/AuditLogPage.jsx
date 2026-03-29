@@ -16,7 +16,75 @@ const ACTION_CONFIG = {
   create:    { label: 'יצירה',            color: 'bg-violet-100 text-violet-700 border-violet-200' },
   broadcast: { label: 'שידור חירום',     color: 'bg-orange-100 text-orange-700 border-orange-200' },
   settings:  { label: 'שינוי הגדרות',    color: 'bg-cyan-100 text-cyan-600 border-cyan-200' },
+  transfer:  { label: 'העברת שאלה',      color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  hidden:    { label: 'הסתרה',           color: 'bg-stone-100 text-stone-600 border-stone-200' },
+  urgent:    { label: 'דחיפות',          color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  sync:      { label: 'סנכרון',          color: 'bg-sky-100 text-sky-600 border-sky-200' },
+  config:    { label: 'שינוי הגדרות',    color: 'bg-cyan-100 text-cyan-600 border-cyan-200' },
 };
+
+// Map backend dotted action strings (e.g. "question.claim") to short keys
+const ACTION_MAP = {
+  'rabbi.login':              'login',
+  'rabbi.logout':             'logout',
+  'question.claim':           'claim',
+  'question.release':         'release',
+  'question.answer':          'answer',
+  'question.transfer':        'transfer',
+  'question.hidden':          'hidden',
+  'question.urgent':          'urgent',
+  'question.edit':            'edit',
+  'question.delete':          'delete',
+  'question.create':          'create',
+  'rabbi.created':            'create',
+  'settings.changed':         'settings',
+  'admin.config_changed':     'config',
+  'system.emergency_broadcast': 'broadcast',
+  'admin.sync_retry':         'sync',
+  'admin.backfill_attachments': 'sync',
+};
+
+function _normalizeAction(rawAction) {
+  if (!rawAction) return 'edit';
+  if (ACTION_CONFIG[rawAction]) return rawAction;
+  if (ACTION_MAP[rawAction]) return ACTION_MAP[rawAction];
+  // Try extracting after the dot: "question.claim" -> "claim"
+  const afterDot = rawAction.split('.').pop();
+  if (ACTION_CONFIG[afterDot]) return afterDot;
+  return rawAction;
+}
+
+function _buildEntity(entityType, entityId) {
+  if (!entityType && !entityId) return null;
+  if (entityType === 'question' && entityId) return `שאלה #${entityId}`;
+  if (entityType === 'rabbi' && entityId) return `רב #${entityId}`;
+  if (entityType === 'system_config') return 'הגדרות מערכת';
+  if (entityType === 'broadcast') return 'שידור';
+  if (entityType === 'wordpress_sync') return 'סנכרון WP';
+  if (entityType) return entityType;
+  return entityId ? `#${entityId}` : null;
+}
+
+function _buildDetails(newValue, oldValue, ip) {
+  const parts = [];
+  if (newValue && typeof newValue === 'object') {
+    // Try to extract a meaningful summary from the JSON
+    const nv = typeof newValue === 'string' ? JSON.parse(newValue) : newValue;
+    if (nv.message) parts.push(nv.message);
+    if (nv.reason) parts.push(nv.reason);
+    if (nv.questionId) parts.push(`שאלה ${nv.questionId}`);
+    if (nv.retriedCount != null) parts.push(`${nv.retriedCount} ניסיונות`);
+    // If no known keys, show a short JSON snippet
+    if (parts.length === 0) {
+      const keys = Object.keys(nv).slice(0, 3);
+      if (keys.length > 0) parts.push(keys.map((k) => `${k}: ${nv[k]}`).join(', '));
+    }
+  } else if (typeof newValue === 'string') {
+    parts.push(newValue);
+  }
+  if (ip) parts.push(`IP: ${ip}`);
+  return parts.length > 0 ? parts.join(' | ') : null;
+}
 
 const ACTION_OPTIONS = [
   { value: 'all', label: 'כל הפעולות' },
@@ -65,27 +133,35 @@ export default function AuditLogPage() {
   const load = useCallback(async (pageNum = 1, append = false) => {
     if (pageNum === 1) setLoading(true); else setLoadingMore(true);
     try {
-      const params = { page: pageNum, limit: 25 };
-      if (actionFilter !== 'all') params.action = actionFilter;
-      if (rabbiFilter) params.rabbi = rabbiFilter;
-      if (dateFrom) params.from = dateFrom;
-      if (dateTo) params.to = dateTo;
+      const params = { page: pageNum, limit: 50 };
+      if (rabbiFilter) params.rabbi_id = rabbiFilter;
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo) params.dateTo = dateTo;
 
       const data = await get('/admin/audit-log', params);
-      const items = Array.isArray(data) ? data : data.logs ?? DEMO_LOGS;
+      const rawEntries = data.entries ?? data.logs ?? [];
+      const items = rawEntries.map((e) => ({
+        id:        e.id,
+        timestamp: e.created_at ?? e.createdAt,
+        rabbiName: e.actor_name ?? e.actorName ?? '—',
+        action:    _normalizeAction(e.action),
+        entity:    _buildEntity(e.entity_type ?? e.entityType, e.entity_id ?? e.entityId),
+        details:   _buildDetails(e.new_value ?? e.newValue, e.old_value ?? e.oldValue, e.ip),
+      }));
       const total = data.total ?? items.length;
 
       setLogs((prev) => append ? [...prev, ...items] : items);
-      setHasMore(items.length === 25 && (pageNum * 25) < total);
+      setHasMore(items.length === 50 && (pageNum * 50) < total);
       setPage(pageNum);
-    } catch {
-      if (!append) setLogs(DEMO_LOGS);
+    } catch (err) {
+      console.error('[AuditLog] fetch error:', err);
+      if (!append) setLogs([]);
       setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [actionFilter, rabbiFilter, dateFrom, dateTo]);
+  }, [rabbiFilter, dateFrom, dateTo]);
 
   // Reload on filter change
   useEffect(() => { load(1, false); }, [load]);
@@ -101,12 +177,15 @@ export default function AuditLogPage() {
     return () => obs.disconnect();
   }, [hasMore, loadingMore, page, load]);
 
-  const filtered = logs.filter((l) =>
-    !search ||
-    l.rabbiName?.includes(search) ||
-    l.entity?.includes(search) ||
-    l.details?.includes(search)
-  );
+  const filtered = logs.filter((l) => {
+    if (actionFilter !== 'all' && l.action !== actionFilter) return false;
+    if (search && !(
+      l.rabbiName?.includes(search) ||
+      l.entity?.includes(search) ||
+      l.details?.includes(search)
+    )) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -235,18 +314,3 @@ export default function AuditLogPage() {
   );
 }
 
-// ─── Demo data ─────────────────────────────────────────────────────────────
-const DEMO_LOGS = [
-  { id: 1, timestamp: '2026-03-16T08:32:00', rabbiName: 'הרב אברהם כהן', action: 'login', entity: 'מערכת', details: 'כניסה מכתובת IP 192.168.1.1' },
-  { id: 2, timestamp: '2026-03-16T08:35:00', rabbiName: 'הרב אברהם כהן', action: 'claim', entity: 'שאלה #1004', details: 'תפיסת שאלה בנושא פסח' },
-  { id: 3, timestamp: '2026-03-16T09:10:00', rabbiName: 'הרב יוסף לוי', action: 'login', entity: 'מערכת', details: 'כניסה מכתובת IP 10.0.0.5' },
-  { id: 4, timestamp: '2026-03-16T09:45:00', rabbiName: 'הרב אברהם כהן', action: 'answer', entity: 'שאלה #1004', details: 'פרסום תשובה — 320 מילים' },
-  { id: 5, timestamp: '2026-03-16T10:02:00', rabbiName: 'הרב דוד פרידמן', action: 'settings', entity: 'הגדרות מערכת', details: 'שינוי זמן נעילה מ-2 ל-4 שעות' },
-  { id: 6, timestamp: '2026-03-16T10:30:00', rabbiName: 'הרב יוסף לוי', action: 'claim', entity: 'שאלה #1002', details: 'תפיסת שאלה בנושא שבת' },
-  { id: 7, timestamp: '2026-03-16T11:00:00', rabbiName: 'הרב משה הורוויץ', action: 'login', entity: 'מערכת', details: 'כניסה מכתובת IP 172.16.0.3' },
-  { id: 8, timestamp: '2026-03-16T11:15:00', rabbiName: 'הרב דוד פרידמן', action: 'broadcast', entity: 'כל הרבנים', details: 'שידור הודעת חירום: עדכון הלכתי דחוף' },
-  { id: 9, timestamp: '2026-03-15T20:00:00', rabbiName: 'הרב שמואל גרינברג', action: 'logout', entity: 'מערכת', details: 'יציאה מהמערכת' },
-  { id: 10, timestamp: '2026-03-15T18:45:00', rabbiName: 'הרב משה הורוויץ', action: 'answer', entity: 'שאלה #998', details: 'פרסום תשובה — 180 מילים' },
-  { id: 11, timestamp: '2026-03-15T17:30:00', rabbiName: 'הרב אברהם כהן', action: 'edit', entity: 'שאלה #995', details: 'עריכת תשובה קיימת' },
-  { id: 12, timestamp: '2026-03-15T16:00:00', rabbiName: 'הרב דוד פרידמן', action: 'create', entity: 'קטגוריה: פסח', details: 'יצירת קטגוריה חדשה' },
-];

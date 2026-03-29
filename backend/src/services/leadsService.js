@@ -23,6 +23,14 @@ function _emailHash(plainEmail) {
   return crypto.createHash('sha256').update(plainEmail.toLowerCase().trim()).digest('hex');
 }
 
+function _phoneHash(plainPhone) {
+  if (!plainPhone) return null;
+  // Normalize: strip spaces, dashes, and leading zeros after country code
+  const normalized = plainPhone.replace(/[\s\-()]/g, '').trim();
+  if (!normalized) return null;
+  return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
 function _nameHash(name) {
   if (!name) return null;
   // Prefix with 'name:' to avoid collisions with email hashes
@@ -44,7 +52,9 @@ function _isHot(questionCount, thankCount, hasUrgent) {
 
 /**
  * Create or update a lead entry when a new question arrives.
- * Safe to call multiple times — uses ON CONFLICT DO UPDATE.
+ * Deduplicates by phone OR email: if a lead with the same phone or email
+ * already exists, updates it (increments question count, updates timestamps)
+ * instead of creating a new row.
  *
  * @param {object} question — row from questions table (after createFromWebhook)
  */
@@ -63,24 +73,51 @@ async function upsertLead(question) {
   } = question;
 
   const emailHash = _emailHash(plainEmail);
+  const phoneHash = _phoneHash(plainPhone);
 
-  // If no email AND no name, skip entirely — we can't identify this lead
-  if (!emailHash && !asker_name) return;
+  // If no email AND no phone AND no name, skip — we can't identify this lead
+  if (!emailHash && !phoneHash && !asker_name) return;
 
-  // Generate a fallback hash from name when email is not available
-  const resolvedHash = emailHash || _nameHash(asker_name);
+  // Fallback hash from name when neither email nor phone is available
+  const nameHash = _nameHash(asker_name);
 
   try {
-    // Aggregate stats for this asker across all questions
+    // ── Step 1: Find existing lead by phone OR email ───────────────────────
+    let existingLead = null;
+
+    if (emailHash) {
+      const { rows } = await query(
+        `SELECT id, email_hash, phone_hash FROM leads WHERE email_hash = $1 LIMIT 1`,
+        [emailHash]
+      );
+      if (rows[0]) existingLead = rows[0];
+    }
+
+    if (!existingLead && phoneHash) {
+      const { rows } = await query(
+        `SELECT id, email_hash, phone_hash FROM leads WHERE phone_hash = $1 LIMIT 1`,
+        [phoneHash]
+      );
+      if (rows[0]) existingLead = rows[0];
+    }
+
+    // Fallback: try name hash (for leads created before phone dedup was added)
+    if (!existingLead && !emailHash && !phoneHash && nameHash) {
+      const { rows } = await query(
+        `SELECT id, email_hash, phone_hash FROM leads WHERE email_hash = $1 LIMIT 1`,
+        [nameHash]
+      );
+      if (rows[0]) existingLead = rows[0];
+    }
+
+    // ── Step 2: Compute aggregate stats ────────────────────────────────────
     let question_count = 1;
     let total_thanks = 0;
-    // The questions table has 'urgency' (varchar: 'normal'|'urgent'), not 'is_urgent' (boolean)
     let has_urgent = (urgency === 'urgent' || urgency === 'critical' || urgency === 'high') || false;
 
     if (asker_email_encrypted) {
-      // The questions table stores encrypted email in the `asker_email` column
       const { rows: stats } = await query(
-        `SELECT COUNT(*)::int          AS question_count,
+        `SELECT COUNT(*)::int AS question_count,
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
                 bool_or(urgency IN ('urgent','critical','high')) AS has_urgent
          FROM   questions
@@ -91,9 +128,8 @@ async function upsertLead(question) {
       total_thanks   = stats[0]?.total_thanks || 0;
       has_urgent     = stats[0]?.has_urgent || false;
     } else if (asker_name) {
-      // Fallback: count by name (less accurate but better than nothing)
       const { rows: stats } = await query(
-        `SELECT COUNT(*)::int          AS question_count,
+        `SELECT COUNT(*)::int AS question_count,
                 COALESCE(SUM(thank_count), 0)::int AS total_thanks,
                 bool_or(urgency IN ('urgent','critical','high')) AS has_urgent
          FROM   questions
@@ -107,34 +143,63 @@ async function upsertLead(question) {
 
     const score  = _hotScore(question_count, total_thanks, has_urgent);
     const is_hot = _isHot(question_count, total_thanks, has_urgent);
+    const now    = created_at || new Date().toISOString();
+    const catId  = category_id ? parseInt(category_id, 10) || null : null;
 
-    await query(
-      `INSERT INTO leads
-         (email_hash, asker_name, asker_email_encrypted, asker_phone_encrypted,
-          question_count, interaction_score, is_hot, last_category_id,
-          first_question_at, last_question_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
-       ON CONFLICT (email_hash) DO UPDATE SET
-         asker_name            = COALESCE(EXCLUDED.asker_name, leads.asker_name),
-         asker_phone_encrypted = COALESCE(EXCLUDED.asker_phone_encrypted, leads.asker_phone_encrypted),
-         question_count        = $5,
-         interaction_score     = $6,
-         is_hot                = $7,
-         last_category_id      = COALESCE($8, leads.last_category_id),
-         last_question_at      = GREATEST(leads.last_question_at, $9),
-         updated_at            = NOW()`,
-      [
-        resolvedHash,
-        asker_name || null,
-        asker_email_encrypted || null,
-        asker_phone_encrypted || null,
-        question_count || 1,
-        score,
-        is_hot,
-        category_id ? parseInt(category_id, 10) || null : null,
-        created_at || new Date().toISOString(),
-      ]
-    );
+    // ── Step 3: Update existing or insert new ──────────────────────────────
+    if (existingLead) {
+      // UPDATE existing lead — merge in any new contact info, bump stats
+      await query(
+        `UPDATE leads SET
+           asker_name            = COALESCE($1, asker_name),
+           asker_email_encrypted = COALESCE($2, asker_email_encrypted),
+           asker_phone_encrypted = COALESCE($3, asker_phone_encrypted),
+           email_hash            = COALESCE($4, email_hash),
+           phone_hash            = COALESCE($5, phone_hash),
+           question_count        = $6,
+           interaction_score     = $7,
+           is_hot                = $8,
+           last_category_id      = COALESCE($9, last_category_id),
+           last_question_at      = GREATEST(last_question_at, $10),
+           updated_at            = NOW()
+         WHERE id = $11`,
+        [
+          asker_name || null,
+          asker_email_encrypted || null,
+          asker_phone_encrypted || null,
+          emailHash,
+          phoneHash,
+          question_count || 1,
+          score,
+          is_hot,
+          catId,
+          now,
+          existingLead.id,
+        ]
+      );
+    } else {
+      // INSERT new lead
+      const resolvedEmailHash = emailHash || (!phoneHash ? nameHash : null);
+      await query(
+        `INSERT INTO leads
+           (email_hash, phone_hash, asker_name, asker_email_encrypted, asker_phone_encrypted,
+            question_count, interaction_score, is_hot, last_category_id,
+            first_question_at, last_question_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+        [
+          resolvedEmailHash,
+          phoneHash,
+          asker_name || null,
+          asker_email_encrypted || null,
+          asker_phone_encrypted || null,
+          question_count || 1,
+          score,
+          is_hot,
+          catId,
+          now,
+        ]
+      );
+    }
   } catch (err) {
     console.error('[leadsService] upsertLead error:', err.message);
     // Non-critical — do not propagate
@@ -258,6 +323,7 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
     asker_email_encrypted: undefined,
     asker_phone_encrypted: undefined,
     email_hash: undefined,
+    phone_hash: undefined,
   }));
 
   return { leads, total: countRows[0]?.total ?? 0 };
@@ -283,6 +349,7 @@ async function getLeadById(id) {
     asker_email_encrypted: undefined,
     asker_phone_encrypted: undefined,
     email_hash: undefined,
+    phone_hash: undefined,
   };
 
   // Fetch question history for this lead

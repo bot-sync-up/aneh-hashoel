@@ -156,19 +156,29 @@ export default function SystemHealthPage() {
 
       // Map backend health response to the shape this page expects
       const rawHealth = healthData ?? {};
+      const checks = rawHealth.checks ?? {};
+
+      const mapStatus = (c) => {
+        if (!c) return 'unknown';
+        if (c.status === 'ok') return 'ok';
+        if (c.status === 'unconfigured') return 'unknown';
+        return 'error';
+      };
+
       const mappedHealth = {
         services: {
-          db:        { status: rawHealth.status === 'healthy' ? 'ok' : 'error', latencyMs: rawHealth.dbLatencyMs ?? null },
-          redis:     { status: 'unknown', latencyMs: null },
-          wordpress: { status: 'unknown', latencyMs: null },
-          greenapi:  { status: 'unknown', latencyMs: null },
+          db:        { status: mapStatus(checks.database),  latencyMs: checks.database?.latencyMs ?? null },
+          redis:     { status: mapStatus(checks.redis),     latencyMs: checks.redis?.latencyMs ?? null },
+          wordpress: { status: mapStatus(checks.wordpress), latencyMs: checks.wordpress?.latencyMs ?? null },
+          greenapi:  { status: mapStatus(checks.greenApi),  latencyMs: checks.greenApi?.latencyMs ?? null },
         },
         uptimePercent: null,
         uptimeDays: rawHealth.uptime != null ? Math.floor(rawHealth.uptime / 86400) : null,
-        avgResponseMs: rawHealth.dbLatencyMs ?? null,
-        pendingWpSync: rawHealth.counts?.pending_questions ?? 0,
+        avgResponseMs: checks.database?.latencyMs ?? null,
+        pendingWpSync: rawHealth.counts?.pending_wp_sync ?? 0,
         failedLeads: 0,
-        ...rawHealth,
+        memory: rawHealth.memory ?? null,
+        counts: rawHealth.counts ?? null,
       };
       setHealth(mappedHealth);
 
@@ -288,6 +298,30 @@ export default function SystemHealthPage() {
               </p>
               <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">זמן תגובה ממוצע</p>
             </div>
+            {health?.memory && (
+              <div>
+                <p className="text-xl font-bold text-[var(--text-primary)] font-heebo tabular-nums">
+                  {Math.round(health.memory.rss / 1024 / 1024)}MB
+                </p>
+                <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">שימוש בזיכרון (RSS)</p>
+              </div>
+            )}
+            {health?.counts && (
+              <>
+                <div>
+                  <p className="text-xl font-bold text-[var(--text-primary)] font-heebo tabular-nums">
+                    {health.counts.pending_questions ?? '—'}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">שאלות ממתינות</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-[var(--text-primary)] font-heebo tabular-nums">
+                    {health.counts.active_questions ?? '—'}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">שאלות בטיפול</p>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

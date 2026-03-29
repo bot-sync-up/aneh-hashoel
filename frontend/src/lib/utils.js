@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { format, formatDistanceToNow, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 // ── cn — classnames merge ──────────────────────────────────────────────────
@@ -40,17 +40,53 @@ export function formatDateTime(date, fmt = "d בMMMM yyyy, HH:mm") {
 }
 
 /**
- * Relative time in Hebrew (e.g. "לפני 3 שעות").
+ * Relative time in Hebrew with time appended for recent dates.
+ *
+ * - < 1 min:  "הרגע"
+ * - < 1 hour: "לפני X דקות"
+ * - < 24 h:   "היום ב-HH:mm"
+ * - yesterday: "אתמול ב-HH:mm"
+ * - 2 days:   "שלשום ב-HH:mm"
+ * - 3-6 days: "לפני X ימים ב-HH:mm"
+ * - 7+ days:  "DD/MM/YYYY HH:mm"
  *
  * @param {Date|string|number} date
- * @param {boolean} addSuffix — add "לפני" prefix (default true)
  */
-export function formatRelative(date, addSuffix = true) {
+export function formatRelative(date) {
   if (!date) return '';
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
   if (!isValid(d)) return '';
+
   try {
-    return formatDistanceToNow(d, { locale: he, addSuffix });
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMinutes = Math.floor(diffMs / 60_000);
+    const diffHours = Math.floor(diffMs / 3_600_000);
+
+    // Less than 1 minute
+    if (diffMinutes < 1) return 'הרגע';
+
+    // Less than 1 hour
+    if (diffMinutes < 60) {
+      return diffMinutes === 1 ? 'לפני דקה' : `לפני ${diffMinutes} דקות`;
+    }
+
+    const time = format(d, 'HH:mm');
+
+    // Less than 24 hours
+    if (diffHours < 24) return `היום ב-${time}`;
+
+    // Calculate day difference based on calendar days
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startOfToday - startOfDate) / 86_400_000);
+
+    if (diffDays === 1) return `אתמול ב-${time}`;
+    if (diffDays === 2) return `שלשום ב-${time}`;
+    if (diffDays >= 3 && diffDays <= 6) return `לפני ${diffDays} ימים ב-${time}`;
+
+    // 7+ days — full date and time
+    return format(d, 'dd/MM/yyyy HH:mm');
   } catch {
     return '';
   }

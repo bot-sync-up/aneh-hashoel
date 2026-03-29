@@ -20,7 +20,6 @@
  */
 
 const crypto = require('crypto');
-const axios  = require('axios');
 const { query: dbQuery } = require('../db/pool');
 
 // ─── Encryption helpers ────────────────────────────────────────────────────────
@@ -70,7 +69,6 @@ function decrypt(encrypted) {
   } catch (err) {
     console.error('[askerNotification] שגיאה בפענוח, מחזיר כ-plaintext:', err.message);
     return encrypted; // fallback: return as-is
-    return '';
   }
 }
 
@@ -119,36 +117,36 @@ async function sendEmail(to, subject, html, options = {}) {
 // ─── WhatsApp via GreenAPI ─────────────────────────────────────────────────────
 
 /**
+ * Lazy-load the WhatsApp service to avoid circular dependencies.
+ * @returns {typeof import('./whatsappService')|null}
+ */
+let _whatsappService = null;
+function getWhatsappService() {
+  if (!_whatsappService) {
+    try { _whatsappService = require('./whatsappService'); } catch { return null; }
+  }
+  return _whatsappService;
+}
+
+/**
  * Send a WhatsApp message via GreenAPI.
+ * Delegates to whatsappService.sendMessage() for proper phone normalisation
+ * (Israeli 05X -> 972) and retry logic.
  *
- * @param {string} phone    Phone number (international format, no +)
+ * @param {string} phone    Phone number (any supported format)
  * @param {string} message  Plain-text message body
  */
 async function sendWhatsApp(phone, message) {
-  const instanceId = process.env.GREENAPI_INSTANCE_ID;
-  const token      = process.env.GREENAPI_TOKEN;
-
-  if (!instanceId || !token) {
-    console.warn('[askerNotification] GreenAPI לא מוגדר — דילוג על WhatsApp');
+  const svc = getWhatsappService();
+  if (!svc) {
+    console.warn('[askerNotification] whatsappService לא זמין — דילוג על WhatsApp');
     return;
   }
 
-  // Normalize phone: strip leading + and non-digit chars
-  const normalizedPhone = phone.replace(/\D/g, '');
-
-  if (!normalizedPhone) {
-    console.warn('[askerNotification] מספר טלפון לא תקין — דילוג על WhatsApp');
-    return;
+  const result = await svc.sendMessage(phone, message);
+  if (!result.success) {
+    console.warn(`[askerNotification] WhatsApp לא נשלח: ${result.error}`);
   }
-
-  const url = `https://api.green-api.com/waInstance${instanceId}/sendMessage/${token}`;
-
-  await axios.post(url, {
-    chatId:  `${normalizedPhone}@c.us`,
-    message,
-  }, {
-    timeout: 10000,
-  });
 }
 
 // ─── Shared fetch logic ────────────────────────────────────────────────────────

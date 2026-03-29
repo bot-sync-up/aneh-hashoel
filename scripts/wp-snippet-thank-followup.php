@@ -32,19 +32,17 @@ add_filter('the_content', function($content) {
     // Build the buttons HTML
     $html = '<div id="aneh-actions" style="margin-top:30px; padding:20px; background:#f8f6f1; border-radius:8px; border:1px solid #e0d8c8; direction:rtl; text-align:right; font-family:Heebo,Arial,sans-serif;">';
 
-    // ── Thank Button ──
+    // ── Thank Button (count shown on button) ──
     $html .= '<div id="aneh-thank-section" style="margin-bottom:20px;">';
-    $html .= '<button id="aneh-thank-btn" onclick="anehThank(' . $post_id . ')" style="
+    $thank_label = ($thank_count > 0) ? '❤️ תודה לרב (' . $thank_count . ')' : '❤️ תודה לרב';
+    $html .= '<button id="aneh-thank-btn" onclick="anehThank(' . $post_id . ')" data-count="' . $thank_count . '" style="
         display:inline-flex; align-items:center; gap:8px;
         padding:12px 28px; background:#B8973A; color:#1B2B5E;
         border:none; border-radius:6px; cursor:pointer;
         font-size:16px; font-weight:700; font-family:Heebo,Arial,sans-serif;
         transition:background 0.2s;">
-        ❤️ תודה לרב
+        ' . $thank_label . '
     </button>';
-    $html .= '<span id="aneh-thank-count" style="margin-right:12px; color:#666; font-size:14px;">'
-           . ($thank_count > 0 ? $thank_count . ' הודו' : '')
-           . '</span>';
     $html .= '<div id="aneh-thank-msg" style="display:none; margin-top:8px; padding:10px 16px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:6px; color:#065f46; font-size:14px;">תודה רבה! הרב יקבל את הודעתך.</div>';
     $html .= '</div>';
 
@@ -73,16 +71,12 @@ add_filter('the_content', function($content) {
         $html .= '<p style="border-top:1px solid #e0d8c8; padding-top:12px; color:#999; font-size:13px;">שאלת המשך כבר נשלחה לשאלה זו.</p>';
     }
 
-    // ── Donation suggestion (appears after thank) ──
-    $html .= '<div id="aneh-donate-section" style="display:none; margin-top:16px; padding:16px; background:#fffbf0; border:1px solid #e8d98a; border-radius:8px;">';
-    $html .= '<p style="margin:0 0 10px; font-size:15px; color:#1B2B5E; font-weight:700;">התשובה עזרה לך?</p>';
-    $html .= '<p style="margin:0 0 12px; font-size:14px; color:#555;">הפעילות הזו מתאפשרת בזכות תורמים. הקדש תרומה להחזקת השרתים והפעילות לזכותך או לעילוי נשמת יקירך.</p>';
-    $html .= '<a href="https://moreshet-maran.com/donate" target="_blank" style="
-        display:inline-block; padding:12px 28px; background:#B8973A; color:#1B2B5E;
-        text-decoration:none; border-radius:6px; font-size:15px; font-weight:700;
-        font-family:Heebo,Arial,sans-serif;">
-        תרמו עכשיו
-    </a>';
+    // ── Donation popup modal (appears after thank) ──
+    $html .= '<div id="aneh-donate-overlay" onclick="anehCloseDonate(event)" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999999; justify-content:center; align-items:center;">';
+    $html .= '<div style="position:relative; background:#fff; border-radius:12px; width:90%; max-width:500px; max-height:90vh; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.3);">';
+    $html .= '<button onclick="anehCloseDonate()" style="position:absolute; top:8px; left:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666; z-index:10; line-height:1;">&times;</button>';
+    $html .= '<iframe src="https://www.matara.pro/nedarimplus/online/?S=EdHK" style="width:100%; height:75vh; border:none; border-radius:0 0 12px 12px;"></iframe>';
+    $html .= '</div>';
     $html .= '</div>';
 
     $html .= '</div>';
@@ -93,6 +87,7 @@ add_filter('the_content', function($content) {
 
     function anehThank(postId) {
         var btn = document.getElementById("aneh-thank-btn");
+        var currentCount = parseInt(btn.getAttribute("data-count")) || 0;
         btn.disabled = true;
         btn.textContent = "שולח...";
 
@@ -105,20 +100,22 @@ add_filter('the_content', function($content) {
         .then(function(data) {
             if (data.error) {
                 btn.textContent = data.error;
-                setTimeout(function() { btn.textContent = "❤️ תודה לרב"; btn.disabled = false; }, 3000);
+                setTimeout(function() {
+                    btn.textContent = currentCount > 0 ? "❤️ תודה לרב (" + currentCount + ")" : "❤️ תודה לרב";
+                    btn.disabled = false;
+                }, 3000);
             } else {
-                btn.textContent = "❤️ תודה נשלחה!";
+                var newCount = currentCount + 1;
+                btn.setAttribute("data-count", newCount);
+                btn.textContent = "❤️ תודה נשלחה! (" + newCount + ")";
                 btn.style.background = "#10b981";
                 btn.style.color = "white";
                 document.getElementById("aneh-thank-msg").style.display = "block";
-                // Show donation suggestion
+                // Show donation popup after short delay
                 setTimeout(function() {
-                    document.getElementById("aneh-donate-section").style.display = "block";
+                    var overlay = document.getElementById("aneh-donate-overlay");
+                    overlay.style.display = "flex";
                 }, 1500);
-                // Update count
-                var countEl = document.getElementById("aneh-thank-count");
-                var current = parseInt(countEl.textContent) || 0;
-                countEl.textContent = (current + 1) + " הודו";
                 // Save visitor ID for dedup
                 if (!localStorage.getItem("aneh_visitor_id")) {
                     localStorage.setItem("aneh_visitor_id", Math.random().toString(36).slice(2));
@@ -129,6 +126,11 @@ add_filter('the_content', function($content) {
             btn.textContent = "שגיאה, נסה שוב";
             btn.disabled = false;
         });
+    }
+
+    function anehCloseDonate(e) {
+        if (e && e.target !== e.currentTarget && !e.target.closest("button")) return;
+        document.getElementById("aneh-donate-overlay").style.display = "none";
     }
 
     function anehFollowUp(postId) {

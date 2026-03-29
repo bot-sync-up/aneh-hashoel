@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 import {
   Flame,
   Lock,
@@ -618,6 +619,7 @@ export default function QuestionDetailPage() {
                       if (publishNow) {
                         fetchQuestion();
                         setShowAnswerModal(false);
+                        toast.success('התשובה נשלחה בהצלחה');
                       }
                     }}
                   />

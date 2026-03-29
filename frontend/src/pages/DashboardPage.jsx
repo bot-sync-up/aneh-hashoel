@@ -308,10 +308,37 @@ export default function DashboardPage() {
     async (questionId) => {
       setClaimingId(questionId);
       try {
-        await api.post(`/questions/claim/${questionId}`);
+        const res = await api.post(`/questions/claim/${questionId}`);
+        const claimedQuestion = res.data?.question || res.data || {};
+
+        // Optimistically remove from pending list
         setPendingQ((prev) => prev.filter((q) => (q._id || q.id) !== questionId));
-        // Add to my questions and refresh
-        fetchDashboard();
+
+        // Add claimed question to my-questions list
+        setMyQuestions((prev) => {
+          const already = prev.some((q) => (q._id || q.id) === questionId);
+          if (already) return prev;
+          const entry = {
+            ...claimedQuestion,
+            _id: claimedQuestion._id || claimedQuestion.id || questionId,
+            id: claimedQuestion.id || claimedQuestion._id || questionId,
+            status: 'in_process',
+          };
+          return [entry, ...prev];
+        });
+
+        // Update stat counts locally (same logic as socket handler)
+        if (isAdmin) {
+          setAdminStats((prev) => ({
+            ...prev,
+            pendingCount: Math.max(0, (prev.pendingCount ?? 0) - 1),
+            inProcessCount: (prev.inProcessCount ?? 0) + 1,
+          }));
+        }
+        setRabbiStats((prev) => ({
+          ...prev,
+          openQuestions: (prev.openQuestions ?? 0) + 1,
+        }));
       } catch (err) {
         const msg =
           err.response?.data?.message ||
@@ -321,7 +348,7 @@ export default function DashboardPage() {
         setClaimingId(null);
       }
     },
-    [fetchDashboard]
+    [isAdmin]
   );
 
   const handleTimerExpired = useCallback(() => {

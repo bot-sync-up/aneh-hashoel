@@ -189,17 +189,20 @@ async function processEmail(parsed) {
 
   if (questionRows.length === 0) {
     console.log(TAG, `Question ${questionId} not found`);
-    await sendConfirmation(from, 'not_found', '', questionId);
     return false;
   }
 
   const question = questionRows[0];
   const questionTitle = question.title || 'שאלה';
 
-  // Already answered?
+  // Already answered? Only send confirmation if this is a RECENT email (< 10 min old)
   if (question.status === 'answered') {
-    console.log(TAG, `Question ${questionId} already answered — notifying ${from}`);
-    await sendConfirmation(from, 'already_answered', questionTitle, questionId);
+    const emailDate = parsed.date ? new Date(parsed.date).getTime() : 0;
+    const isRecent = emailDate && (Date.now() - emailDate) < 10 * 60 * 1000;
+    console.log(TAG, `Question ${questionId} already answered — skipping`);
+    if (isRecent) {
+      await sendConfirmation(from, 'already_answered', questionTitle, questionId);
+    }
     return false;
   }
 
@@ -343,17 +346,20 @@ async function runImapPoller() {
                 simpleParser(buffer)
                   .then((parsed) => processEmail(parsed))
                   .then((success) => {
-                    if (success) {
-                      processed++;
-                      // Mark as seen
-                      imap.addFlags(uid, ['\\Seen'], (err) => {
-                        if (err) console.warn(TAG, `Failed to mark ${uid} as seen:`, err.message);
-                      });
-                    }
+                    if (success) processed++;
+                    // Mark ALL processed emails as seen (not just successful ones)
+                    // to prevent re-processing on next poll cycle
+                    imap.addFlags(uid, ['\\Seen'], (err) => {
+                      if (err) console.warn(TAG, `Failed to mark ${uid} as seen:`, err.message);
+                    });
                   })
                   .catch((err) => {
                     errors++;
                     console.error(TAG, `Error processing email #${seqno}:`, err.message);
+                    // Still mark as seen to avoid infinite retry loop
+                    imap.addFlags(uid, ['\\Seen'], (flagErr) => {
+                      if (flagErr) console.warn(TAG, `Failed to mark ${uid} as seen:`, flagErr.message);
+                    });
                   })
               );
             });

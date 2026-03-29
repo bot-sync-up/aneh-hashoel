@@ -71,7 +71,7 @@
               <p style="margin:0 0 16px;">שלום {{rabbiName}},</p>
               <p style="margin:0 0 20px;">שאלה חדשה הוגשה למערכת וממתינה לתשובה:</p>
 
-              <!-- Question card — title only, no content -->
+              <!-- Question card — title + full content -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                      style="background-color:#F8F6F1;border-right:5px solid #B8973A;
                             border-radius:4px;margin:0 0 24px;">
@@ -85,7 +85,7 @@
 
                     <!-- Meta row -->
                     <table role="presentation" cellpadding="0" cellspacing="0"
-                           style="margin:0 0 4px;font-size:13px;color:#777;">
+                           style="margin:0 0 12px;font-size:13px;color:#777;">
                       <tr>
                         <td style="padding-left:20px;">
                           <span style="background:#1B2B5E;color:#B8973A;padding:2px 10px;
@@ -98,6 +98,12 @@
                         </td>
                       </tr>
                     </table>
+
+                    <!-- Full question content -->
+                    <div style="margin:0;padding:12px 0 0;border-top:1px solid #e0d8c8;
+                                font-size:15px;line-height:1.7;color:#333;">
+                      {{questionContent}}
+                    </div>
 
                   </td>
                 </tr>

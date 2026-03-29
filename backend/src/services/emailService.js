@@ -223,14 +223,15 @@ async function sendNewQuestionBroadcast(rabbis, question) {
     const actionUrl = claimUrl(question.id);
 
     const html = renderTemplate('new-question-broadcast', {
-      rabbiName:     rabbi.name || 'הרב',
-      questionTitle: titleTruncated,
-      questionId:    question.id,
-      category:      categoryLabel,
+      rabbiName:       rabbi.name || 'הרב',
+      questionTitle:   titleTruncated,
+      questionContent: question.content || preview || '',
+      questionId:      question.id,
+      category:        categoryLabel,
       urgencyBadge,
       preview,
       submitTime,
-      claimUrl:      actionUrl,
+      claimUrl:        actionUrl,
     });
 
     return _send({ to: rabbi.email, subject, html });

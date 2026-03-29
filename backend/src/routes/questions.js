@@ -242,6 +242,11 @@ router.get('/:id', authenticate, async (req, res, next) => {
     // Attach follow-up if any
     const followUp = await questionService.getFollowUp(req.params.id);
 
+    // Map answer_content → answer for frontend compatibility
+    if (question.answer_content !== undefined) {
+      question.answer = question.answer_content;
+    }
+
     return res.json({ question, followUp: followUp || null });
   } catch (err) {
     return next(err);

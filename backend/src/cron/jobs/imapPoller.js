@@ -106,13 +106,55 @@ function stripReplyContent(text) {
   return cleaned;
 }
 
+// ── Claim-only keywords ──────────────────────────────────────────────────────
+
+const CLAIM_KEYWORDS = ['תפוס', 'תפיסה', 'קבל', 'אני לוקח', 'claim'];
+
+function isClaimOnly(text) {
+  if (!text) return false;
+  const trimmed = text.trim().toLowerCase();
+  return CLAIM_KEYWORDS.some((kw) => trimmed === kw || trimmed === kw + '.');
+}
+
+// ── Send confirmation email back to rabbi ────────────────────────────────────
+
+async function sendConfirmation(rabbiEmail, type, questionTitle, questionId) {
+  try {
+    const { sendEmail } = require('../../services/email');
+    const { createEmailHTML } = require('../../templates/emailBase');
+
+    const messages = {
+      claimed:  `השאלה "${questionTitle}" נתפסה בהצלחה ומחכה לתשובתך. תוכל לענות בהשב למייל זה או דרך המערכת.`,
+      answered: `התשובה שלך לשאלה "${questionTitle}" נקלטה ופורסמה בהצלחה!`,
+      already_answered: `השאלה "${questionTitle}" כבר נענתה על ידי רב אחר.`,
+      already_claimed:  `השאלה "${questionTitle}" כבר נתפסה על ידי רב אחר.`,
+      not_found: `השאלה שניסית לענות עליה לא נמצאה במערכת.`,
+    };
+
+    const msg = messages[type] || messages.answered;
+    const subject = type === 'answered'
+      ? `[Q:${questionId}] תשובתך נקלטה — ${questionTitle}`
+      : `[Q:${questionId}] ${questionTitle}`;
+
+    const html = createEmailHTML(
+      type === 'answered' ? 'תשובתך נקלטה בהצלחה' : 'עדכון שאלה',
+      `<p style="font-size:15px;line-height:1.7;">${msg}</p>`,
+      [],
+      { systemName: 'ענה את השואל' }
+    );
+
+    await sendEmail(rabbiEmail, subject, html);
+  } catch (err) {
+    console.warn(TAG, 'Failed to send confirmation email:', err.message);
+  }
+}
+
 // ── Process a single email ───────────────────────────────────────────────────
 
 async function processEmail(parsed) {
   const from = parsed.from?.value?.[0]?.address?.toLowerCase();
   const subject = parsed.subject || '';
   const textBody = parsed.text || '';
-  const htmlBody = parsed.html || '';
 
   if (!from) {
     console.log(TAG, 'Skipping email with no sender');
@@ -128,7 +170,7 @@ async function processEmail(parsed) {
 
   // Find rabbi by email
   const { rows: rabbiRows } = await db(
-    `SELECT id, name, role FROM rabbis WHERE LOWER(email) = $1 AND is_active = true`,
+    `SELECT id, name, email, role FROM rabbis WHERE LOWER(email) = $1 AND is_active = true`,
     [from]
   );
 
@@ -141,25 +183,56 @@ async function processEmail(parsed) {
 
   // Get question
   const { rows: questionRows } = await db(
-    `SELECT id, status, assigned_rabbi_id FROM questions WHERE id = $1`,
+    `SELECT id, title, status, assigned_rabbi_id FROM questions WHERE id = $1`,
     [questionId]
   );
 
   if (questionRows.length === 0) {
     console.log(TAG, `Question ${questionId} not found`);
+    await sendConfirmation(from, 'not_found', '', questionId);
     return false;
   }
 
   const question = questionRows[0];
+  const questionTitle = question.title || 'שאלה';
 
   // Already answered?
   if (question.status === 'answered') {
-    console.log(TAG, `Question ${questionId} already answered — skipping`);
+    console.log(TAG, `Question ${questionId} already answered — notifying ${from}`);
+    await sendConfirmation(from, 'already_answered', questionTitle, questionId);
     return false;
   }
 
-  // Extract and clean the answer text
+  // Extract and clean the reply text
   const rawText = stripReplyContent(textBody);
+
+  // Check if this is a claim-only request
+  if (isClaimOnly(rawText)) {
+    // Already claimed by someone else?
+    if (question.status === 'in_process' && question.assigned_rabbi_id && String(question.assigned_rabbi_id) !== String(rabbi.id)) {
+      console.log(TAG, `Q:${questionId} already claimed by another rabbi — notifying ${from}`);
+      await sendConfirmation(from, 'already_claimed', questionTitle, questionId);
+      return false;
+    }
+
+    // Claim it
+    if (question.status === 'pending' || !question.assigned_rabbi_id) {
+      await db(
+        `UPDATE questions SET status = 'in_process', assigned_rabbi_id = $1, lock_timestamp = NOW() WHERE id = $2`,
+        [rabbi.id, questionId]
+      );
+      console.log(TAG, `Claim-only via email: Q:${questionId} by ${rabbi.name}`);
+      await sendConfirmation(from, 'claimed', questionTitle, questionId);
+      return true;
+    }
+
+    // Already claimed by me
+    console.log(TAG, `Q:${questionId} already claimed by ${rabbi.name}`);
+    await sendConfirmation(from, 'claimed', questionTitle, questionId);
+    return false;
+  }
+
+  // This is an answer
   if (!rawText || rawText.length < 5) {
     console.log(TAG, `Email from ${from} for Q:${questionId} — body too short after stripping`);
     return false;
@@ -179,9 +252,9 @@ async function processEmail(parsed) {
       [rabbi.id, questionId]
     );
   } else if (String(question.assigned_rabbi_id) !== String(rabbi.id)) {
-    // Question is assigned to someone else
     if (rabbi.role !== 'admin') {
-      console.log(TAG, `Q:${questionId} assigned to another rabbi — skipping (${from})`);
+      console.log(TAG, `Q:${questionId} assigned to another rabbi — notifying ${from}`);
+      await sendConfirmation(from, 'already_claimed', questionTitle, questionId);
       return false;
     }
   }
@@ -193,13 +266,11 @@ async function processEmail(parsed) {
   );
 
   if (existingAnswer.length > 0) {
-    // Update existing answer
     await db(
       `UPDATE answers SET content = $1, updated_at = NOW() WHERE question_id = $2`,
       [answerHtml, questionId]
     );
   } else {
-    // Insert new answer
     await db(
       `INSERT INTO answers (question_id, rabbi_id, content, is_private, created_at) VALUES ($1, $2, $3, false, NOW())`,
       [questionId, rabbi.id, answerHtml]
@@ -213,6 +284,7 @@ async function processEmail(parsed) {
   );
 
   console.log(TAG, `Answer submitted via email: Q:${questionId} by ${rabbi.name} (${from})`);
+  await sendConfirmation(from, 'answered', questionTitle, questionId);
   return true;
 }
 

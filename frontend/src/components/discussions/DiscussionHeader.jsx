@@ -20,6 +20,7 @@ export default function DiscussionHeader({
   discussion,
   discussionId,
   onBack,
+  onLeave,
   onDiscussionUpdate,
 }) {
   const { rabbi } = useAuth();
@@ -135,11 +136,12 @@ export default function DiscussionHeader({
     setLeavingDiscussion(true);
     try {
       await api.post(`/discussions/${discussionId}/leave`);
+      onLeave?.(discussionId);
       onBack?.();
     } catch {
       setLeavingDiscussion(false);
     }
-  }, [discussionId, onBack]);
+  }, [discussionId, onBack, onLeave]);
 
   // ── Lock discussion ──────────────────────────────────────────────────────
 
@@ -165,11 +167,12 @@ export default function DiscussionHeader({
     setDeletingDiscussion(true);
     try {
       await api.delete(`/discussions/${discussionId}/permanent`);
+      onLeave?.(discussionId);
       onBack?.();
     } catch {
       setDeletingDiscussion(false);
     }
-  }, [discussionId, onBack]);
+  }, [discussionId, onBack, onLeave]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
@@ -543,8 +546,8 @@ export default function DiscussionHeader({
           </Tooltip>
         )}
 
-        {/* Delete discussion (admin only) */}
-        {rabbi?.role === 'admin' && (
+        {/* Delete discussion (creator or admin) */}
+        {(String(discussion?.created_by) === String(rabbi?.id) || rabbi?.role === 'admin') && (
           <Tooltip content="מחק דיון" placement="bottom">
             <button
               onClick={handleDelete}

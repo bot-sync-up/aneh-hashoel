@@ -32,6 +32,7 @@ export default function DiscussionChat({
   onBack,
   onUnreadUpdate,
   onMarkRead,
+  onLeave,
 }) {
   const { rabbi } = useAuth();
   const { emit, on } = useSocket();
@@ -392,6 +393,7 @@ export default function DiscussionChat({
       <DiscussionHeader
         discussion={discussion}
         onBack={onBack}
+        onLeave={onLeave}
         discussionId={discussionId}
         onDiscussionUpdate={setDiscussion}
       />

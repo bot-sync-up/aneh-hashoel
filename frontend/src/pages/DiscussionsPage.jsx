@@ -85,6 +85,14 @@ export default function DiscussionsPage() {
     []
   );
 
+  const handleLeave = useCallback(
+    (discussionId) => {
+      setDiscussions((prev) => (prev || []).filter((d) => d.id !== discussionId));
+      setSearchParams({});
+    },
+    [setSearchParams]
+  );
+
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const showList = !isMobile || !activeId;
   const showChat = !isMobile || !!activeId;
@@ -142,6 +150,7 @@ export default function DiscussionsPage() {
               onBack={handleBackToList}
               onUnreadUpdate={handleUnreadUpdate}
               onMarkRead={handleMarkRead}
+              onLeave={handleLeave}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">

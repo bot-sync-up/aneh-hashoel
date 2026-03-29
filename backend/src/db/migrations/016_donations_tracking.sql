@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS donations (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id       UUID        REFERENCES questions(id) ON DELETE SET NULL,
-  rabbi_id          UUID        REFERENCES users(id)     ON DELETE SET NULL,
+  rabbi_id          UUID        REFERENCES rabbis(id)    ON DELETE SET NULL,
   amount            DECIMAL(12,2) NOT NULL,
   currency          VARCHAR(3)  NOT NULL DEFAULT 'ILS',
   donor_name        VARCHAR(255),

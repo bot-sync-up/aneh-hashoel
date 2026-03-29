@@ -108,8 +108,8 @@ router.post('/inbound', async (req, res) => {
       return res.status(200).json({ ok: true });   // silent ignore — not our email
     }
 
-    const { action, questionId } = emailAction;
-    console.info(`[emailInbound] action=${action} questionId=${questionId} from=${sender}`);
+    const { action, questionId, followUpId } = emailAction;
+    console.info(`[emailInbound] action=${action} questionId=${questionId}${followUpId ? ` followUpId=${followUpId}` : ''} from=${sender}`);
 
     // ─── 4a. CLAIM ───────────────────────────────────────────────────
     if (action === 'claim') {
@@ -221,16 +221,49 @@ router.post('/inbound', async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-    // ─── 4c. ANSWER ──────────────────────────────────────────────────
-    // (action === 'answer')
+    // ─── 4c. ANSWER / FOLLOWUP_ANSWER ──────────────────────────────
+    // (action === 'answer' or 'followup_answer')
 
-    const { valid, rabbi, question } = await validateSender(sender, questionId);
+    let { valid, rabbi, question } = await validateSender(sender, questionId);
+
+    // If the subject explicitly carries [FOLLOWUP:XX:YY], inject the
+    // follow_up_id so the answer-saving logic treats it as a follow-up reply.
+    if (action === 'followup_answer' && followUpId && question) {
+      question.follow_up_id = followUpId;
+    }
 
     if (!question) {
       console.warn('[emailInbound] שאלה לא נמצאה:', questionId);
       await logAction(null, 'email.inbound_rejected', 'email', String(questionId), null,
         { reason: 'question_not_found', sender, questionId }, ip, null);
       return res.status(200).json({ error: 'השאלה לא נמצאה במערכת' });
+    }
+
+    // ── Auto-claim: if the question is unassigned (pending), the replying
+    //    rabbi is implicitly claiming + answering in one step. ──
+    if (!valid && question.status === 'pending' && !question.assigned_rabbi_id) {
+      const senderRabbi = await findRabbiByEmail(sender);
+      if (senderRabbi) {
+        try {
+          const { claimQuestion } = require('../services/questions');
+          const claimResult = await claimQuestion(questionId, senderRabbi.id);
+          if (claimResult.success) {
+            console.info(`[emailInbound] auto-claim: שאלה ${questionId} נתפסה אוטומטית על ידי רב ${senderRabbi.id} (reply-to-answer)`);
+            await logAction(senderRabbi.id, ACTIONS.QUESTION_CLAIMED, 'question', String(questionId), null,
+              { source: 'email', auto_claim: true }, ip, null);
+            // Re-validate now that the rabbi is assigned
+            ({ valid, rabbi, question } = await validateSender(sender, questionId));
+            // Re-inject follow-up ID if this was a followup_answer action
+            if (action === 'followup_answer' && followUpId && question) {
+              question.follow_up_id = followUpId;
+            }
+          } else {
+            console.info(`[emailInbound] auto-claim: שאלה ${questionId} כבר נתפסה — ${sender}`);
+          }
+        } catch (claimErr) {
+          console.error('[emailInbound] auto-claim error:', claimErr.message);
+        }
+      }
     }
 
     if (!valid) {
@@ -390,11 +423,12 @@ if (process.env.NODE_ENV !== 'production') {
 
       console.info('[emailInbound/test] סימולציית אימייל נכנס:', { sender, subject });
 
-      // ── Parse question ID ──
-      const questionId = extractQuestionId(subject);
-      if (!questionId) {
-        return res.status(400).json({ error: 'לא נמצא מזהה שאלה בנושא האימייל. פורמט נדרש: [ID: ###]' });
+      // ── Parse action from subject ──
+      const emailAction = extractEmailAction(subject);
+      if (!emailAction || (emailAction.action !== 'answer' && emailAction.action !== 'followup_answer')) {
+        return res.status(400).json({ error: 'לא נמצא מזהה שאלה בנושא האימייל. פורמט נדרש: [ID: ###] או [FOLLOWUP: ###:###]' });
       }
+      const questionId = emailAction.questionId;
 
       // ── Validate sender ──
       const { valid, rabbi, question } = await validateSender(sender, questionId);

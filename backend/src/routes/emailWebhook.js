@@ -37,6 +37,7 @@ const {
   parseIncomingEmail,
   validateRabbiEmail,
   validateSender,
+  findRabbiByEmail,
 }                                                = require('../services/emailParser');
 const { query }                                  = require('../db/pool');
 const { logAction, ACTIONS }                     = require('../middleware/auditLog');
@@ -268,7 +269,7 @@ router.post('/inbound', async (req, res) => {
     }
 
     // ── 4. Validate sender is the assigned rabbi ──────────────────────────
-    const { valid, rabbi, question } = await validateRabbiEmail(senderEmail, questionId);
+    let { valid, rabbi, question } = await validateRabbiEmail(senderEmail, questionId);
 
     if (!question) {
       console.warn('[emailWebhook] שאלה לא נמצאה:', questionId);
@@ -276,6 +277,26 @@ router.post('/inbound', async (req, res) => {
         { reason: 'question_not_found', senderEmail, questionId }, ip, null).catch(() => {});
 
       return res.status(200).json({ ok: false, reason: 'question_not_found' });
+    }
+
+    // ── Auto-claim: if the question is unassigned (pending), the replying
+    //    rabbi is implicitly claiming + answering in one step. ──
+    if (!valid && question.status === 'pending' && !question.assigned_rabbi_id) {
+      const senderRabbi = await findRabbiByEmail(senderEmail);
+      if (senderRabbi) {
+        try {
+          const { claimQuestion } = require('../services/questions');
+          const claimResult = await claimQuestion(questionId, senderRabbi.id);
+          if (claimResult.success) {
+            console.info(`[emailWebhook] auto-claim: שאלה ${questionId} נתפסה אוטומטית על ידי רב ${senderRabbi.id}`);
+            await logAction(senderRabbi.id, ACTIONS.QUESTION_CLAIMED, 'question', String(questionId), null,
+              { source: 'email', auto_claim: true }, ip, null).catch(() => {});
+            ({ valid, rabbi, question } = await validateRabbiEmail(senderEmail, questionId));
+          }
+        } catch (claimErr) {
+          console.error('[emailWebhook] auto-claim error:', claimErr.message);
+        }
+      }
     }
 
     if (!valid) {
@@ -501,7 +522,7 @@ router.post('/webhook/email/inbound', async (req, res) => {
       }
 
       // 4. Validate sender
-      const { valid, rabbi, question } = await validateSender(rabbiEmail, questionId);
+      let { valid, rabbi, question } = await validateSender(rabbiEmail, questionId);
 
       if (!question) {
         console.warn('[emailWebhook/sg] שאלה לא נמצאה:', questionId);
@@ -513,6 +534,25 @@ router.post('/webhook/email/inbound', async (req, res) => {
           );
         }
         return;
+      }
+
+      // Auto-claim: if question is unassigned, the replying rabbi claims + answers
+      if (!valid && question.status === 'pending' && !question.assigned_rabbi_id) {
+        const senderRabbi = await findRabbiByEmail(rabbiEmail);
+        if (senderRabbi) {
+          try {
+            const { claimQuestion } = require('../services/questions');
+            const claimResult = await claimQuestion(questionId, senderRabbi.id);
+            if (claimResult.success) {
+              console.info(`[emailWebhook/sg] auto-claim: שאלה ${questionId} נתפסה אוטומטית על ידי רב ${senderRabbi.id}`);
+              await logAction(senderRabbi.id, ACTIONS.QUESTION_CLAIMED, 'question', String(questionId), null,
+                { source: 'email', auto_claim: true }, ip, null).catch(() => {});
+              ({ valid, rabbi, question } = await validateSender(rabbiEmail, questionId));
+            }
+          } catch (claimErr) {
+            console.error('[emailWebhook/sg] auto-claim error:', claimErr.message);
+          }
+        }
       }
 
       // Wrong sender — log and ignore (do not reply to prevent email loops)

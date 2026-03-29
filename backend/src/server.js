@@ -52,6 +52,7 @@ const leadsRoutes             = require('./routes/leads');
 
 const wpWebhook       = require('./routes/wpWebhook');
 const emailWebhook    = require('./routes/emailWebhook');
+const emailInbound    = require('./routes/emailInbound');
 const whatsappWebhook = require('./routes/whatsappWebhook');
 
 // ─── App + HTTP server ────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ const authLimiter = rateLimit({
 
 app.use('/webhook/wordpress', wpWebhook);
 app.use('/webhook/email',     emailWebhook);
+app.use('/api/email',         emailInbound);    // Mailgun inbound webhook
 app.use('/webhook/whatsapp',  whatsappWebhook);
 
 // ─── API routes ───────────────────────────────────────────────────────────────

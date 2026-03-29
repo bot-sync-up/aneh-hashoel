@@ -45,6 +45,12 @@ const CLAIM_PATTERN = /\[CLAIM:\s*(\d+)\]/i;
 const RELEASE_PATTERN = /\[RELEASE:\s*(\d+)\]/i;
 
 /**
+ * Matches "[FOLLOWUP:42:7]" — rabbi replies to a follow-up notification.
+ * The first number is the question ID, the second is the follow-up ID.
+ */
+const FOLLOWUP_PATTERN = /\[FOLLOWUP:\s*(\d+)\s*:\s*(\d+)\]/i;
+
+/**
  * Lines starting with any of these patterns mark the beginning of quoted
  * history, reply chains, or signatures — everything from this line down is
  * discarded.
@@ -387,12 +393,13 @@ async function validateSender(email, questionId) {
  * Determine the action type from an inbound email subject line.
  *
  * Priority:
- *   1. [CLAIM:XX]   → rabbi wants to claim question XX
- *   2. [RELEASE:XX] → rabbi wants to release question XX
- *   3. [ID: XX]     → rabbi is answering question XX
+ *   1. [CLAIM:XX]          → rabbi wants to claim question XX
+ *   2. [RELEASE:XX]        → rabbi wants to release question XX
+ *   3. [FOLLOWUP:XX:YY]    → rabbi is answering follow-up YY on question XX
+ *   4. [ID: XX]            → rabbi is answering question XX
  *
  * @param {string} subject
- * @returns {{ action: 'claim'|'release'|'answer', questionId: number } | null}
+ * @returns {{ action: 'claim'|'release'|'answer'|'followup_answer', questionId: number, followUpId?: number } | null}
  */
 function extractEmailAction(subject) {
   if (!subject || typeof subject !== 'string') return null;
@@ -407,6 +414,15 @@ function extractEmailAction(subject) {
   if (releaseMatch) {
     const id = parseInt(releaseMatch[1], 10);
     if (Number.isFinite(id) && id > 0) return { action: 'release', questionId: id };
+  }
+
+  const followupMatch = subject.match(FOLLOWUP_PATTERN);
+  if (followupMatch) {
+    const qId  = parseInt(followupMatch[1], 10);
+    const fuId = parseInt(followupMatch[2], 10);
+    if (Number.isFinite(qId) && qId > 0 && Number.isFinite(fuId) && fuId > 0) {
+      return { action: 'followup_answer', questionId: qId, followUpId: fuId };
+    }
   }
 
   const answerId = extractQuestionId(subject);

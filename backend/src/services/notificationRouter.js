@@ -77,7 +77,7 @@ function _parsePreferences(pref) {
 // ─── Rabbi loader ──────────────────────────────────────────────────────────────
 
 /**
- * טוען פרטי רב יחיד מה-DB (כולל notification_pref, email, whatsapp_number).
+ * טוען פרטי רב יחיד מה-DB (כולל notification_pref, email, whatsapp_number, is_vacation).
  *
  * @param {string|number} rabbiId
  * @returns {Promise<object|null>}
@@ -85,7 +85,8 @@ function _parsePreferences(pref) {
 async function _loadRabbi(rabbiId) {
   try {
     const { rows } = await query(
-      `SELECT id, name, email, whatsapp_number, notification_pref
+      `SELECT id, name, email, whatsapp_number, notification_pref,
+              is_vacation
        FROM rabbis
        WHERE id = $1
          AND status = 'active'
@@ -100,16 +101,18 @@ async function _loadRabbi(rabbiId) {
 }
 
 /**
- * טוען את כל הרבנים הפעילים.
+ * טוען את כל הרבנים הפעילים שאינם במצב חופשה.
  *
  * @returns {Promise<Array<object>>}
  */
 async function _loadAllActiveRabbis() {
   try {
     const { rows } = await query(
-      `SELECT id, name, email, whatsapp_number, notification_pref
+      `SELECT id, name, email, whatsapp_number, notification_pref,
+              is_vacation
        FROM rabbis
        WHERE status = 'active'
+         AND is_vacation = false
        ORDER BY id`
     );
     return rows;
@@ -296,6 +299,20 @@ async function notify(rabbiId, type, data) {
   const rabbi = await _loadRabbi(rabbiId);
   if (!rabbi) {
     console.warn(`[notificationRouter] notify: רב ${rabbiId} לא נמצא או לא פעיל`);
+    return { rabbiId, channels: [] };
+  }
+
+  // סוגי התראות שידור — לא נשלחים לרב בחופשה
+  const BROADCAST_TYPES = [
+    'question_broadcast',
+    'urgent_question',
+    'question_released',
+    'daily_digest',
+    'weekly_report',
+  ];
+
+  if (rabbi.is_vacation && BROADCAST_TYPES.includes(type)) {
+    console.info(`[notificationRouter] notify: רב ${rabbiId} בחופשה — דילוג על '${type}'`);
     return { rabbiId, channels: [] };
   }
 

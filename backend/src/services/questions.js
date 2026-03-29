@@ -78,9 +78,18 @@ async function getQuestions(filters = {}) {
   }
 
   if (filters.search) {
-    conditions.push(`(q.title ILIKE $${paramIndex} OR q.content ILIKE $${paramIndex})`);
-    params.push(`%${filters.search}%`);
-    paramIndex++;
+    const searchTerm = filters.search.trim();
+    if (searchTerm.length < 3) {
+      // Short queries: fall back to ILIKE (full-text search needs meaningful tokens)
+      conditions.push(`(q.title ILIKE $${paramIndex} OR q.content ILIKE $${paramIndex})`);
+      params.push(`%${searchTerm}%`);
+      paramIndex++;
+    } else {
+      // Full-text search using the pre-computed tsvector column + GIN index
+      conditions.push(`q.search_vector @@ plainto_tsquery('simple', $${paramIndex})`);
+      params.push(searchTerm);
+      paramIndex++;
+    }
   }
 
   if (filters.dateFrom) {

@@ -216,8 +216,8 @@ async function getNewQuestions() {
     );
 
     const existingSet = new Set([
-      ...existingRows.map((r) => r.wp_post_id),
-      ...blockedRows.map((r) => r.wp_post_id),
+      ...existingRows.map((r) => Number(r.wp_post_id)),
+      ...blockedRows.map((r) => Number(r.wp_post_id)),
     ]);
     const newQuestions = wpQuestions.filter((q) => !existingSet.has(q.id));
 

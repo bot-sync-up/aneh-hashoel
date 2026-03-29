@@ -27,6 +27,7 @@ const { runSheetsSyncLeads }    = require('./jobs/sheetsSyncLeads');
 const { runWeeklyNewsletter }   = require('./jobs/weeklyNewsletter');
 const { runHolidayGreetings }   = require('./jobs/holidayGreetings');
 const { runImapPoller }         = require('./jobs/imapPoller');
+const { runOnboardingDrip }    = require('./jobs/onboardingDrip');
 const {
   syncPendingQuestions,
   syncAnswersToWP,
@@ -125,6 +126,11 @@ function startCronJobs(io = null) {
 
   // ─── Weekly Friday 10:00 — send שו"ת השבוע newsletter ─────────────────────
   cron.schedule('0 10 * * 5', safeJob('sendWeeklyNewsletter', runWeeklyNewsletter), {
+    timezone: TIMEZONE,
+  });
+
+  // ─── Every 10 min — send onboarding drip emails ──────────────────────────
+  cron.schedule('*/10 * * * *', safeJob('onboardingDrip', runOnboardingDrip), {
     timezone: TIMEZONE,
   });
 

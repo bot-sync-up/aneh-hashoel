@@ -20,6 +20,8 @@
  * POST   /answer/:id          – submit answer { content, publishNow: bool }
  * PUT    /answer/:id          – edit answer after publish
  * POST   /followup-answer/:id – rabbi answers follow-up question
+ * POST   /:id/wp-follow-up    – WP: asker submits follow-up (public, email-verified, rate-limited)
+ * POST   /:id/wp-thank        – WP: visitor thanks a rabbi (public, rate-limited, visitor_id dedup)
  * POST   /thank/:id           – thank a rabbi (public, rate-limited by IP)
  * POST   /urgent/:id          – admin: mark question as urgent
  * POST   /hide/:id            – admin: hide question
@@ -523,7 +525,188 @@ router.put(
   }
 );
 
-// ─── POST /:id/follow-up — asker submits a follow-up question ────────────────
+// ─── WordPress public endpoints ──────────────────────────────────────────────
+// These are called from the WordPress frontend (no auth), so they use
+// rate-limiting and email verification instead of JWT authentication.
+
+/** Rate limiter for WP follow-up: 5 per 15 minutes per IP. */
+const wpFollowUpRateLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  keyGenerator:    (req) => _clientIp(req),
+  message: {
+    error: 'יותר מדי בקשות. נסה שוב מאוחר יותר.',
+    code:  'TOO_MANY_REQUESTS',
+  },
+});
+
+/**
+ * POST /:id/wp-follow-up — WordPress asker submits a follow-up question.
+ * Public endpoint (no auth). Verifies asker identity via email match.
+ * Body: { email: string, content: string }
+ * Limits: one follow-up per question (follow_up_count < 1).
+ */
+router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) => {
+  try {
+    const { email, content } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({
+        error: 'כתובת אימייל נדרשת',
+        code:  'MISSING_EMAIL',
+      });
+    }
+
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({
+        error: 'תוכן שאלת ההמשך נדרש',
+        code:  'MISSING_CONTENT',
+      });
+    }
+
+    if (content.trim().length < 10) {
+      return res.status(400).json({
+        error: 'שאלת ההמשך חייבת להכיל לפחות 10 תווים',
+        code:  'CONTENT_TOO_SHORT',
+      });
+    }
+
+    // Fetch question and verify email matches the original asker
+    const { rows: qRows } = await dbQuery(
+      `SELECT id, status, follow_up_count, asker_email_encrypted, assigned_rabbi_id
+       FROM   questions
+       WHERE  id = $1`,
+      [req.params.id]
+    );
+
+    if (!qRows[0]) {
+      return res.status(404).json({
+        error: 'שאלה לא נמצאה',
+        code:  'QUESTION_NOT_FOUND',
+      });
+    }
+
+    const question = qRows[0];
+
+    // Verify asker email: decrypt stored email and compare
+    let storedEmail = null;
+    if (question.asker_email_encrypted) {
+      try {
+        const { decryptField } = require('../utils/encryption');
+        storedEmail = decryptField(question.asker_email_encrypted);
+      } catch (decryptErr) {
+        console.error('[questions] wp-follow-up decrypt error:', decryptErr.message);
+      }
+    }
+
+    if (!storedEmail || storedEmail.toLowerCase().trim() !== email.toLowerCase().trim()) {
+      return res.status(403).json({
+        error: 'כתובת האימייל אינה תואמת לשואל המקורי',
+        code:  'EMAIL_MISMATCH',
+      });
+    }
+
+    // Delegate to the existing submitFollowUp service (validates status + count)
+    const followUp = await questionService.submitFollowUp(req.params.id, content);
+
+    return res.status(201).json({
+      message: 'שאלת ההמשך נשמרה בהצלחה',
+      followUp,
+    });
+  } catch (err) {
+    // Forward known business-logic errors with their status code
+    if (err.status) {
+      return res.status(err.status).json({ error: err.message, code: err.code || 'ERROR' });
+    }
+    return next(err);
+  }
+});
+
+/**
+ * POST /:id/wp-thank — WordPress visitor thanks a rabbi.
+ * Public endpoint (no auth). Rate-limited by IP.
+ * Optional body: { visitor_id: string } for deduplication.
+ */
+router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
+  try {
+    const ip        = _clientIp(req);
+    const visitorId = req.body?.visitor_id;
+
+    // Use visitor_id for dedup if provided, otherwise fall back to IP
+    const dedupKey = visitorId
+      ? `wp-thank:visitor:${visitorId}:${req.params.id}`
+      : null;
+
+    // If visitor_id provided, check Redis for dedup
+    if (dedupKey) {
+      try {
+        const redis = require('../db/redis');
+        const existing = await redis.get(dedupKey);
+        if (existing) {
+          // Already thanked — fetch current count and return idempotent response
+          const { rows } = await dbQuery(
+            `SELECT thank_count FROM questions WHERE id = $1`,
+            [req.params.id]
+          );
+          return res.json({
+            message:        'כבר הודית על שאלה זו',
+            thankCount:     rows[0]?.thank_count || 0,
+            alreadyThanked: true,
+          });
+        }
+      } catch (redisErr) {
+        // Redis down — continue with IP-based dedup via incrementThankCount
+        console.error('[questions] wp-thank redis check error:', redisErr.message);
+      }
+    }
+
+    const result = await questionService.incrementThankCount(req.params.id, ip);
+
+    // Store visitor_id dedup key in Redis (24h TTL)
+    if (dedupKey && !result.alreadyThanked) {
+      try {
+        const redis = require('../db/redis');
+        await redis.setEx(dedupKey, 86400, '1');
+      } catch (redisErr) {
+        console.error('[questions] wp-thank redis set error:', redisErr.message);
+      }
+    }
+
+    if (result.alreadyThanked) {
+      return res.json({
+        message:        'כבר הודית על שאלה זו',
+        thankCount:     result.thankCount,
+        alreadyThanked: true,
+      });
+    }
+
+    // Fire-and-forget: sync thank count to WordPress
+    if (result.wpPostId) {
+      const { syncThankCount } = require('../services/wpService');
+      syncThankCount(result.wpPostId, result.thankCount).catch((err) => {
+        console.error('[questions] wp-thank syncThankCount error:', err.message);
+      });
+    }
+
+    // Schedule WhatsApp + email thank notification — fire-and-forget
+    questionService.scheduleThankNotification(req.params.id, result.rabbiId)
+      .catch((err) => {
+        console.error('[questions] wp-thank notification error:', err.message);
+      });
+
+    return res.json({
+      message:        'תודה רבה! ההודאה נשלחה לרב',
+      thankCount:     result.thankCount,
+      alreadyThanked: false,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── POST /:id/follow-up — asker submits a follow-up question (rabbi portal) ─
 
 /**
  * Asker submits a follow-up question after an answered question.

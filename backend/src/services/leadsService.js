@@ -180,12 +180,13 @@ async function upsertLead(question) {
     } else {
       // INSERT new lead
       const resolvedEmailHash = emailHash || (!phoneHash ? nameHash : null);
-      await query(
+      const { rows: insertedRows } = await query(
         `INSERT INTO leads
            (email_hash, phone_hash, asker_name, asker_email_encrypted, asker_phone_encrypted,
             question_count, interaction_score, is_hot, last_category_id,
             first_question_at, last_question_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+         RETURNING id`,
         [
           resolvedEmailHash,
           phoneHash,
@@ -199,6 +200,16 @@ async function upsertLead(question) {
           now,
         ]
       );
+
+      // Queue onboarding emails for first-time askers
+      if (insertedRows[0]?.id && asker_email_encrypted) {
+        try {
+          const { queueOnboarding } = require('../cron/jobs/onboardingDrip');
+          queueOnboarding(insertedRows[0].id, asker_email_encrypted, asker_name);
+        } catch (onboardErr) {
+          console.warn('[leadsService] onboarding queue failed:', onboardErr.message);
+        }
+      }
     }
   } catch (err) {
     console.error('[leadsService] upsertLead error:', err.message);

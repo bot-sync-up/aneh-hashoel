@@ -178,7 +178,7 @@ export default function EditAnswerEditor({
       onSave?.({ html });
     } catch (err) {
       setError(
-        err?.response?.data?.message || 'שגיאה בשמירת השינויים. אנא נסה שוב.'
+        err?.response?.data?.error || err?.response?.data?.message || 'שגיאה בשמירת השינויים. אנא נסה שוב.'
       );
     } finally {
       setSaving(false);

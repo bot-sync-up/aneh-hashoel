@@ -33,7 +33,7 @@ export default function PublishConfirmModal({
       onClose?.();
     } catch (err) {
       setError(
-        err?.response?.data?.message || 'שגיאה בפרסום התשובה. אנא נסה שוב.'
+        err?.response?.data?.error || err?.response?.data?.message || 'שגיאה בפרסום התשובה. אנא נסה שוב.'
       );
     } finally {
       setPublishing(false);

@@ -36,7 +36,7 @@ router.get('/', async (req, res, next) => {
   try {
     const page   = Math.max(1, parseInt(req.query.page  || '1',  10));
     const limit  = Math.min(50, Math.max(1, parseInt(req.query.limit || '20', 10)));
-    const filter = ['all', 'hot', 'contacted', 'not_contacted'].includes(req.query.filter)
+    const filter = ['all', 'hot', 'urgent', 'contacted', 'not_contacted'].includes(req.query.filter)
       ? req.query.filter : 'all';
     const search = req.query.search || '';
 
@@ -56,7 +56,7 @@ router.get('/export', async (req, res, next) => {
     const leads = result.leads || [];
 
     // Build CSV manually — no external dependency needed
-    const headers = ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'טופל', 'שאלה אחרונה', 'הערות'];
+    const headers = ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'דחוף', 'טופל', 'תאריך יצירה', 'שאלה אחרונה', 'הערות'];
 
     function escapeCsvField(val) {
       const str = String(val ?? '');
@@ -73,7 +73,9 @@ router.get('/export', async (req, res, next) => {
       l.question_count || 0,
       l.last_category_name || '',
       l.is_hot ? 'כן' : 'לא',
+      l.has_urgent ? 'כן' : 'לא',
       l.contacted ? 'כן' : 'לא',
+      l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
       l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
       l.contact_notes || '',
     ].map(escapeCsvField).join(','));

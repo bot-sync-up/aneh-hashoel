@@ -293,6 +293,13 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
 
   if (filter === 'hot') {
     conditions.push(`l.is_hot = true`);
+  } else if (filter === 'urgent') {
+    // Leads that have at least one urgent/critical/high question
+    conditions.push(`EXISTS (
+      SELECT 1 FROM questions q
+      WHERE (q.asker_email = l.asker_email_encrypted OR (q.asker_name = l.asker_name AND q.asker_email IS NULL))
+        AND q.urgency IN ('urgent','critical','high')
+    )`);
   } else if (filter === 'contacted') {
     conditions.push(`l.contacted = true`);
   } else if (filter === 'not_contacted') {
@@ -336,6 +343,81 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
     email_hash: undefined,
     phone_hash: undefined,
   }));
+
+  // Fetch recent questions for each lead (batch query)
+  if (leads.length > 0) {
+    // Build a map of encrypted emails from the raw rows
+    const leadEmailMap = new Map();
+    const leadNameMap = new Map();
+    for (const row of rows) {
+      if (row.asker_email_encrypted) {
+        leadEmailMap.set(row.id, row.asker_email_encrypted);
+      } else if (row.asker_name) {
+        leadNameMap.set(row.id, row.asker_name);
+      }
+    }
+
+    // Fetch questions for all leads that have encrypted email
+    const encryptedEmails = [...leadEmailMap.values()].filter(Boolean);
+    const leadNames = [...leadNameMap.values()].filter(Boolean);
+
+    let questionsByEmail = new Map();
+    let questionsByName = new Map();
+
+    if (encryptedEmails.length > 0) {
+      const placeholders = encryptedEmails.map((_, i) => `$${i + 1}`).join(',');
+      const { rows: qRows } = await query(
+        `SELECT id, title, status, urgency, created_at, answered_at, asker_email, asker_name
+         FROM   questions
+         WHERE  asker_email IN (${placeholders})
+         ORDER  BY created_at DESC`,
+        encryptedEmails
+      );
+      for (const q of qRows) {
+        const key = q.asker_email;
+        if (!questionsByEmail.has(key)) questionsByEmail.set(key, []);
+        questionsByEmail.get(key).push({
+          id: q.id, title: q.title, status: q.status,
+          urgency: q.urgency, created_at: q.created_at, answered_at: q.answered_at,
+        });
+      }
+    }
+
+    if (leadNames.length > 0) {
+      const placeholders = leadNames.map((_, i) => `$${i + 1}`).join(',');
+      const { rows: qRows } = await query(
+        `SELECT id, title, status, urgency, created_at, answered_at, asker_name
+         FROM   questions
+         WHERE  asker_name IN (${placeholders}) AND asker_email IS NULL
+         ORDER  BY created_at DESC`,
+        leadNames
+      );
+      for (const q of qRows) {
+        const key = q.asker_name;
+        if (!questionsByName.has(key)) questionsByName.set(key, []);
+        questionsByName.get(key).push({
+          id: q.id, title: q.title, status: q.status,
+          urgency: q.urgency, created_at: q.created_at, answered_at: q.answered_at,
+        });
+      }
+    }
+
+    // Attach questions to each lead + compute has_urgent flag
+    for (const lead of leads) {
+      const encEmail = leadEmailMap.get(lead.id);
+      const name = leadNameMap.get(lead.id);
+      if (encEmail && questionsByEmail.has(encEmail)) {
+        lead.questions = questionsByEmail.get(encEmail);
+      } else if (name && questionsByName.has(name)) {
+        lead.questions = questionsByName.get(name);
+      } else {
+        lead.questions = [];
+      }
+      lead.has_urgent = lead.questions.some(
+        (q) => q.urgency === 'urgent' || q.urgency === 'critical' || q.urgency === 'high'
+      );
+    }
+  }
 
   return { leads, total: countRows[0]?.total ?? 0 };
 }

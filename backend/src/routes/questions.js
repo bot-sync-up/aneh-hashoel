@@ -219,6 +219,92 @@ router.get('/counts', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── PUT /draft/:id — save answer draft ─────────────────────────────────────
+
+/**
+ * Save an answer draft for a question.
+ * Only the assigned rabbi may save a draft (enforced by questionOwnership).
+ * Body: { content: string }
+ */
+router.put(
+  '/draft/:id',
+  authenticate,
+  questionOwnership,
+  async (req, res, next) => {
+    try {
+      const { content } = req.body;
+
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        return res.status(400).json({
+          error: 'תוכן הטיוטה נדרש',
+          code:  'MISSING_CONTENT',
+        });
+      }
+
+      const { rows } = await dbQuery(
+        `UPDATE questions
+         SET    draft_content    = $1,
+                draft_updated_at = NOW(),
+                updated_at       = NOW()
+         WHERE  id = $2
+         RETURNING id, draft_content, draft_updated_at`,
+        [content.trim(), req.params.id]
+      );
+
+      if (!rows[0]) {
+        return res.status(404).json({
+          error: 'שאלה לא נמצאה',
+          code:  'QUESTION_NOT_FOUND',
+        });
+      }
+
+      return res.json({
+        message:       'הטיוטה נשמרה בהצלחה',
+        draft_content: rows[0].draft_content,
+        draft_saved_at: rows[0].draft_updated_at,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
+// ─── GET /draft/:id — load answer draft ─────────────────────────────────────
+
+/**
+ * Load a saved answer draft for a question.
+ * Only the assigned rabbi may read the draft (enforced by questionOwnership).
+ */
+router.get(
+  '/draft/:id',
+  authenticate,
+  questionOwnership,
+  async (req, res, next) => {
+    try {
+      const { rows } = await dbQuery(
+        `SELECT draft_content, draft_updated_at
+         FROM   questions
+         WHERE  id = $1`,
+        [req.params.id]
+      );
+
+      if (!rows[0]) {
+        return res.status(404).json({
+          error: 'שאלה לא נמצאה',
+          code:  'QUESTION_NOT_FOUND',
+        });
+      }
+
+      return res.json({
+        draft_content:  rows[0].draft_content,
+        draft_saved_at: rows[0].draft_updated_at,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
 // ─── GET /:id — single question ───────────────────────────────────────────────
 
 /**
@@ -419,6 +505,27 @@ router.post(
         });
       }
 
+      // ── Draft save (publishNow === false) ─────────────────────────────
+      if (!publishNow) {
+        const { rows } = await dbQuery(
+          `UPDATE questions
+           SET    draft_content    = $1,
+                  draft_updated_at = NOW(),
+                  updated_at       = NOW()
+           WHERE  id = $2
+           RETURNING id, draft_content, draft_updated_at`,
+          [content.trim(), req.params.id]
+        );
+
+        return res.json({
+          message:       'הטיוטה נשמרה בהצלחה',
+          draft_content: rows[0]?.draft_content,
+          draft_saved_at: rows[0]?.draft_updated_at,
+        });
+      }
+
+      // ── Publish flow ──────────────────────────────────────────────────
+
       if (content.trim().length < 10) {
         return res.status(400).json({
           error: 'תוכן התשובה חייב להכיל לפחות 10 תווים',
@@ -426,8 +533,8 @@ router.post(
         });
       }
 
-      // Require category if publishing (not draft)
-      if (publishNow) {
+      // Require category if publishing (skip for private answers)
+      if (!isPrivate) {
         const { rows: catCheck } = await dbQuery(
           `SELECT category_id FROM questions WHERE id = $1`, [req.params.id]
         );
@@ -443,9 +550,17 @@ router.post(
         req.params.id,
         req.rabbi.id,
         content,
-        publishNow,
+        true,
         Boolean(isPrivate)
       );
+
+      // Clear draft after successful publish (fire-and-forget)
+      dbQuery(
+        `UPDATE questions SET draft_content = NULL, draft_updated_at = NULL WHERE id = $1`,
+        [req.params.id]
+      ).catch((err) => {
+        console.error('[questions] Error clearing draft after publish:', err.message);
+      });
 
       const io = _io(req);
       if (io) {

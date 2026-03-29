@@ -3,7 +3,8 @@ import { clsx } from 'clsx';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
-  StickyNote, X, Download,
+  StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
+  CalendarDays, FileText,
 } from 'lucide-react';
 import { get, patch } from '../../lib/api';
 import api from '../../lib/api';
@@ -16,18 +17,34 @@ const PAGE_SIZE = 20;
 
 const FILTERS = [
   { value: 'all',           label: 'כל הלידים' },
-  { value: 'hot',           label: '🔥 חמים'   },
+  { value: 'hot',           label: 'חמים'       },
+  { value: 'urgent',        label: 'דחופים'     },
   { value: 'not_contacted', label: 'טרם טופלו' },
   { value: 'contacted',     label: 'טופלו'      },
 ];
 
 // ── Lead Row ─────────────────────────────────────────────────────────────────
 
+const URGENCY_MAP = {
+  urgent:   { label: 'דחוף',    color: 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-700' },
+  critical: { label: 'קריטי',   color: 'text-red-700 bg-red-100 border-red-300 dark:text-red-300 dark:bg-red-900/30 dark:border-red-600' },
+  high:     { label: 'גבוה',    color: 'text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-900/20 dark:border-orange-700' },
+  normal:   { label: 'רגיל',    color: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600' },
+};
+
+const STATUS_MAP = {
+  pending:    { label: 'ממתין',     color: 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-700' },
+  in_process: { label: 'בטיפול',   color: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-700' },
+  answered:   { label: 'נענה',     color: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-700' },
+  hidden:     { label: 'מוסתר',    color: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600' },
+};
+
 function LeadRow({ lead, onUpdate }) {
-  const [notesOpen,  setNotesOpen]  = useState(false);
-  const [notes,      setNotes]      = useState(lead.contact_notes || '');
-  const [savingNote, setSavingNote] = useState(false);
-  const [toggling,   setToggling]   = useState(false);
+  const [notesOpen,     setNotesOpen]     = useState(false);
+  const [notes,         setNotes]         = useState(lead.contact_notes || '');
+  const [savingNote,    setSavingNote]    = useState(false);
+  const [toggling,      setToggling]      = useState(false);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
 
   const handleToggleContacted = async () => {
     setToggling(true);
@@ -48,6 +65,11 @@ function LeadRow({ lead, onUpdate }) {
     finally { setSavingNote(false); }
   };
 
+  const questions = lead.questions || [];
+  const hasUrgent = lead.has_urgent || questions.some(
+    (q) => q.urgency === 'urgent' || q.urgency === 'critical' || q.urgency === 'high'
+  );
+
   return (
     <div
       className={clsx(
@@ -55,12 +77,14 @@ function LeadRow({ lead, onUpdate }) {
         'bg-[var(--bg-surface)] hover:shadow-soft',
         lead.is_hot
           ? 'border-orange-300 dark:border-orange-700'
-          : 'border-[var(--border-default)]'
+          : hasUrgent
+            ? 'border-red-300 dark:border-red-700'
+            : 'border-[var(--border-default)]'
       )}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-col gap-1.5 min-w-0">
           {/* Name + badges */}
           <div className="flex items-center gap-2 flex-wrap">
             {lead.is_hot && (
@@ -69,29 +93,46 @@ function LeadRow({ lead, onUpdate }) {
                 חם
               </span>
             )}
+            {hasUrgent && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-full px-2 py-0.5 font-heebo">
+                <AlertTriangle size={10} />
+                דחוף
+              </span>
+            )}
             <span className="text-sm font-bold text-[var(--text-primary)] font-heebo">
               {lead.asker_name || 'שואל אנונימי'}
             </span>
-            {lead.contacted && (
+            {lead.contacted ? (
               <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5 font-heebo">
                 <CheckCircle2 size={10} />
                 טופל
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-2 py-0.5 font-heebo">
+                <Clock size={10} />
+                טרם טופל
               </span>
             )}
           </div>
 
           {/* Contact info */}
-          <div className="flex items-center gap-3 flex-wrap text-xs text-[var(--text-muted)] font-heebo">
+          <div className="flex items-center gap-4 flex-wrap text-xs text-[var(--text-muted)] font-heebo">
             {lead.email && (
-              <span className="flex items-center gap-1">
+              <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-brand-navy dark:hover:text-dark-accent transition-colors">
                 <Mail size={11} />
                 {lead.email}
-              </span>
+              </a>
             )}
             {lead.phone && (
-              <span className="flex items-center gap-1">
+              <a href={`tel:${lead.phone}`} className="flex items-center gap-1 hover:text-brand-navy dark:hover:text-dark-accent transition-colors">
                 <Phone size={11} />
-                {lead.phone}
+                <span dir="ltr">{lead.phone}</span>
+              </a>
+            )}
+            {lead.created_at && (
+              <span className="flex items-center gap-1">
+                <CalendarDays size={11} />
+                נוצר: {formatDate(lead.created_at)}
               </span>
             )}
           </div>
@@ -115,10 +156,54 @@ function LeadRow({ lead, onUpdate }) {
         </div>
       </div>
 
+      {/* Questions list (expandable) */}
+      {questions.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => setQuestionsOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-heebo text-brand-navy dark:text-dark-accent hover:underline self-start"
+          >
+            <FileText size={12} />
+            {questions.length} שאלות ששאל
+            {questionsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+
+          {questionsOpen && (
+            <div className="flex flex-col gap-1.5 mt-1 bg-[var(--bg-muted)] rounded-lg p-3">
+              {questions.map((q) => {
+                const urg = URGENCY_MAP[q.urgency] || URGENCY_MAP.normal;
+                const sts = STATUS_MAP[q.status] || STATUS_MAP.pending;
+                return (
+                  <div key={q.id} className="flex items-center justify-between gap-2 text-xs font-heebo py-1.5 border-b border-[var(--border-default)] last:border-b-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[var(--text-primary)] truncate font-medium">
+                        {q.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={clsx('inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5', urg.color)}>
+                        {q.urgency !== 'normal' && <AlertTriangle size={9} />}
+                        {urg.label}
+                      </span>
+                      <span className={clsx('inline-flex items-center rounded-full border px-2 py-0.5', sts.color)}>
+                        {sts.label}
+                      </span>
+                      <span className="text-[var(--text-muted)]">
+                        {formatDate(q.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Notes preview */}
       {lead.contact_notes && !notesOpen && (
         <p className="text-xs text-[var(--text-muted)] font-heebo bg-[var(--bg-muted)] rounded px-3 py-2 line-clamp-2">
-          📝 {lead.contact_notes}
+          {lead.contact_notes}
         </p>
       )}
 
@@ -175,6 +260,15 @@ function LeadRow({ lead, onUpdate }) {
           >
             <Mail size={12} />
             שלח מייל
+          </a>
+        )}
+        {lead.phone && (
+          <a
+            href={`tel:${lead.phone}`}
+            className="inline-flex items-center gap-1.5 text-xs font-heebo text-brand-navy dark:text-dark-accent hover:underline"
+          >
+            <Phone size={12} />
+            חייג
           </a>
         )}
       </div>

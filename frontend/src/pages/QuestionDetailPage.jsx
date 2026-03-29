@@ -608,7 +608,7 @@ export default function QuestionDetailPage() {
                 ) : (
                   <AnswerEditorAdvanced
                     questionId={id}
-                    existingAnswer={question.answer_draft || ''}
+                    existingAnswer={question.draft_content || ''}
                     hasCategory={!!question.category_id}
                     onCategorySet={() => {
                       // Lightweight update — don't refetch; just mark category as set
@@ -868,7 +868,7 @@ function AnswerEditor({ questionId, initialDraft, onPublished }) {
   const saveDraft = async (text) => {
     setSaving(true);
     try {
-      await put(`/questions/${questionId}/draft`, { draft: text });
+      await put(`/questions/draft/${questionId}`, { content: text });
       setSaved(true);
     } catch {
       // silent — don't block the rabbi
@@ -888,7 +888,7 @@ function AnswerEditor({ questionId, initialDraft, onPublished }) {
       const data = await post(`/questions/answer/${questionId}`, { content: draft, publishNow: true });
       onPublished?.(data.question || data);
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'שגיאה בפרסום התשובה.');
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'שגיאה בפרסום התשובה.');
     } finally {
       setPublishing(false);
     }

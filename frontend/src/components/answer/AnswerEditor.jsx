@@ -280,7 +280,7 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
       try { localStorage.setItem(draftKey(questionId), JSON.stringify({ html, savedAt: new Date().toISOString() })); } catch { /* ignore */ }
       onSave?.({ html, publishNow: false });
     } catch (err) {
-      setSaveError(err?.response?.data?.message || 'שגיאה בשמירת הטיוטה.');
+      setSaveError(err?.response?.data?.error || err?.response?.data?.message || 'שגיאה בשמירת הטיוטה.');
     } finally { setSavingDraft(false); }
   }, [editor, questionId, onSave, isPrivate]);
 

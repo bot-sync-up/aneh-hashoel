@@ -5,6 +5,7 @@ import React, {
   useRef,
 } from 'react';
 import { clsx } from 'clsx';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   BellOff,
@@ -78,7 +79,7 @@ const FILTER_OPTIONS = [
   { key: 'answer_published', label: 'תשובות' },
   { key: 'user_thanks',      label: 'תודות' },
   { key: 'lock_reminder',    label: 'תזכורות' },
-  { key: 'followup_question','label': 'שאלות המשך' },
+  { key: 'followup_question', label: 'שאלות המשך' },
   { key: 'new_device_login', label: 'כניסות' },
 ];
 
@@ -101,13 +102,22 @@ function formatRelative(dateStr) {
 // ── Single notification row ───────────────────────────────────────────────────
 
 function NotificationRow({ notification, onMarkRead }) {
+  const navigate = useNavigate();
   const type = notification.type || 'new_question';
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.new_question;
   const isUnread = !notification.read && !notification.readAt;
 
   const handleClick = () => {
     if (isUnread) onMarkRead(notification._id || notification.id);
-    if (notification.actionUrl) window.location.href = notification.actionUrl;
+    if (notification.actionUrl) {
+      // Use SPA navigation for internal URLs, window.location for external
+      const url = notification.actionUrl;
+      if (url.startsWith('/') || url.startsWith(window.location.origin)) {
+        navigate(url.replace(window.location.origin, ''));
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    }
   };
 
   return (

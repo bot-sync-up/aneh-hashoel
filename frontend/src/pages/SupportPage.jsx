@@ -22,12 +22,19 @@ function ConversationView({ request, onBack }) {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
 
+  const [fetchError, setFetchError] = useState(null);
+
   const fetchMessages = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await get(`/support/${request.id}/messages`);
       setMessages(data.messages || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (err) {
+      setFetchError('שגיאה בטעינת ההודעות. נסה לרענן.');
+      console.error('[support] fetchMessages error:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [request.id]);
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
@@ -36,15 +43,22 @@ function ConversationView({ request, onBack }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const [sendError, setSendError] = useState(null);
+
   const handleSend = async () => {
     if (!newMessage.trim() || sending) return;
     setSending(true);
+    setSendError(null);
     try {
       const data = await post(`/support/${request.id}/messages`, { message: newMessage.trim() });
       setMessages((prev) => [...prev, data.message]);
       setNewMessage('');
-    } catch { /* ignore */ }
-    finally { setSending(false); }
+    } catch (err) {
+      setSendError('שגיאה בשליחת ההודעה. נסה שוב.');
+      console.error('[support] handleSend error:', err);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -69,9 +83,15 @@ function ConversationView({ request, onBack }) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F8F6F1]">
+        {fetchError && (
+          <div className="text-center py-4 text-red-600 font-heebo text-sm">{fetchError}</div>
+        )}
+        {sendError && (
+          <div className="text-center py-2 text-red-600 font-heebo text-xs bg-red-50 rounded-md mx-4 px-3 py-1.5">{sendError}</div>
+        )}
         {loading ? (
           <div className="text-center py-8 text-[var(--text-muted)] font-heebo text-sm">טוען הודעות...</div>
-        ) : messages.length === 0 ? (
+        ) : messages.length === 0 && !fetchError ? (
           <div className="text-center py-8 text-[var(--text-muted)] font-heebo text-sm">אין הודעות</div>
         ) : (
           messages.map((msg) => (

@@ -14,7 +14,7 @@ add_action('wp_footer', function() {
     if (empty($answer)) return;
 
     $post_id       = $post->ID;
-    $thank_count   = (int) get_post_meta($post->ID, 'thank_count', true);
+    $thank_count   = (int) get_post_meta($post->ID, 'thank_count', true) ?: (int) get_post_meta($post->ID, 'ask_thank_count', true);
     $followup_done = (int) get_post_meta($post->ID, 'follow_up_count', true) >= 1;
     ?>
 
@@ -130,12 +130,10 @@ add_action('wp_footer', function() {
                     btn.style.background = "#16a34a";
                     btn.style.opacity = "1";
                     document.getElementById("aneh-thank-ok").style.display = "block";
-                    if (!d.alreadyThanked) {
-                        setTimeout(function(){
-                            var ov = document.getElementById("aneh-donate-overlay");
-                            ov.style.display = "flex";
-                        }, 1200);
-                    }
+                    setTimeout(function(){
+                        var ov = document.getElementById("aneh-donate-overlay");
+                        ov.style.display = "flex";
+                    }, 1200);
                 } else {
                     btn.textContent = d.error || "שגיאה";
                     btn.style.opacity = "1";

@@ -705,7 +705,7 @@ async function syncThankCount(wpPostId, thankCount) {
 
     const response = await withRateLimitRetry(
       () => client.post(`/ask-rabai/${wpPostId}`, {
-        meta: { ask_thank_count: thankCount },
+        meta: { thank_count: thankCount },
       }),
       `syncThankCount(${wpPostId})`
     );

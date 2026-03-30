@@ -1,244 +1,198 @@
 <?php
 /**
  * WP Snippet: Thank Button + Follow-up Form for ask-rabai posts
- *
- * Add this as a Code Snippet in WordPress (via Code Snippets plugin)
- * or paste into functions.php of the active theme.
- *
- * Displays:
- * 1. "תודה לרב" button — calls /api/questions/:wp_post_id/wp-thank
- * 2. "שאלת המשך" form — calls /api/questions/:wp_post_id/wp-follow-up
- *
- * Only shows on answered questions (has ask-answ meta field).
- *
- * Uses wp_footer hook (works with Elementor and any page builder).
+ * Injected into the answer container (data-id="425ccb7") via wp_footer.
  */
 
-// API base URL for the aneh-hashoel backend
 define('ANEH_API_URL', 'https://aneh.syncup.co.il/api');
 
-/**
- * Inject thank button + follow-up form via wp_footer
- * (Elementor does not trigger the_content filter, so we use wp_footer instead)
- */
 add_action('wp_footer', function() {
     if (!is_singular('ask-rabai')) return;
 
     global $post;
     $answer = get_post_meta($post->ID, 'ask-answ', true);
-    if (empty($answer)) return; // No answer yet
+    if (empty($answer)) return;
 
-    $post_id = $post->ID;
-    $thank_count = (int) get_post_meta($post->ID, 'thank_count', true);
-    $follow_up_count = (int) get_post_meta($post->ID, 'follow_up_count', true);
+    $post_id       = $post->ID;
+    $thank_count   = (int) get_post_meta($post->ID, 'thank_count', true);
+    $followup_done = (int) get_post_meta($post->ID, 'follow_up_count', true) >= 1;
     ?>
-    <div id="aneh-actions" style="display:none; margin:20px 0 0 0; padding:24px 28px; background:#f9f5ef; border-radius:6px; border:1px solid #ddd0bb; direction:rtl; text-align:right; font-family:'Polin',Heebo,Arial,sans-serif; color:#333;">
 
-        <!-- Thank Button -->
-        <div id="aneh-thank-section" style="margin-bottom:20px;">
-            <button id="aneh-thank-btn" data-count="<?php echo $thank_count; ?>" style="
-                display:inline-flex; align-items:center; gap:8px;
-                padding:12px 28px; background:#B8973A; color:#1B2B5E;
-                border:none; border-radius:6px; cursor:pointer;
-                font-size:16px; font-weight:700; font-family:Heebo,Arial,sans-serif;
-                transition:background 0.2s;">
-                <?php echo ($thank_count > 0) ? '❤️ תודה לרב (' . $thank_count . ')' : '❤️ תודה לרב'; ?>
+    <!-- ── ANEH Thank + Follow-up ── -->
+    <div id="aneh-actions" style="display:none;">
+
+        <div style="border-top: 1px solid #e5e0d8; margin-top: 24px; padding-top: 20px; direction: rtl; text-align: right;">
+
+            <!-- Thank Button -->
+            <button id="aneh-thank-btn" data-count="<?php echo $thank_count; ?>"
+                style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+                       padding:10px 24px; border:none; border-radius:4px;
+                       background:#B8973A; color:#fff;
+                       font-size:15px; font-weight:700; font-family:inherit;
+                       transition:opacity .15s;">
+                ❤️ <?php echo $thank_count > 0 ? "תודה לרב ({$thank_count})" : 'תודה לרב'; ?>
             </button>
-            <div id="aneh-thank-msg" style="display:none; margin-top:8px; padding:10px 16px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:6px; color:#065f46; font-size:14px;">
+
+            <div id="aneh-thank-ok" style="display:none; margin-top:10px; padding:8px 14px;
+                 background:#f0fdf4; border:1px solid #86efac; border-radius:4px;
+                 color:#166534; font-size:14px; font-family:inherit;">
                 תודה רבה! הרב יקבל את הודעתך.
             </div>
         </div>
 
-        <?php if ($follow_up_count < 1): ?>
+        <?php if (!$followup_done): ?>
         <!-- Follow-up Form -->
-        <div id="aneh-followup-section" style="border-top:1px solid #e0d8c8; padding-top:16px;">
-            <h4 style="margin:0 0 10px; color:#1B2B5E; font-size:16px;">שאלת המשך</h4>
-            <p style="margin:0 0 10px; color:#666; font-size:13px;">ניתן לשלוח שאלת הבהרה אחת בלבד.</p>
+        <div style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:18px; direction:rtl; text-align:right;">
+            <h4 style="margin:0 0 4px; font-size:15px; font-weight:700; color:inherit; font-family:inherit;">שאלת המשך</h4>
+            <p style="margin:0 0 12px; font-size:13px; color:#888; font-family:inherit;">ניתן לשלוח שאלת הבהרה אחת בלבד.</p>
+
             <div id="aneh-followup-form">
-                <input type="email" id="aneh-followup-email" placeholder="האימייל שלך (כפי ששלחת את השאלה)" style="
-                    width:100%; padding:10px 14px; margin-bottom:8px; border:1px solid #ccc; border-radius:6px;
-                    font-size:14px; font-family:Heebo,Arial,sans-serif; direction:rtl; box-sizing:border-box;" />
-                <textarea id="aneh-followup-content" placeholder="כתוב את שאלת ההמשך שלך..." rows="3" style="
-                    width:100%; padding:10px 14px; margin-bottom:8px; border:1px solid #ccc; border-radius:6px;
-                    font-size:14px; font-family:Heebo,Arial,sans-serif; direction:rtl; resize:vertical; box-sizing:border-box;"></textarea>
-                <button id="aneh-followup-btn" style="
-                    padding:10px 24px; background:#1B2B5E; color:white;
-                    border:none; border-radius:6px; cursor:pointer;
-                    font-size:14px; font-weight:600; font-family:Heebo,Arial,sans-serif;">
+                <input type="email" id="aneh-fu-email" placeholder="האימייל שלך (כפי ששלחת את השאלה)"
+                    style="width:100%; padding:9px 12px; margin-bottom:8px; box-sizing:border-box;
+                           border:1px solid #ccc; border-radius:4px; font-size:14px;
+                           font-family:inherit; direction:rtl; outline:none;" />
+                <textarea id="aneh-fu-content" rows="3" placeholder="כתוב את שאלת ההמשך שלך..."
+                    style="width:100%; padding:9px 12px; margin-bottom:10px; box-sizing:border-box;
+                           border:1px solid #ccc; border-radius:4px; font-size:14px;
+                           font-family:inherit; direction:rtl; resize:vertical; outline:none;"></textarea>
+                <button id="aneh-fu-btn"
+                    style="padding:9px 22px; border:none; border-radius:4px; cursor:pointer;
+                           background:#1B2B5E; color:#fff; font-size:14px;
+                           font-weight:600; font-family:inherit;">
                     שלח שאלת המשך
                 </button>
-                <div id="aneh-followup-msg" style="display:none; margin-top:8px; padding:10px 16px; border-radius:6px; font-size:14px;"></div>
+                <div id="aneh-fu-msg" style="display:none; margin-top:10px; padding:8px 14px;
+                     border-radius:4px; font-size:14px; font-family:inherit;"></div>
             </div>
         </div>
         <?php else: ?>
-        <p style="border-top:1px solid #e0d8c8; padding-top:12px; color:#999; font-size:13px;">שאלת המשך כבר נשלחה לשאלה זו.</p>
+        <p style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:12px;
+                  color:#aaa; font-size:13px; font-family:inherit;">
+            שאלת המשך כבר נשלחה לשאלה זו.
+        </p>
         <?php endif; ?>
+    </div>
 
-        <!-- Donation popup modal (appears after thank) -->
-        <div id="aneh-donate-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999999; justify-content:center; align-items:center;">
-            <div style="position:relative; background:#fff; border-radius:12px; width:90%; max-width:500px; max-height:90vh; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-                <button onclick="anehCloseDonate()" style="position:absolute; top:8px; left:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666; z-index:10; line-height:1;">&times;</button>
-                <iframe src="https://www.matara.pro/nedarimplus/online/?S=EdHK" style="width:100%; height:75vh; border:none; border-radius:0 0 12px 12px;"></iframe>
-            </div>
+    <!-- Donation popup -->
+    <div id="aneh-donate-overlay" style="display:none; position:fixed; inset:0;
+         background:rgba(0,0,0,.55); z-index:999999; justify-content:center; align-items:center;">
+        <div style="position:relative; background:#fff; border-radius:10px;
+                    width:90%; max-width:480px; max-height:90vh; overflow:hidden;
+                    box-shadow:0 8px 32px rgba(0,0,0,.3);">
+            <button id="aneh-donate-close"
+                style="position:absolute; top:6px; left:10px; background:none; border:none;
+                       font-size:22px; cursor:pointer; color:#555; line-height:1;">&times;</button>
+            <iframe src="https://www.matara.pro/nedarimplus/online/?S=EdHK"
+                style="width:100%; height:72vh; border:none;"></iframe>
         </div>
     </div>
 
     <script>
     (function() {
-        var ANEH_API = "<?php echo ANEH_API_URL; ?>";
-        var POST_ID = <?php echo $post_id; ?>;
-        var actionsEl = document.getElementById("aneh-actions");
+        var API    = "<?php echo ANEH_API_URL; ?>";
+        var PID    = <?php echo (int)$post_id; ?>;
+        var el     = document.getElementById("aneh-actions");
 
-        // Insert the actions block inside the Elementor content area, after the last text-editor widget
-        // Strategy: find the last elementor-widget-text-editor inside elementor-location-single,
-        // then insert after its parent section/container so we stay within the page layout
-        var inserted = false;
-        var locationSingle = document.querySelector('.elementor-location-single');
-        if (locationSingle) {
-            var textWidgets = locationSingle.querySelectorAll('[data-widget_type="text-editor.default"]');
-            if (textWidgets.length > 0) {
-                var lastWidget = textWidgets[textWidgets.length - 1];
-                // Walk up to find the top-level e-con or section inside location-single
-                var topLevel = lastWidget;
-                while (topLevel.parentElement && topLevel.parentElement !== locationSingle) {
-                    topLevel = topLevel.parentElement;
-                }
-                // Insert actionsEl after topLevel, inside locationSingle — matches page container width
-                actionsEl.style.maxWidth = getComputedStyle(topLevel).maxWidth || '1140px';
-                actionsEl.style.margin = '0 auto';
-                topLevel.parentNode.insertBefore(actionsEl, topLevel.nextSibling);
-                inserted = true;
-            }
+        // ── Insertion: inside the answer e-con (data-id="425ccb7") ──
+        // Find it by data-id; fall back to last e-con inside elementor-location-single
+        var target = document.querySelector('[data-id="425ccb7"] > .e-con-inner');
+        if (!target) {
+            // fallback: last e-con-inner inside single template
+            var all = document.querySelectorAll('.elementor-location-single .e-con-inner');
+            target = all.length ? all[all.length - 1] : null;
         }
-        // Fallback: insert after last text-editor widget anywhere
-        if (!inserted) {
-            var allWidgets = document.querySelectorAll('[data-widget_type="text-editor.default"]');
-            if (allWidgets.length > 0) {
-                var last = allWidgets[allWidgets.length - 1];
-                last.parentNode.insertBefore(actionsEl, last.nextSibling);
-                inserted = true;
-            }
+        if (target) {
+            target.appendChild(el);
+        } else {
+            document.body.appendChild(el);
         }
-        // Final fallback: append to body
-        if (!inserted) {
-            document.body.appendChild(actionsEl);
-        }
+        el.style.display = "block";
 
-        actionsEl.style.display = "block";
+        // ── Thank ──
+        var btn = document.getElementById("aneh-thank-btn");
+        btn && btn.addEventListener("click", function() {
+            var cnt = parseInt(btn.dataset.count) || 0;
+            btn.disabled = true;
+            btn.style.opacity = ".6";
+            var vid = localStorage.getItem("aneh_vid") || (localStorage.setItem("aneh_vid", Math.random().toString(36).slice(2)), localStorage.getItem("aneh_vid"));
 
-        // ── Thank Button ──
-        var thankBtn = document.getElementById("aneh-thank-btn");
-        if (thankBtn) {
-            thankBtn.addEventListener("click", function() {
-                var currentCount = parseInt(thankBtn.getAttribute("data-count")) || 0;
-                thankBtn.disabled = true;
-                thankBtn.textContent = "שולח...";
-
-                // Get or create visitor ID
-                var visitorId = localStorage.getItem("aneh_visitor_id");
-                if (!visitorId) {
-                    visitorId = Math.random().toString(36).slice(2);
-                    localStorage.setItem("aneh_visitor_id", visitorId);
-                }
-
-                fetch(ANEH_API + "/questions/" + POST_ID + "/wp-thank", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({visitor_id: visitorId})
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.error) {
-                        thankBtn.textContent = data.error;
-                        setTimeout(function() {
-                            thankBtn.textContent = currentCount > 0 ? "❤️ תודה לרב (" + currentCount + ")" : "❤️ תודה לרב";
-                            thankBtn.disabled = false;
-                        }, 3000);
-                    } else {
-                        var newCount = data.thankCount || (currentCount + 1);
-                        thankBtn.setAttribute("data-count", newCount);
-                        thankBtn.textContent = "❤️ תודה נשלחה! (" + newCount + ")";
-                        thankBtn.style.background = "#10b981";
-                        thankBtn.style.color = "white";
-                        document.getElementById("aneh-thank-msg").style.display = "block";
-                        // Show donation popup after short delay
-                        setTimeout(function() {
-                            var overlay = document.getElementById("aneh-donate-overlay");
-                            overlay.style.display = "flex";
-                        }, 1500);
+            fetch(API + "/questions/" + PID + "/wp-thank", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({visitor_id: vid})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (d.alreadyThanked || !d.error) {
+                    var n = d.thankCount || cnt + 1;
+                    btn.dataset.count = n;
+                    btn.textContent = "❤️ תודה נשלחה! (" + n + ")";
+                    btn.style.background = "#16a34a";
+                    btn.style.opacity = "1";
+                    document.getElementById("aneh-thank-ok").style.display = "block";
+                    if (!d.alreadyThanked) {
+                        setTimeout(function(){
+                            var ov = document.getElementById("aneh-donate-overlay");
+                            ov.style.display = "flex";
+                        }, 1200);
                     }
-                })
-                .catch(function() {
-                    thankBtn.textContent = "שגיאה, נסה שוב";
-                    setTimeout(function() {
-                        thankBtn.disabled = false;
-                        thankBtn.textContent = currentCount > 0 ? "❤️ תודה לרב (" + currentCount + ")" : "❤️ תודה לרב";
-                    }, 3000);
-                });
-            });
-        }
-
-        // ── Donation popup close ──
-        window.anehCloseDonate = function(e) {
-            if (e && e.target !== e.currentTarget && !e.target.closest("button")) return;
-            document.getElementById("aneh-donate-overlay").style.display = "none";
-        };
-        var overlay = document.getElementById("aneh-donate-overlay");
-        if (overlay) overlay.addEventListener("click", window.anehCloseDonate);
-
-        // ── Follow-up Form ──
-        var followUpBtn = document.getElementById("aneh-followup-btn");
-        if (followUpBtn) {
-            followUpBtn.addEventListener("click", function() {
-                var email = document.getElementById("aneh-followup-email").value.trim();
-                var content = document.getElementById("aneh-followup-content").value.trim();
-                var msgEl = document.getElementById("aneh-followup-msg");
-
-                if (!email || !content) {
-                    msgEl.style.display = "block";
-                    msgEl.style.background = "#fef2f2";
-                    msgEl.style.border = "1px solid #fca5a5";
-                    msgEl.style.color = "#991b1b";
-                    msgEl.textContent = "יש למלא אימייל ותוכן השאלה";
-                    return;
+                } else {
+                    btn.textContent = d.error || "שגיאה";
+                    btn.style.opacity = "1";
+                    setTimeout(function(){ btn.disabled=false; btn.textContent = cnt>0?"❤️ תודה לרב ("+cnt+")":"❤️ תודה לרב"; }, 3000);
                 }
+            })
+            .catch(function(){ btn.disabled=false; btn.style.opacity="1"; btn.textContent="שגיאה, נסה שוב"; });
+        });
 
-                followUpBtn.disabled = true;
-                followUpBtn.textContent = "שולח...";
+        // ── Donate overlay close ──
+        var ov = document.getElementById("aneh-donate-overlay");
+        var cls = document.getElementById("aneh-donate-close");
+        cls && cls.addEventListener("click", function(){ ov.style.display="none"; });
+        ov && ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
 
-                fetch(ANEH_API + "/questions/" + POST_ID + "/wp-follow-up", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({email: email, content: content})
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    msgEl.style.display = "block";
-                    if (data.error) {
-                        msgEl.style.background = "#fef2f2";
-                        msgEl.style.border = "1px solid #fca5a5";
-                        msgEl.style.color = "#991b1b";
-                        msgEl.textContent = data.error;
-                        followUpBtn.disabled = false;
-                        followUpBtn.textContent = "שלח שאלת המשך";
-                    } else {
-                        msgEl.style.background = "#ecfdf5";
-                        msgEl.style.border = "1px solid #6ee7b7";
-                        msgEl.style.color = "#065f46";
-                        msgEl.textContent = "שאלת ההמשך נשלחה בהצלחה! הרב יקבל אותה ויענה בהקדם.";
-                        document.getElementById("aneh-followup-form").style.display = "none";
-                    }
-                })
-                .catch(function() {
-                    msgEl.style.display = "block";
-                    msgEl.style.background = "#fef2f2";
-                    msgEl.style.color = "#991b1b";
-                    msgEl.textContent = "שגיאה בשליחה, נסה שוב";
-                    followUpBtn.disabled = false;
-                    followUpBtn.textContent = "שלח שאלת המשך";
-                });
+        // ── Follow-up ──
+        var fuBtn = document.getElementById("aneh-fu-btn");
+        fuBtn && fuBtn.addEventListener("click", function() {
+            var email   = (document.getElementById("aneh-fu-email").value || "").trim();
+            var content = (document.getElementById("aneh-fu-content").value || "").trim();
+            var msg     = document.getElementById("aneh-fu-msg");
+
+            function showMsg(text, ok) {
+                msg.style.display = "block";
+                msg.style.background = ok ? "#f0fdf4" : "#fef2f2";
+                msg.style.border = "1px solid " + (ok ? "#86efac" : "#fca5a5");
+                msg.style.color  = ok ? "#166534" : "#991b1b";
+                msg.textContent  = text;
+            }
+
+            if (!email || !content) { showMsg("יש למלא אימייל ותוכן השאלה", false); return; }
+
+            fuBtn.disabled = true;
+            fuBtn.textContent = "שולח...";
+
+            fetch(API + "/questions/" + PID + "/wp-follow-up", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({email: email, content: content})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (d.error) {
+                    showMsg(d.error, false);
+                    fuBtn.disabled = false;
+                    fuBtn.textContent = "שלח שאלת המשך";
+                } else {
+                    showMsg("שאלת ההמשך נשלחה בהצלחה! הרב יקבל אותה ויענה בהקדם.", true);
+                    document.getElementById("aneh-followup-form").style.display = "none";
+                }
+            })
+            .catch(function(){
+                showMsg("שגיאה בשליחה, נסה שוב", false);
+                fuBtn.disabled = false;
+                fuBtn.textContent = "שלח שאלת המשך";
             });
-        }
+        });
     })();
     </script>
     <?php

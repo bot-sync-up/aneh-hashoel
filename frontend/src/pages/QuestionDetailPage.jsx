@@ -733,26 +733,12 @@ export default function QuestionDetailPage() {
               </div>
             )}
 
-            {/* Thank count + Thank button */}
-            <div className="mt-4 flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+            {/* Thank count */}
+            <div className="mt-4 flex items-center border-t border-[var(--border-default)] pt-3">
               <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-heebo">
-                <Heart size={12} />
-                {thank_count} אנשים הודו על התשובה
+                <Heart size={12} className={thank_count > 0 ? 'fill-rose-400 text-rose-400' : ''} />
+                {thank_count > 0 ? `${thank_count} אנשים הודו על התשובה` : 'טרם התקבלו תודות'}
               </div>
-              <button
-                type="button"
-                onClick={handleThank}
-                disabled={thankLoading || thankDone}
-                className={clsx(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium font-heebo transition-colors',
-                  thankDone
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 cursor-default'
-                    : 'bg-brand-gold/10 text-brand-gold hover:bg-brand-gold/20 dark:bg-brand-gold/20 dark:hover:bg-brand-gold/30'
-                )}
-              >
-                <Heart size={13} className={thankDone ? 'fill-emerald-500 text-emerald-500' : ''} />
-                {thankDone ? 'תודה נשלחה!' : 'תודה לרב'}
-              </button>
             </div>
           </Card>
         )}

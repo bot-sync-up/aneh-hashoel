@@ -735,7 +735,7 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
 
     // Fetch question and verify email matches the original asker
     const { rows: qRows } = await dbQuery(
-      `SELECT id, status, follow_up_count, asker_email_encrypted, assigned_rabbi_id
+      `SELECT id, status, follow_up_count, asker_email AS asker_email_encrypted, assigned_rabbi_id
        FROM   questions
        WHERE  id = $1`,
       [questionId]

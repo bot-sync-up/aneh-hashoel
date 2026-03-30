@@ -103,6 +103,27 @@ function _io(req) {
   return req.app.get('io') || null;
 }
 
+// ─── Resolve question ID (UUID or wp_post_id) ──────────────────────────────
+
+/**
+ * Given a param that could be either a UUID (internal id) or a WordPress
+ * post ID (integer), return the internal UUID.  Returns null if not found.
+ */
+async function _resolveQuestionId(idParam) {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
+  if (isUuid) return idParam;
+
+  // Treat as wp_post_id (integer)
+  const numericId = parseInt(idParam, 10);
+  if (!numericId || isNaN(numericId)) return null;
+
+  const { rows } = await dbQuery(
+    `SELECT id FROM questions WHERE wp_post_id = $1 LIMIT 1`,
+    [numericId]
+  );
+  return rows[0]?.id || null;
+}
+
 // ─── GET / — paginated question list ─────────────────────────────────────────
 
 /**
@@ -706,12 +727,18 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
       });
     }
 
+    // Resolve question ID (supports both UUID and wp_post_id)
+    const questionId = await _resolveQuestionId(req.params.id);
+    if (!questionId) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה', code: 'QUESTION_NOT_FOUND' });
+    }
+
     // Fetch question and verify email matches the original asker
     const { rows: qRows } = await dbQuery(
       `SELECT id, status, follow_up_count, asker_email_encrypted, assigned_rabbi_id
        FROM   questions
        WHERE  id = $1`,
-      [req.params.id]
+      [questionId]
     );
 
     if (!qRows[0]) {
@@ -742,7 +769,7 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
     }
 
     // Delegate to the existing submitFollowUp service (validates status + count)
-    const followUp = await questionService.submitFollowUp(req.params.id, content);
+    const followUp = await questionService.submitFollowUp(questionId, content);
 
     return res.status(201).json({
       message: 'שאלת ההמשך נשמרה בהצלחה',
@@ -764,12 +791,18 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
  */
 router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
   try {
+    // Resolve question ID (supports both UUID and wp_post_id)
+    const questionId = await _resolveQuestionId(req.params.id);
+    if (!questionId) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה', code: 'QUESTION_NOT_FOUND' });
+    }
+
     const ip        = _clientIp(req);
     const visitorId = req.body?.visitor_id;
 
     // Use visitor_id for dedup if provided, otherwise fall back to IP
     const dedupKey = visitorId
-      ? `wp-thank:visitor:${visitorId}:${req.params.id}`
+      ? `wp-thank:visitor:${visitorId}:${questionId}`
       : null;
 
     // If visitor_id provided, check Redis for dedup
@@ -781,7 +814,7 @@ router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
           // Already thanked — fetch current count and return idempotent response
           const { rows } = await dbQuery(
             `SELECT thank_count FROM questions WHERE id = $1`,
-            [req.params.id]
+            [questionId]
           );
           return res.json({
             message:        'כבר הודית על שאלה זו',
@@ -795,7 +828,7 @@ router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
       }
     }
 
-    const result = await questionService.incrementThankCount(req.params.id, ip);
+    const result = await questionService.incrementThankCount(questionId, ip);
 
     // Store visitor_id dedup key in Redis (24h TTL)
     if (dedupKey && !result.alreadyThanked) {
@@ -824,7 +857,7 @@ router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
     }
 
     // Schedule WhatsApp + email thank notification — fire-and-forget
-    questionService.scheduleThankNotification(req.params.id, result.rabbiId)
+    questionService.scheduleThankNotification(questionId, result.rabbiId)
       .catch((err) => {
         console.error('[questions] wp-thank notification error:', err.message);
       });

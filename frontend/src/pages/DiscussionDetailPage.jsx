@@ -1,32 +1,17 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import PageHeader, { Breadcrumb } from '../components/layout/PageHeader';
-import Card from '../components/ui/Card';
+import { useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 
+/**
+ * DiscussionDetailPage — redirects to /discussions?d=:id
+ * All discussion functionality lives in the main DiscussionsPage.
+ */
 export default function DiscussionDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
-  return (
-    <div className="page-enter">
-      <PageHeader
-        title="פרטי דיון"
-        breadcrumb={
-          <Breadcrumb
-            items={[
-              { label: 'דיונים', href: '/discussions' },
-              { label: `דיון #${id}` },
-            ]}
-          />
-        }
-      />
-      <div className="p-6">
-        <Card>
-          <Card.Title>דיון #{id}</Card.Title>
-          <Card.Description>
-            פרטי הדיון יוצגו כאן.
-          </Card.Description>
-        </Card>
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    navigate(`/discussions?d=${id}`, { replace: true });
+  }, [id, navigate]);
+
+  return null;
 }

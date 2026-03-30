@@ -6,6 +6,16 @@
 
 define('ANEH_API_URL', 'https://aneh.syncup.co.il/api');
 
+// Register thank_count meta so it's writable via WP REST API
+add_action('init', function() {
+    register_post_meta('ask-rabai', 'thank_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+    ]);
+});
+
 add_action('wp_footer', function() {
     if (!is_singular('ask-rabai')) return;
 

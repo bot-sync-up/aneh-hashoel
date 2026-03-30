@@ -204,6 +204,9 @@
 | DiscussionDetailPage | ✅ תוקן | redirect אוטומטי ל-`/discussions?d=:id` |
 | WP snippet — מיקום | ✅ תוקן | שונה מ-`the_content` (לא עובד עם Elementor) ל-`wp_footer` |
 | WP thank/follow-up API | ✅ תוקן | תמיכה ב-wp_post_id (לא רק UUID) |
+| user_thanks notification | ✅ תוקן | כעת יוצר רשומה ב-notifications_log + socket `notification:new` לרב בזמן אמת |
+| ENCRYPTION_KEY | ✅ תוקן | מפתח 32 תווים בדיוק בשרת — WP sync עובד על כל השאלות |
+| WP sync status filter | ✅ תוקן | שונה מ-`status:pending` ל-`status:publish` — שאלות מסתנכרנות כעת |
 | Mobile app | ❌ לא בנוי | FCM tokens מוכן, אפליקציה עצמה לא קיימת |
 | Email delivery tracking | ⚠️ | routes קיימות (emailWebhook.js) אבל לא מחובר לממשק |
 

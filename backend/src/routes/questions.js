@@ -862,6 +862,37 @@ router.post('/:id/wp-thank', thankRateLimiter, async (req, res, next) => {
         console.error('[questions] wp-thank notification error:', err.message);
       });
 
+    // Create in-app notification record for the rabbi — fire-and-forget
+    if (result.rabbiId) {
+      (async () => {
+        try {
+          const { rows: qRows } = await dbQuery(
+            `SELECT title FROM questions WHERE id = $1`,
+            [questionId]
+          );
+          const title = qRows[0]?.title || 'שאלה';
+          await dbQuery(
+            `INSERT INTO notifications_log (rabbi_id, type, channel, content, status)
+             VALUES ($1, 'user_thanks', 'in_app', $2, 'sent')`,
+            [result.rabbiId, JSON.stringify({ questionId, questionTitle: title, thankCount: result.thankCount })]
+          );
+          // Emit real-time notification to rabbi
+          const io = _io(req);
+          if (io) {
+            const { sendToRabbi } = require('../socket/notificationEvents');
+            sendToRabbi(io, result.rabbiId, {
+              type:  'user_thanks',
+              title: 'תודה מהשואל',
+              body:  `מישהו הודה על תשובתך לשאלה: ${title}`,
+              link:  `/questions/${questionId}`,
+            });
+          }
+        } catch (notifErr) {
+          console.error('[questions] wp-thank in-app notification error:', notifErr.message);
+        }
+      })();
+    }
+
     return res.json({
       message:        'תודה רבה! ההודאה נשלחה לרב',
       thankCount:     result.thankCount,

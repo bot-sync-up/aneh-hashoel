@@ -264,6 +264,9 @@ async function start() {
   // Wire Socket.io authentication + event handlers
   initSocketHandlers(io);
 
+  // Give questionService access to io so _emitSafe works (thankReceived, followUp, etc.)
+  require('./services/questionService').setIO(io);
+
   // Start background cron jobs (pass io so polling sync can broadcast socket events)
   startCronJobs(io);
 

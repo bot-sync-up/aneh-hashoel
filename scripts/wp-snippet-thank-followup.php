@@ -133,7 +133,13 @@ add_action('wp_footer', function() {
             })
             .then(function(r){ return r.json(); })
             .then(function(d) {
-                if (d.alreadyThanked || !d.error) {
+                if (d.alreadyThanked) {
+                    var n = d.thankCount || cnt;
+                    btn.textContent = "❤️ כבר הודית (" + n + ")";
+                    btn.style.background = "#6b7280";
+                    btn.style.opacity = "1";
+                    btn.disabled = false;
+                } else if (!d.error) {
                     var n = d.thankCount || cnt + 1;
                     btn.dataset.count = n;
                     btn.textContent = "❤️ תודה נשלחה! (" + n + ")";

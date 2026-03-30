@@ -31,6 +31,7 @@ const { getWebhookSecret } = require('../config/wordpress');
 const { createFromWebhook } = require('../services/questions');
 const { sanitizeRichText }  = require('../utils/sanitize');
 const { enqueue }           = require('../services/wpSyncQueue');
+const { encryptField }      = require('../utils/encryption');
 
 const {
   broadcastNewQuestion,
@@ -98,18 +99,16 @@ function normaliseWebhookPayload(body) {
     try { vals = JSON.parse(vals); } catch { vals = {}; }
   }
 
-  // Debug log — full payload structure to diagnose field mapping
+  // Debug log — payload structure (no PII)
   console.log(
     '[wp-webhook] payload keys:',
     JSON.stringify({
-      body_keys: Object.keys(body),
-      src_keys:  Object.keys(src).slice(0, 20),
-      meta_keys: Object.keys(meta).slice(0, 20),
-      vals_keys: Object.keys(vals).slice(0, 20),
-      vals_full: typeof vals === 'object' ? JSON.stringify(vals).slice(0, 500) : '(not object)',
-      vals_type: typeof (body.values || src.values),
-      vals_email: vals.visitor_email || vals['visitor-email'] || vals.email || vals.asker_email || vals['ask-email'] || '(none)',
-      meta_email: meta.visitor_email || meta['visitor-email'] || meta.asker_email || '(none)',
+      body_keys:  Object.keys(body),
+      src_keys:   Object.keys(src).slice(0, 20),
+      meta_keys:  Object.keys(meta).slice(0, 20),
+      vals_keys:  Object.keys(vals).slice(0, 20),
+      has_email:  !!(vals.visitor_email || vals['visitor-email'] || vals.email || vals.asker_email || vals['ask-email'] || meta.visitor_email || meta['visitor-email'] || meta.asker_email),
+      has_phone:  !!(vals.visitor_phone || vals['visitor-phone'] || vals.phone || vals.asker_phone || meta.visitor_phone || meta['visitor-phone'] || meta.asker_phone),
     })
   );
 
@@ -280,9 +279,12 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
         const imgUrl = meta['ask-visitor-img'] || null;
         const wpLink = wpQ.link || null;
         // WP JetEngine stores contact as visitor_email / visitor_phone
-        const email  = meta['visitor_email'] || meta['asker_email'] || null;
-        const phone  = meta['visitor_phone'] || meta['asker_phone'] || null;
-        const name   = meta['visitor_name']  || meta['asker_name']  || null;
+        const emailPlain = meta['visitor_email'] || meta['asker_email'] || null;
+        const phonePlain = meta['visitor_phone'] || meta['asker_phone'] || null;
+        const name       = meta['visitor_name']  || meta['asker_name']  || null;
+        // Encrypt PII before storing in DB
+        const emailEnc   = encryptField(emailPlain);
+        const phoneEnc   = encryptField(phonePlain);
 
         await query(
           `UPDATE questions
@@ -293,9 +295,9 @@ router.post('/new-question', verifyWebhookSecret, async (req, res, next) => {
                   asker_name         = COALESCE(NULLIF(asker_name,''), $5),
                   updated_at         = NOW()
            WHERE  id = $6`,
-          [imgUrl, wpLink, email, phone, name, question.id]
+          [imgUrl, wpLink, emailEnc, phoneEnc, name, question.id]
         );
-        console.log(`[wp-webhook] enriched question ${question.id} img=${!!imgUrl} email=${!!email}`);
+        console.log(`[wp-webhook] enriched question ${question.id} img=${!!imgUrl} email=${!!emailPlain}`);
       }
     } catch (enrichErr) {
       console.warn('[wp-webhook] failed to enrich question with WP data:', enrichErr.message);

@@ -19,57 +19,22 @@
  *   ENCRYPTION_KEY          – AES key for decrypting asker PII
  */
 
-const crypto = require('crypto');
 const { query: dbQuery } = require('../db/pool');
+const { decryptField }   = require('../utils/encryption');
 
 // ─── Encryption helpers ────────────────────────────────────────────────────────
 
-const ALGORITHM    = 'aes-256-cbc';
-const IV_LENGTH    = 16;
-
 /**
- * Decrypt a value that was encrypted with AES-256-CBC.
- * The stored format is iv:encryptedData (both hex-encoded).
+ * Decrypt a PII field stored with AES-256-GCM.
+ * Delegates to the shared encryption utility which handles the correct
+ * "iv:authTag:ciphertext" format and returns null-safe plaintext.
  *
- * @param {string} encrypted  "iv:ciphertext" hex string
- * @returns {string}          Plain-text value
+ * @param {string|null} encrypted  Stored ciphertext (or plaintext for legacy rows)
+ * @returns {string}               Decrypted value, or '' if absent
  */
 function decrypt(encrypted) {
   if (!encrypted) return '';
-
-  // If value doesn't look encrypted (plaintext email/phone from WP enrichment),
-  // return as-is
-  const parts = encrypted.split(':');
-  if (parts.length < 2 || parts.length > 3) {
-    return encrypted; // plaintext
-  }
-
-  // Quick check: if it looks like an email or phone, it's plaintext
-  if (encrypted.includes('@') || /^\+?[\d\s\-()]{7,}$/.test(encrypted)) {
-    return encrypted;
-  }
-
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
-    console.error('[askerNotification] ENCRYPTION_KEY לא מוגדר');
-    return encrypted; // return as-is instead of empty
-  }
-
-  try {
-    const [ivHex, cipherHex] = parts;
-    const iv         = Buffer.from(ivHex, 'hex');
-    const cipherText = Buffer.from(cipherHex, 'hex');
-    const keyBuffer  = Buffer.from(key, 'hex');
-
-    const decipher = crypto.createDecipheriv(ALGORITHM, keyBuffer, iv);
-    let decrypted  = decipher.update(cipherText);
-    decrypted      = Buffer.concat([decrypted, decipher.final()]);
-
-    return decrypted.toString('utf8');
-  } catch (err) {
-    console.error('[askerNotification] שגיאה בפענוח, מחזיר כ-plaintext:', err.message);
-    return encrypted; // fallback: return as-is
-  }
+  return decryptField(encrypted) || '';
 }
 
 // ─── Email sending ─────────────────────────────────────────────────────────────

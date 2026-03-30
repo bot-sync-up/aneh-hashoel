@@ -777,7 +777,10 @@ router.post('/2fa/login', authLimiter, async (req, res, next) => {
 
 router.post('/2fa/disable', authenticate, async (req, res, next) => {
   try {
-    const targetId = req.body.rabbiId || req.rabbi.id;
+    // Non-admins can only disable their own 2FA — ignore any rabbiId in body.
+    // Admins may pass rabbiId to disable for another rabbi.
+    const isAdmin  = req.rabbi.role === 'admin';
+    const targetId = isAdmin ? (req.body.rabbiId || req.rabbi.id) : req.rabbi.id;
     await legacyAuth.disable2FA(targetId, req.rabbi.id, req.rabbi.role);
     return res.json({ message: 'אימות דו-שלבי בוטל בהצלחה' });
   } catch (err) {

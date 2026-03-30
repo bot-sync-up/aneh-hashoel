@@ -85,7 +85,7 @@ export default function NotificationBell({ className }) {
 
   const fetchCount = useCallback(async () => {
     try {
-      const { data } = await api.get('/notifications/count');
+      const { data } = await api.get('/notifications/unread-count');
       setCount(data?.unread ?? data?.count ?? 0);
     } catch {
       // Non-fatal

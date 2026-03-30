@@ -32,7 +32,7 @@ add_action('wp_footer', function() {
     $thank_count = (int) get_post_meta($post->ID, 'thank_count', true);
     $follow_up_count = (int) get_post_meta($post->ID, 'follow_up_count', true);
     ?>
-    <div id="aneh-actions" style="display:none; margin:30px auto; padding:20px; max-width:800px; background:#f8f6f1; border-radius:8px; border:1px solid #e0d8c8; direction:rtl; text-align:right; font-family:Heebo,Arial,sans-serif;">
+    <div id="aneh-actions" style="display:none; margin:20px 0 0 0; padding:24px 28px; background:#f9f5ef; border-radius:6px; border:1px solid #ddd0bb; direction:rtl; text-align:right; font-family:'Polin',Heebo,Arial,sans-serif; color:#333;">
 
         <!-- Thank Button -->
         <div id="aneh-thank-section" style="margin-bottom:20px;">
@@ -89,26 +89,37 @@ add_action('wp_footer', function() {
         var POST_ID = <?php echo $post_id; ?>;
         var actionsEl = document.getElementById("aneh-actions");
 
-        // Insert the actions block after the main content area
-        // Try multiple selectors to find the right insertion point (works with Elementor and standard themes)
-        var targets = [
-            '.elementor-widget-theme-post-content',
-            '.elementor-location-single .elementor-section:last-of-type',
-            '.entry-content',
-            '.post-content',
-            'article.ask-rabai',
-            '.elementor-location-single'
-        ];
+        // Insert the actions block inside the Elementor content area, after the last text-editor widget
+        // Strategy: find the last elementor-widget-text-editor inside elementor-location-single,
+        // then insert after its parent section/container so we stay within the page layout
         var inserted = false;
-        for (var i = 0; i < targets.length; i++) {
-            var target = document.querySelector(targets[i]);
-            if (target) {
-                target.parentNode.insertBefore(actionsEl, target.nextSibling);
+        var locationSingle = document.querySelector('.elementor-location-single');
+        if (locationSingle) {
+            var textWidgets = locationSingle.querySelectorAll('[data-widget_type="text-editor.default"]');
+            if (textWidgets.length > 0) {
+                var lastWidget = textWidgets[textWidgets.length - 1];
+                // Walk up to find the top-level e-con or section inside location-single
+                var topLevel = lastWidget;
+                while (topLevel.parentElement && topLevel.parentElement !== locationSingle) {
+                    topLevel = topLevel.parentElement;
+                }
+                // Insert actionsEl after topLevel, inside locationSingle — matches page container width
+                actionsEl.style.maxWidth = getComputedStyle(topLevel).maxWidth || '1140px';
+                actionsEl.style.margin = '0 auto';
+                topLevel.parentNode.insertBefore(actionsEl, topLevel.nextSibling);
                 inserted = true;
-                break;
             }
         }
-        // Fallback: append to body (still visible)
+        // Fallback: insert after last text-editor widget anywhere
+        if (!inserted) {
+            var allWidgets = document.querySelectorAll('[data-widget_type="text-editor.default"]');
+            if (allWidgets.length > 0) {
+                var last = allWidgets[allWidgets.length - 1];
+                last.parentNode.insertBefore(actionsEl, last.nextSibling);
+                inserted = true;
+            }
+        }
+        // Final fallback: append to body
         if (!inserted) {
             document.body.appendChild(actionsEl);
         }

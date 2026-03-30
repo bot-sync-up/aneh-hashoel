@@ -689,7 +689,7 @@ async function getAttachmentUrl(attachmentId) {
 /**
  * Sync thank count to the corresponding WordPress post meta.
  *
- * Endpoint: PATCH /ask-rabai/{wpPostId} with meta: { ask_thank_count }
+ * Endpoint: PATCH /ask-rabai/{wpPostId} with meta: { thank_count }
  *
  * @param {number} wpPostId
  * @param {number} thankCount

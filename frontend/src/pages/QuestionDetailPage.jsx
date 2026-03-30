@@ -143,11 +143,21 @@ export default function QuestionDetailPage() {
       setQuestion((prev) => prev ? { ...prev, thank_count } : prev);
     });
 
+    const offFollowUp = on('question:followUpReceived', ({ questionId: qId, followUp }) => {
+      if (String(qId) !== String(id)) return;
+      setQuestion((prev) => prev ? {
+        ...prev,
+        follow_up_question: followUp?.asker_content || prev.follow_up_question,
+        follow_up_count:    (prev.follow_up_count || 0) + 1,
+      } : prev);
+    });
+
     return () => {
       offClaimed();
       offReleased();
       offAnswered();
       offThank();
+      offFollowUp();
     };
   }, [on, id]);
 

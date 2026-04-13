@@ -104,9 +104,20 @@ CREATE INDEX IF NOT EXISTS idx_leads_log_is_hot
   WHERE is_hot = TRUE;
 
 -- CRM sync: find un-synced leads for the Google Sheets exporter
-CREATE INDEX IF NOT EXISTS idx_leads_log_gs_synced
-  ON leads_log (gs_synced)
-  WHERE gs_synced = FALSE;
+-- (gs_synced column may not exist if 001_create_tables ran before 001_initial)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'leads_log' AND column_name = 'gs_synced'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_indexes WHERE indexname = 'idx_leads_log_gs_synced'
+    ) THEN
+      CREATE INDEX idx_leads_log_gs_synced ON leads_log (gs_synced) WHERE gs_synced = FALSE;
+    END IF;
+  END IF;
+END $$;
 
 -- ─── discussion_messages ──────────────────────────────────────────────────────
 

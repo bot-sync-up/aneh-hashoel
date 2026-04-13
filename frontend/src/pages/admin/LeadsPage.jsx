@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clsx } from 'clsx';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
   StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
-  CalendarDays, FileText,
+  CalendarDays, FileText, Bell,
 } from 'lucide-react';
 import { get, patch } from '../../lib/api';
 import api from '../../lib/api';
@@ -12,6 +12,7 @@ import { formatDate } from '../../lib/utils';
 import Spinner, { BlockSpinner } from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import { useSocket } from '../../contexts/SocketContext';
 
 const PAGE_SIZE = 20;
 
@@ -278,6 +279,38 @@ function LeadRow({ lead, onUpdate }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+// ── Click Alert Toast ────────────────────────────────────────────────────────
+
+function ClickAlertToast({ alert, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 12000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className="flex items-start gap-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-xl px-4 py-3 shadow-lg animate-slide-in-top">
+      <Bell size={18} className="text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-sm font-bold text-orange-800 dark:text-orange-200 font-heebo">
+          גולש פתח תשובה עכשיו!
+        </span>
+        <span className="text-xs text-orange-700 dark:text-orange-300 font-heebo">
+          {alert.name || 'שואל אנונימי'}
+          {alert.category ? ` · ${alert.category}` : ''}
+        </span>
+        <span className="text-[10px] text-orange-500 dark:text-orange-400 font-heebo">
+          זה הזמן המושלם לשיחה
+        </span>
+      </div>
+      <button onClick={onClose} className="flex-shrink-0 text-orange-400 hover:text-orange-600 transition-colors">
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function LeadsPage() {
   const [leads,   setLeads]   = useState([]);
   const [total,   setTotal]   = useState(0);
@@ -287,6 +320,24 @@ export default function LeadsPage() {
   const [filter,  setFilter]  = useState('all');
   const [search,  setSearch]  = useState('');
   const [searchQ, setSearchQ] = useState(''); // debounced
+  const [clickAlerts, setClickAlerts] = useState([]);
+  const { on } = useSocket();
+
+  // Listen for real-time lead click events from CS socket room
+  useEffect(() => {
+    const unsub = on('lead:click', (data) => {
+      const alertId = `${data.leadId}-${Date.now()}`;
+      setClickAlerts((prev) => [{ ...data, _id: alertId }, ...prev].slice(0, 5));
+
+      // Play notification sound if available
+      try {
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      } catch { /* ignore */ }
+    });
+    return unsub;
+  }, [on]);
 
   // Debounce search
   useEffect(() => {
@@ -319,6 +370,19 @@ export default function LeadsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)]" dir="rtl">
+      {/* Real-time click alerts */}
+      {clickAlerts.length > 0 && (
+        <div className="fixed top-4 left-4 z-50 flex flex-col gap-2 max-w-sm">
+          {clickAlerts.map((alert) => (
+            <ClickAlertToast
+              key={alert._id}
+              alert={alert}
+              onClose={() => setClickAlerts((prev) => prev.filter((a) => a._id !== alert._id))}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-[var(--bg-surface)] border-b border-[var(--border-default)] shadow-[var(--shadow-soft)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">

@@ -5,10 +5,10 @@ import { clsx } from 'clsx';
 import {
   LayoutDashboard,
   MessageCircleQuestion,
-  ListFilter,
+  Clock,
   CheckCircle2,
-  MessageSquare,
-  FileText,
+  MessagesSquare,
+  BookTemplate,
   Bell,
   UserRound,
   ShieldCheck,
@@ -42,22 +42,22 @@ const NAV_ITEMS = [
   {
     to: '/questions',
     label: 'שאלות פתוחות',
-    icon: ListFilter,
+    icon: Clock,
   },
   {
     to: '/answers',
-    label: 'תשובות',
+    label: 'שאלות שנענו',
     icon: CheckCircle2,
   },
   {
     to: '/discussions',
     label: 'דיונים',
-    icon: MessageSquare,
+    icon: MessagesSquare,
   },
   {
     to: '/templates',
     label: 'תבניות',
-    icon: FileText,
+    icon: BookTemplate,
   },
   {
     to: '/profile',

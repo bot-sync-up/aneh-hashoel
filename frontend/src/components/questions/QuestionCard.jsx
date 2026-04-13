@@ -192,8 +192,8 @@ function QuestionCard({
 
         {/* Content preview */}
         {showContentPreview && content && (
-          <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed mb-2 line-clamp-2">
-            {truncate(stripHtml(content), 100)}
+          <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed mb-2 line-clamp-3">
+            {truncate(stripHtml(content), 200)}
           </p>
         )}
 

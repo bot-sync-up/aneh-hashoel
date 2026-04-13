@@ -45,6 +45,7 @@ const {
   broadcastUrgentQuestion,
   broadcastStatusChanged,
   notifyThankReceived,
+  notifyQuestionAnswered,
 } = require('../socket/questionEvents');
 
 const { notifyAll } = require('../services/notificationRouter');
@@ -155,6 +156,9 @@ function normalisePayload(body) {
     questionStatus: meta.status            || null,
     // file attachment from asker
     attachmentUrl:  meta['ask-visitor-img'] || vals['ask-visitor-img'] || src.attachment_url || src.attachmentUrl || null,
+    // answer written on WordPress side (field name: ask-answ)
+    wpAnswer:       _firstNonEmpty(meta['ask-answ'], meta.rabbi_answer, meta.answer, vals['ask-answ'], vals.rabbi_answer),
+    wpAnswerRabbi:  _firstNonEmpty(meta['ask-rabbi'], meta.rabbi_name, vals['ask-rabbi']),
     // thank-click specific
     sessionToken:   src.session_token      || src.sessionToken || null,
     thankMessage:   src.message            || meta.message     || null,
@@ -503,6 +507,87 @@ router.post('/question-updated', verifyWebhookSecret, async (req, res, next) => 
     return next(updateErr);
   }
 
+  // ── Sync answer written on WP side ────────────────────────────────────────
+  // If the WP post now carries answer content (ask-answ meta) and the question
+  // is not yet answered in our DB, insert the answer row and mark it answered.
+  if (payload.wpAnswer && local.status !== 'answered') {
+    try {
+      const sanitizedAnswer = sanitizeRichText(payload.wpAnswer);
+
+      if (sanitizedAnswer.trim()) {
+        // Use a SYSTEM_RABBI_ID placeholder when no rabbi can be identified.
+        // Falls back to a dedicated env variable or null — the answers table
+        // allows null rabbi_id for externally-sourced answers.
+        const systemRabbiId = process.env.WP_SYNC_RABBI_ID || null;
+
+        await query('BEGIN');
+        try {
+          const { rows: answerRows } = await query(
+            `INSERT INTO answers
+               (question_id, rabbi_id, content, content_versions, is_private, created_at)
+             VALUES
+               ($1, $2, $3, $4, false, NOW())
+             ON CONFLICT DO NOTHING
+             RETURNING id`,
+            [
+              local.id,
+              systemRabbiId,
+              sanitizedAnswer,
+              JSON.stringify([{
+                content: sanitizedAnswer,
+                edited_at: new Date().toISOString(),
+                version: 1,
+                source: 'wordpress_webhook',
+              }]),
+            ]
+          );
+
+          // Update question status only if the INSERT actually happened
+          if (answerRows.length > 0) {
+            await query(
+              `UPDATE questions
+               SET    status      = 'answered',
+                      answered_at = NOW(),
+                      updated_at  = NOW()
+               WHERE  id = $1`,
+              [local.id]
+            );
+            newStatus = 'answered';
+
+            await query('COMMIT');
+
+            const answerId = answerRows[0].id;
+            console.log(
+              `[wpWebhook] question-updated: synced WP answer → answers.id=${answerId} ` +
+              `questionId=${local.id} wpPostId=${payload.wpPostId}`
+            );
+
+            // Socket.io — notify admins / dashboard
+            const ioInner = req.app.get('io');
+            if (ioInner) {
+              notifyQuestionAnswered(ioInner, local.id, systemRabbiId, answerId);
+            }
+          } else {
+            await query('ROLLBACK');
+            console.log(
+              `[wpWebhook] question-updated: answer already exists for questionId=${local.id} — skipped`
+            );
+          }
+        } catch (txErr) {
+          await query('ROLLBACK');
+          throw txErr;
+        }
+      }
+    } catch (answerSyncErr) {
+      // Non-fatal — log and continue; we still ack the webhook
+      console.error(
+        `[wpWebhook] question-updated: שגיאה בסנכרון תשובה מ-WP ` +
+        `questionId=${local.id}:`,
+        answerSyncErr.message
+      );
+    }
+  }
+
   // ── Socket.io broadcast ────────────────────────────────────────────────────
   const io = req.app.get('io');
   if (io && newStatus !== local.status) {
@@ -696,6 +781,21 @@ router.post('/thank-click', verifyWebhookSecret, async (req, res, next) => {
       console.error('[wpWebhook] syncThankCount error:', err.message);
     });
   }
+
+  // ── Fire-and-forget: mark lead as has_thanked for ROI attribution ──────
+  (async () => {
+    try {
+      await query(
+        `UPDATE leads SET has_thanked = true, updated_at = NOW()
+         WHERE  asker_email_encrypted = (
+           SELECT asker_email FROM questions WHERE id = $1
+         ) AND has_thanked = false`,
+        [question.id]
+      );
+    } catch (err) {
+      console.warn('[wpWebhook] has_thanked update error:', err.message);
+    }
+  })();
 
   // ── Notify assigned rabbi via Socket.io ───────────────────────────────────
   const io = req.app.get('io');

@@ -154,14 +154,28 @@ export function AuthProvider({ children }) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Verify token on mount
+  // Verify token on mount — restores session after F5 page refresh
   useEffect(() => {
     const verifySession = async () => {
       const storedToken = localStorage.getItem(TOKEN_KEY);
+      const storedRabbi = localStorage.getItem(RABBI_KEY);
+
       if (!storedToken) {
         setLoading(false);
         setInitializing(false);
         return;
+      }
+
+      // Optimistically restore from localStorage so the UI is not blank
+      // while the network request is in flight
+      if (storedRabbi) {
+        try {
+          const parsedRabbi = JSON.parse(storedRabbi);
+          setRabbi(parsedRabbi);
+          setToken(storedToken);
+        } catch {
+          // ignore parse errors
+        }
       }
 
       try {
@@ -169,12 +183,16 @@ export function AuthProvider({ children }) {
         setRabbi(data.rabbi || data);
         setToken(storedToken);
         persistAuth(data.rabbi || data, storedToken, localStorage.getItem(REFRESH_KEY));
-      } catch {
-        // Token invalid — clear
-        persistAuth(null, null, null);
-        setRabbi(null);
-        setToken(null);
-        setRefreshToken(null);
+      } catch (err) {
+        // Only clear session on explicit 401 Unauthorized.
+        // Network errors or 5xx should keep the stored session intact.
+        if (err.response?.status === 401) {
+          persistAuth(null, null, null);
+          setRabbi(null);
+          setToken(null);
+          setRefreshToken(null);
+        }
+        // Otherwise: keep the optimistically-restored state from localStorage
       } finally {
         setLoading(false);
         setInitializing(false);

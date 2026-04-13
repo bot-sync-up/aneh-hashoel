@@ -100,8 +100,9 @@ router.post('/inbound', async (req, res) => {
       ip,
     }, ip, null);
 
-    // ─── 3. Determine action from subject ([CLAIM:X] / [RELEASE:X] / [ID: X])
-    const emailAction = extractEmailAction(subject);
+    // ─── 3. Determine action from subject + body ("תפוס"/"שחרר" keywords)
+    const cleanedBody = cleanEmailBody(bodyPlain);
+    const emailAction = extractEmailAction(subject, cleanedBody);
 
     if (!emailAction) {
       console.warn('[emailInbound] לא נמצאה פעולה בנושא:', subject);

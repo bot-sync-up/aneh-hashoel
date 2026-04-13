@@ -198,7 +198,14 @@ async function _dispatchEmail(rabbi, type, data) {
       case 'question_released': {
         const { question } = data;
         if (svc.sendQuestionNotification) {
-          await svc.sendQuestionNotification(rabbi.email, question);
+          const result = await svc.sendQuestionNotification(rabbi.email, question);
+          // Store Message-ID from the first successful send so follow-up emails can thread
+          if (type === 'question_broadcast' && result && result.messageId && question && question.id) {
+            query(
+              'UPDATE questions SET email_message_id = $1 WHERE id = $2 AND email_message_id IS NULL',
+              [result.messageId, question.id]
+            ).catch((err) => log.warn({ err, questionId: question.id }, 'Failed to store email_message_id'));
+          }
         }
         break;
       }
@@ -232,8 +239,29 @@ async function _dispatchEmail(rabbi, type, data) {
         break;
       }
 
+      case 'follow_up': {
+        if (svc.sendFollowUpNotification) {
+          // Fetch the original question's stored Message-ID for threading
+          let questionWithMsgId = data.question;
+          if (data.question && data.question.id && !data.question.email_message_id) {
+            try {
+              const { rows } = await query(
+                'SELECT email_message_id FROM questions WHERE id = $1',
+                [data.question.id]
+              );
+              if (rows[0] && rows[0].email_message_id) {
+                questionWithMsgId = { ...data.question, email_message_id: rows[0].email_message_id };
+              }
+            } catch (err) {
+              log.warn({ err, questionId: data.question.id }, 'Failed to fetch email_message_id for threading');
+            }
+          }
+          await svc.sendFollowUpNotification(rabbi.email, questionWithMsgId, data.followUpContent);
+        }
+        break;
+      }
+
       case 'answer_published':
-      case 'follow_up':
       case 'timeout_warning':
       case 'daily_digest':
       case 'emergency':

@@ -92,6 +92,7 @@ const Input = React.forwardRef(function Input(
               ? `${id}-helper`
               : undefined
           }
+          dir={type === 'email' ? 'ltr' : undefined}
           className={clsx(
             // Base
             'w-full rounded-md border font-heebo text-sm',
@@ -101,7 +102,7 @@ const Input = React.forwardRef(function Input(
             'focus:outline-none focus:ring-2',
             'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[var(--bg-muted)]',
             // Direction
-            'direction-rtl text-right',
+            type === 'email' ? 'text-left' : 'direction-rtl text-right',
             // Padding based on icons
             hasStartIcon ? 'pr-10' : 'pr-3',
             hasEndIcon ? 'pl-10' : 'pl-3',

@@ -101,12 +101,17 @@ function wpUrl() {
  * Low-level send wrapper.
  *
  * @param {object} msg   SendGrid message object
- * @returns {Promise<void>}
+ * @returns {Promise<string|null>}  SendGrid Message-ID (from x-message-id response header), or null
  */
 async function _send(msg) {
   try {
-    await sgMail.send({ ...msg, from: fromField() });
+    const [response] = await sgMail.send({ ...msg, from: fromField() });
     console.info(`[emailService] sent "${msg.subject}" → ${Array.isArray(msg.to) ? msg.to.join(', ') : msg.to}`);
+    // SendGrid returns the message ID in the x-message-id response header
+    const messageId = response && response.headers && response.headers['x-message-id']
+      ? `<${response.headers['x-message-id']}@sendgrid.net>`
+      : null;
+    return messageId;
   } catch (err) {
     const detail = err.response ? JSON.stringify(err.response.body) : err.message;
     console.error(`[emailService] SendGrid error sending "${msg.subject}": ${detail}`);
@@ -328,9 +333,12 @@ async function sendAnswerToAsker(askerEmail, question, answer, answerUrl) {
 
 /**
  * Alert the assigned rabbi that the asker sent a follow-up question.
+ * If the original question's email_message_id is provided, the email is
+ * threaded (In-Reply-To + References headers) so it appears as a reply
+ * to the original broadcast in the rabbi's email client.
  *
  * @param {{ id: string|number, email: string, name?: string }} rabbi
- * @param {{ id: string|number, title?: string, content?: string }} question
+ * @param {{ id: string|number, title?: string, content?: string, email_message_id?: string }} question
  * @param {string} followUpContent  The asker's follow-up text
  * @returns {Promise<void>}
  */
@@ -362,7 +370,17 @@ async function sendFollowUpToRabbi(rabbi, question, followUpContent) {
     { label: 'מענה על שאלת ההמשך', url: actionUrl, color: BRAND_GOLD },
   ]);
 
-  return _send({ to: rabbi.email, subject, html });
+  const msg = { to: rabbi.email, subject, html };
+
+  // Thread this email under the original question's broadcast if we have its Message-ID
+  if (question.email_message_id) {
+    msg.headers = {
+      'In-Reply-To': question.email_message_id,
+      'References':  question.email_message_id,
+    };
+  }
+
+  return _send(msg);
 }
 
 // ─── sendFollowUpAnswerToAsker ────────────────────────────────────────────────
@@ -870,7 +888,12 @@ async function sendQuestionBroadcast(question, rabbis) {
     });
   });
 
-  await Promise.allSettled(promises);
+  const results = await Promise.allSettled(promises);
+  // Return the Message-ID from the first successful send (used for email threading)
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) return r.value;
+  }
+  return null;
 }
 
 // ─── sendUrgentQuestion ───────────────────────────────────────────────────────

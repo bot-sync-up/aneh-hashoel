@@ -457,7 +457,7 @@ export default function DashboardPage() {
   }, [on]);
 
   // ── Derived values ─────────────────────────────────────────────────────
-  const firstName  = rabbi?.name?.split(' ')[0] || 'הרב';
+  const firstName  = rabbi?.name || 'הרב';
   const todayLabel = formatDate(new Date(), 'EEEE, d בMMMM yyyy');
 
   // Pending count for the alert banner

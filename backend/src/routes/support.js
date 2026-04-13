@@ -65,7 +65,7 @@ router.post('/contact', authenticate, async (req, res, next) => {
         const html = createEmailHTML(
           `פנייה חדשה מ${rabbiName}`,
           `<p><strong>נושא:</strong> ${subject.trim()}</p><p>${message.trim().replace(/\n/g, '<br>')}</p>`,
-          [{ label: 'צפה בפניות', url: `${process.env.APP_URL || 'https://aneh.syncup.co.il'}/admin/support` }]
+          [{ label: 'צפה בפניות', url: `${process.env.APP_URL || ''}/admin/support` }]
         );
 
         // Collect all admin email addresses
@@ -223,6 +223,45 @@ router.post('/:id/messages', authenticate, async (req, res, next) => {
       `SELECT name FROM rabbis WHERE id = $1`,
       [req.rabbi.id]
     );
+
+    // If admin replied — notify the rabbi via socket + email
+    if (isAdmin) {
+      const rabbiId = reqRows[0].rabbi_id;
+
+      // Socket: real-time alert to the rabbi
+      try {
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`rabbi:${rabbiId}`).emit('support:reply', {
+            requestId: id,
+            message: message.trim(),
+            senderName: rabbiRows[0]?.name || 'מנהל',
+          });
+        }
+      } catch (socketErr) {
+        console.error('[support] Failed to emit support:reply socket event:', socketErr.message);
+      }
+
+      // Email: fire-and-forget
+      setImmediate(async () => {
+        try {
+          const { sendSupportReply } = require('../services/email');
+          const { rows: targetRabbi } = await dbQuery(
+            `SELECT name, email FROM rabbis WHERE id = $1`,
+            [rabbiId]
+          );
+          if (targetRabbi[0]?.email) {
+            await sendSupportReply(
+              targetRabbi[0].email,
+              targetRabbi[0].name || 'רב',
+              message.trim()
+            );
+          }
+        } catch (emailErr) {
+          console.error('[support] Failed to send support reply email:', emailErr.message);
+        }
+      });
+    }
 
     return res.status(201).json({
       ok: true,

@@ -135,7 +135,7 @@ function Layout({ children, notificationCount = 0 }) {
           tabIndex={-1}
           id="page-main"
         >
-          <div className="min-h-full">
+          <div className="min-h-0">
             {children}
           </div>
         </main>

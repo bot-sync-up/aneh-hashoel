@@ -141,10 +141,11 @@ async function upsertLead(question) {
       has_urgent     = stats[0]?.has_urgent || false;
     }
 
-    const score  = _hotScore(question_count, total_thanks, has_urgent);
-    const is_hot = _isHot(question_count, total_thanks, has_urgent);
-    const now    = created_at || new Date().toISOString();
-    const catId  = category_id ? parseInt(category_id, 10) || null : null;
+    const score       = _hotScore(question_count, total_thanks, has_urgent);
+    const is_hot      = _isHot(question_count, total_thanks, has_urgent);
+    const has_thanked = total_thanks > 0;
+    const now         = created_at || new Date().toISOString();
+    const catId       = category_id ? parseInt(category_id, 10) || null : null;
 
     // ── Step 3: Update existing or insert new ──────────────────────────────
     if (existingLead) {
@@ -161,6 +162,7 @@ async function upsertLead(question) {
            is_hot                = $8,
            last_category_id      = COALESCE($9, last_category_id),
            last_question_at      = GREATEST(last_question_at, $10),
+           has_thanked           = (COALESCE(has_thanked, false) OR $12),
            updated_at            = NOW()
          WHERE id = $11`,
         [
@@ -175,6 +177,7 @@ async function upsertLead(question) {
           catId,
           now,
           existingLead.id,
+          has_thanked,
         ]
       );
     } else {
@@ -183,9 +186,9 @@ async function upsertLead(question) {
       const { rows: insertedRows } = await query(
         `INSERT INTO leads
            (email_hash, phone_hash, asker_name, asker_email_encrypted, asker_phone_encrypted,
-            question_count, interaction_score, is_hot, last_category_id,
+            question_count, interaction_score, is_hot, has_thanked, last_category_id,
             first_question_at, last_question_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
          RETURNING id`,
         [
           resolvedEmailHash,
@@ -196,6 +199,7 @@ async function upsertLead(question) {
           question_count || 1,
           score,
           is_hot,
+          has_thanked,
           catId,
           now,
         ]
@@ -283,9 +287,10 @@ async function syncLeadsFromQuestions() {
  * @param {number} [opts.limit=20]
  * @param {'all'|'hot'|'contacted'|'not_contacted'} [opts.filter='all']
  * @param {string} [opts.search='']
+ * @param {string} [opts.role='admin'] — caller role; 'customer_service' gets restricted data
  * @returns {Promise<{ leads: object[], total: number }>}
  */
-async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = {}) {
+async function getLeads({ page = 1, limit = 20, filter = 'all', search = '', role = 'admin' } = {}) {
   const offset = (page - 1) * limit;
   const conditions = [];
   const params     = [];
@@ -332,10 +337,13 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
     params.slice(0, params.length - 2) // exclude limit/offset
   );
 
+  const isCS = role === 'customer_service';
+
   // Decrypt contact info for authorised consumer
+  // CS agents only get phone (for calling), not email — privacy per spec
   const leads = rows.map((row) => ({
     ...row,
-    email: decryptField(row.asker_email_encrypted) || null,
+    email: isCS ? undefined : (decryptField(row.asker_email_encrypted) || null),
     phone: decryptField(row.asker_phone_encrypted) || null,
     // Remove encrypted fields from response
     asker_email_encrypted: undefined,
@@ -416,6 +424,18 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
       lead.has_urgent = lead.questions.some(
         (q) => q.urgency === 'urgent' || q.urgency === 'critical' || q.urgency === 'high'
       );
+
+      // CS agents only see question metadata (status, urgency, date), not titles/content
+      if (isCS) {
+        lead.questions = lead.questions.map((q) => ({
+          id:         q.id,
+          status:     q.status,
+          urgency:    q.urgency,
+          created_at: q.created_at,
+          answered_at: q.answered_at,
+          // title and content stripped for privacy
+        }));
+      }
     }
   }
 
@@ -424,7 +444,9 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '' } = 
 
 // ─── getLeadById ──────────────────────────────────────────────────────────────
 
-async function getLeadById(id) {
+async function getLeadById(id, role = 'admin') {
+  const isCS = role === 'customer_service';
+
   const { rows } = await query(
     `SELECT l.*, c.name AS last_category_name
      FROM   leads l
@@ -437,7 +459,7 @@ async function getLeadById(id) {
 
   const lead = {
     ...rows[0],
-    email: decryptField(rows[0].asker_email_encrypted) || null,
+    email: isCS ? undefined : (decryptField(rows[0].asker_email_encrypted) || null),
     phone: decryptField(rows[0].asker_phone_encrypted) || null,
     asker_email_encrypted: undefined,
     asker_phone_encrypted: undefined,
@@ -446,7 +468,6 @@ async function getLeadById(id) {
   };
 
   // Fetch question history for this lead
-  // The questions table uses `asker_email` column for encrypted email
   const { rows: questions } = await query(
     `SELECT id, title, status, category_id, thank_count, urgency, created_at, answered_at
      FROM   questions
@@ -456,7 +477,17 @@ async function getLeadById(id) {
     [rows[0].asker_email_encrypted]
   );
 
-  lead.questions = questions;
+  // CS agents only see question metadata, not titles/content
+  lead.questions = isCS
+    ? questions.map((q) => ({
+        id:         q.id,
+        status:     q.status,
+        urgency:    q.urgency,
+        created_at: q.created_at,
+        answered_at: q.answered_at,
+      }))
+    : questions;
+
   return lead;
 }
 

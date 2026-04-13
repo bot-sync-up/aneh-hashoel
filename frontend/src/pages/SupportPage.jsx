@@ -12,6 +12,8 @@ import PageHeader from '../components/layout/PageHeader';
 import Button from '../components/ui/Button';
 import { get, post } from '../lib/api';
 import { formatDate } from '../lib/utils';
+import { useSocket } from '../contexts/SocketContext';
+import { showToast } from '../components/common/Toast';
 
 // ── Conversation view ─────────────────────────────────────────────────────
 
@@ -164,6 +166,8 @@ export default function SupportPage() {
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [activeRequest, setActiveRequest] = useState(null);
 
+  const { on } = useSocket();
+
   const fetchMyRequests = useCallback(async () => {
     try {
       const data = await get('/support/my');
@@ -173,6 +177,16 @@ export default function SupportPage() {
   }, []);
 
   useEffect(() => { fetchMyRequests(); }, [fetchMyRequests]);
+
+  // ── Real-time: admin replied to a support request ─────────────────────────
+  useEffect(() => {
+    const unsub = on('support:reply', (payload) => {
+      showToast.info('קיבלת תשובה מההנהלה לפנייתך');
+      // Refresh the requests list so message_count updates
+      fetchMyRequests();
+    });
+    return unsub;
+  }, [on, fetchMyRequests]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -38,14 +38,40 @@ api.interceptors.request.use(
 
 // ── Response interceptor ───────────────────────────────────────────────────
 // Normalises error shapes and handles network errors gracefully.
+// Retries up to MAX_RETRIES times on 500 server errors to prevent infinite loops.
+const MAX_RETRIES = 3;
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+
     if (error.code === 'ECONNABORTED') {
       error.message = 'הבקשה ארכה יותר מדי זמן. אנא נסה שוב.';
     } else if (!error.response) {
       error.message = 'לא ניתן להתחבר לשרת. בדוק את החיבור לאינטרנט.';
     }
+
+    // Retry on 500 errors, up to MAX_RETRIES attempts
+    if (
+      error.response?.status === 500 &&
+      config &&
+      !config._retryCount
+    ) {
+      config._retryCount = 0;
+    }
+
+    if (
+      error.response?.status === 500 &&
+      config &&
+      config._retryCount < MAX_RETRIES
+    ) {
+      config._retryCount += 1;
+      // Brief delay before retry (300ms * attempt number)
+      await new Promise((resolve) => setTimeout(resolve, 300 * config._retryCount));
+      return api(config);
+    }
+
     return Promise.reject(error);
   }
 );

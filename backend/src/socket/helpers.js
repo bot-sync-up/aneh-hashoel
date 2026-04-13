@@ -73,6 +73,21 @@ function emitToAdmins(io, event, data) {
 }
 
 /**
+ * Emit an event to the customer-service agents room.
+ *
+ * @param {import('socket.io').Server} io    - Socket.io server instance
+ * @param {string}                     event - Event name
+ * @param {*}                          data  - Payload
+ */
+function emitToCSAgents(io, event, data) {
+  try {
+    io.to('cs-agents').emit(event, data);
+  } catch (err) {
+    console.error('[socket:helpers] emitToCSAgents failed:', err.message);
+  }
+}
+
+/**
  * Emit an event to all members of a specific discussion room.
  *
  * @param {import('socket.io').Server} io           - Socket.io server instance
@@ -154,6 +169,7 @@ module.exports = {
   emitToRabbi,
   emitToAll,
   emitToAdmins,
+  emitToCSAgents,
   emitToDiscussion,
   getOnlineRabbiIds,
   isRabbiOnline,

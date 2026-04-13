@@ -390,18 +390,21 @@ async function validateSender(email, questionId) {
 // ─── extractEmailAction ────────────────────────────────────────────────────────
 
 /**
- * Determine the action type from an inbound email subject line.
+ * Determine the action type from an inbound email subject line and optional body.
  *
  * Priority:
  *   1. [CLAIM:XX]          → rabbi wants to claim question XX
  *   2. [RELEASE:XX]        → rabbi wants to release question XX
  *   3. [FOLLOWUP:XX:YY]    → rabbi is answering follow-up YY on question XX
- *   4. [ID: XX]            → rabbi is answering question XX
+ *   4. [ID: XX] + body "תפוס"  → claim (reply to notification email)
+ *   5. [ID: XX] + body "שחרר"  → release (reply to full-question email)
+ *   6. [ID: XX]            → rabbi is answering question XX
  *
  * @param {string} subject
+ * @param {string} [body]  Cleaned plain-text body (optional)
  * @returns {{ action: 'claim'|'release'|'answer'|'followup_answer', questionId: number, followUpId?: number } | null}
  */
-function extractEmailAction(subject) {
+function extractEmailAction(subject, body) {
   if (!subject || typeof subject !== 'string') return null;
 
   const claimMatch = subject.match(CLAIM_PATTERN);
@@ -426,7 +429,15 @@ function extractEmailAction(subject) {
   }
 
   const answerId = extractQuestionId(subject);
-  if (answerId) return { action: 'answer', questionId: answerId };
+  if (answerId) {
+    // Check body for Hebrew command words before treating as an answer
+    if (body && typeof body === 'string') {
+      const trimmed = body.trim();
+      if (trimmed === 'תפוס') return { action: 'claim',   questionId: answerId };
+      if (trimmed === 'שחרר') return { action: 'release', questionId: answerId };
+    }
+    return { action: 'answer', questionId: answerId };
+  }
 
   return null;
 }

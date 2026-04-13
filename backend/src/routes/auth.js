@@ -108,7 +108,7 @@ passport.deserializeUser((user, done) => done(null, user));
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function _frontendUrl() {
-  return (process.env.FRONTEND_URL || process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '');
+  return (process.env.FRONTEND_URL || process.env.APP_URL || '').replace(/\/$/, '');
 }
 
 /**

@@ -971,6 +971,7 @@ async function getROIStats() {
     topCategoriesResult,
     avgResponseResult,
     conversionResult,
+    thankDonateResult,
   ] = await Promise.all([
     // Total thanks (all time)
     query(`
@@ -1049,11 +1050,34 @@ async function getROIStats() {
       LEFT JOIN donor_hashes dh ON dh.email_hash = l.email_hash
       WHERE  l.email_hash IS NOT NULL
     `),
+
+    // Thank → Donation attribution: leads who clicked "thank rabbi" AND also donated.
+    // Uses has_thanked flag (set by leadsService.upsertLead when total_thanks > 0).
+    query(`
+      WITH donor_hashes AS (
+        SELECT DISTINCT encode(digest(lower(trim(donor_email)), 'sha256'), 'hex') AS email_hash
+        FROM   donations
+        WHERE  donor_email IS NOT NULL
+          AND  trim(donor_email) != ''
+          AND  status = 'completed'
+      )
+      SELECT
+        COUNT(DISTINCT l.id)::int AS thankers_total,
+        COUNT(DISTINCT CASE WHEN dh.email_hash IS NOT NULL THEN l.id END)::int AS thankers_who_donated
+      FROM   leads l
+      LEFT JOIN donor_hashes dh ON dh.email_hash = l.email_hash
+      WHERE  l.has_thanked = true
+        AND  l.email_hash IS NOT NULL
+    `),
   ]);
 
   const convRow       = conversionResult.rows[0];
   const totalAskers   = convRow.total_askers;
   const askersDonated = convRow.askers_who_donated;
+
+  const thankRow          = thankDonateResult.rows[0];
+  const thankersTotal     = thankRow.thankers_total;
+  const thankersWhoDonated = thankRow.thankers_who_donated;
 
   return {
     total_thanks:              thanksResult.rows[0].total_thanks,
@@ -1070,6 +1094,12 @@ async function getROIStats() {
     total_askers_who_donated:  askersDonated,
     conversion_rate:           totalAskers > 0
       ? parseFloat((askersDonated / totalAskers * 100).toFixed(2))
+      : 0,
+    // Thank → Donation attribution
+    thankers_total:            thankersTotal,
+    thankers_who_donated:      thankersWhoDonated,
+    thank_to_donate_rate:      thankersTotal > 0
+      ? parseFloat((thankersWhoDonated / thankersTotal * 100).toFixed(2))
       : 0,
   };
 }

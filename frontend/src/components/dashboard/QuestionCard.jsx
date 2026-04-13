@@ -7,6 +7,11 @@ import Button from '../ui/Button';
 import CountdownTimer from './CountdownTimer';
 import { truncate, formatRelative, formatDateTime, getCategoryLabel, colorFromCategory } from '../../lib/utils';
 
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+}
+
 /**
  * QuestionCard — mini card for dashboard question lists.
  *
@@ -31,6 +36,7 @@ export default function QuestionCard({
     _id,
     id,
     title,
+    content,
     category,
     status,
     createdAt,
@@ -120,6 +126,13 @@ export default function QuestionCard({
         >
           {titleTruncated}
         </button>
+
+        {/* Content preview (pending mode) */}
+        {mode === 'pending' && content && (
+          <p className="text-xs text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-3">
+            {truncate(stripHtml(content), 200)}
+          </p>
+        )}
 
         {/* Asker (if available) */}
         {askerName && (

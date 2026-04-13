@@ -35,9 +35,12 @@ router.get('/:questionId', async (req, res) => {
   let question;
   try {
     const { rows } = await dbQuery(
-      `SELECT id, wp_post_id, wp_link, asker_email_encrypted, notified_asker, updated_at
-       FROM   questions
-       WHERE  id = $1
+      `SELECT q.id, q.wp_post_id, q.wp_link, q.asker_email_encrypted,
+              q.notified_asker, q.updated_at, q.category_id,
+              COALESCE(c.name, 'כללי') AS category_name
+       FROM   questions q
+       LEFT JOIN categories c ON c.id = q.category_id
+       WHERE  q.id = $1
        LIMIT  1`,
       [questionId]
     );
@@ -142,6 +145,24 @@ router.get('/:questionId', async (req, res) => {
           } catch (socketErr) {
             console.error('[track] Socket emit error:', socketErr.message);
           }
+        }
+
+        // ── Emit click event to CS agents for real-time telemarketing ──
+        try {
+          const { getIO } = require('../socket/handlers');
+          const io = getIO();
+          if (io) {
+            io.to('cs-agents').emit('lead:click', {
+              leadId:    lead.id,
+              name:      lead.asker_name || null,
+              questionId,
+              category:  question.category_name || null,
+              clickCount: lead.click_count,
+              clickedAt: now.toISOString(),
+            });
+          }
+        } catch (socketErr) {
+          console.error('[track] CS socket emit error:', socketErr.message);
         }
 
         // ── Fire-and-forget: mark hot in Google Sheets ──────────────────

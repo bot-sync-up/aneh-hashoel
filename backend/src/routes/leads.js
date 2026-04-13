@@ -40,7 +40,7 @@ router.get('/', async (req, res, next) => {
       ? req.query.filter : 'all';
     const search = req.query.search || '';
 
-    const result = await getLeads({ page, limit, filter, search });
+    const result = await getLeads({ page, limit, filter, search, role: req.rabbi.role });
     return res.json(result);
   } catch (err) {
     return next(err);
@@ -51,12 +51,18 @@ router.get('/', async (req, res, next) => {
 
 router.get('/export', async (req, res, next) => {
   try {
+    const role = req.rabbi.role;
+    const isCS = role === 'customer_service';
+
     // Fetch all leads (no pagination)
-    const result = await getLeads({ page: 1, limit: 10000, filter: 'all', search: '' });
+    const result = await getLeads({ page: 1, limit: 10000, filter: 'all', search: '', role });
     const leads = result.leads || [];
 
     // Build CSV manually — no external dependency needed
-    const headers = ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'דחוף', 'טופל', 'תאריך יצירה', 'שאלה אחרונה', 'הערות'];
+    // CS agents get restricted columns (no email, no question content)
+    const headers = isCS
+      ? ['שם', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'טופל', 'תאריך יצירה', 'הערות']
+      : ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'דחוף', 'טופל', 'תאריך יצירה', 'שאלה אחרונה', 'הערות'];
 
     function escapeCsvField(val) {
       const str = String(val ?? '');
@@ -66,19 +72,30 @@ router.get('/export', async (req, res, next) => {
       return str;
     }
 
-    const rows = leads.map((l) => [
-      l.asker_name || '',
-      l.email || '',
-      l.phone || '',
-      l.question_count || 0,
-      l.last_category_name || '',
-      l.is_hot ? 'כן' : 'לא',
-      l.has_urgent ? 'כן' : 'לא',
-      l.contacted ? 'כן' : 'לא',
-      l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
-      l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
-      l.contact_notes || '',
-    ].map(escapeCsvField).join(','));
+    const rows = leads.map((l) => isCS
+      ? [
+          l.asker_name || '',
+          l.phone || '',
+          l.question_count || 0,
+          l.last_category_name || '',
+          l.is_hot ? 'כן' : 'לא',
+          l.contacted ? 'כן' : 'לא',
+          l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
+          l.contact_notes || '',
+        ].map(escapeCsvField).join(',')
+      : [
+          l.asker_name || '',
+          l.email || '',
+          l.phone || '',
+          l.question_count || 0,
+          l.last_category_name || '',
+          l.is_hot ? 'כן' : 'לא',
+          l.has_urgent ? 'כן' : 'לא',
+          l.contacted ? 'כן' : 'לא',
+          l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
+          l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
+          l.contact_notes || '',
+        ].map(escapeCsvField).join(','));
 
     // UTF-8 BOM for Excel compatibility
     const BOM = '\uFEFF';
@@ -115,7 +132,7 @@ router.post('/sync', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const lead = await getLeadById(req.params.id);
+    const lead = await getLeadById(req.params.id, req.rabbi.role);
     if (!lead) {
       return res.status(404).json({ error: 'ליד לא נמצא' });
     }

@@ -110,23 +110,25 @@ function AnswerCard({ question, currentRabbiId }) {
 
       {/* Answer snippet */}
       {answer_is_private && !isMyAnswer ? (
-        <p className="text-sm text-[var(--text-muted)] font-heebo italic mb-3">
+        <p className="text-sm text-[var(--text-muted)] font-heebo italic mb-1">
           תשובה פרטית — גלויה לרב שענה בלבד.
         </p>
       ) : answer ? (
-        <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-2 mb-3"
+        <p className="text-sm text-[var(--text-secondary)] font-heebo leading-relaxed line-clamp-2 mb-1"
           dangerouslySetInnerHTML={{ __html: answer }}
         />
       ) : null}
 
+      {/* Rabbi attribution below answer */}
+      {rabbiName && (
+        <p className="text-xs text-emerald-700 dark:text-emerald-400 font-heebo mb-3 flex items-center gap-1">
+          <User size={11} />
+          הרב {rabbiName}
+        </p>
+      )}
+
       {/* Footer */}
       <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] font-heebo mt-3 pt-3 border-t border-[var(--border-default)] flex-wrap">
-        {rabbiName && (
-          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
-            <User size={11} />
-            הרב {rabbiName}
-          </span>
-        )}
         <span className="flex items-center gap-1">
           <Eye size={11} />
           {view_count} צפיות
@@ -232,11 +234,11 @@ export default function AnswersPage() {
   return (
     <div className="page-enter" dir="rtl">
       <PageHeader
-        title="תשובות"
+        title="שאלות שנענו"
         subtitle={
           total > 0
-            ? `${total.toLocaleString('he-IL')} תשובות פורסמו`
-            : 'כל השאלות שנענו'
+            ? `${total.toLocaleString('he-IL')} שאלות נענו`
+            : 'כל השאלות שנענו על ידי הרבנים'
         }
         actions={
           <Button
@@ -252,7 +254,7 @@ export default function AnswersPage() {
       />
 
       <div className="p-6 space-y-5">
-        {loading && <BlockSpinner label="טוען תשובות..." />}
+        {loading && <BlockSpinner label="טוען שאלות שנענו..." />}
 
         {!loading && error && (
           <div className="text-center py-12">
@@ -267,10 +269,10 @@ export default function AnswersPage() {
               <Inbox size={28} className="text-[var(--text-muted)]" />
             </div>
             <h3 className="text-lg font-semibold text-[var(--text-primary)] font-heebo mb-2">
-              אין תשובות עדיין
+              אין שאלות שנענו עדיין
             </h3>
             <p className="text-sm text-[var(--text-muted)] font-heebo">
-              תשובות לשאלות יופיעו כאן לאחר שיפורסמו
+              שאלות שנענו על ידי הרבנים יופיעו כאן לאחר פרסומן
             </p>
           </div>
         )}
@@ -297,7 +299,7 @@ export default function AnswersPage() {
 
         {!hasMore && answers.length > 0 && !loadingMore && (
           <p className="text-center text-sm text-[var(--text-muted)] font-heebo py-4">
-            הגעת לסוף הרשימה · {answers.length} תשובות
+            הגעת לסוף הרשימה · {answers.length} שאלות שנענו
           </p>
         )}
       </div>

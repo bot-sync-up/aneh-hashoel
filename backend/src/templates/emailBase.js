@@ -142,7 +142,7 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
             ">
               <div style="display:inline-block; background:#ffffff; border-radius:10px; padding:8px 16px; margin-bottom:10px;">
                 <img
-                  src="${(process.env.APP_URL || 'https://aneh.syncup.co.il').replace(/\/$/, '')}/logo.png"
+                  src="${(process.env.APP_URL || '').replace(/\/$/, '')}/logo.png"
                   alt="ענה את השואל"
                   width="110"
                   style="display:block; max-width:110px; height:auto;"

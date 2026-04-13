@@ -94,6 +94,11 @@ function onConnection(io, socket) {
 
   if (role === 'admin') {
     socket.join('admins');
+    socket.join('cs-agents'); // admins also see CS events
+  }
+
+  if (role === 'customer_service') {
+    socket.join('cs-agents');
   }
 
   // ── Notify admins of new connection ──────────────────────────────────────

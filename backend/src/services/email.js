@@ -217,6 +217,10 @@ async function sendEmail(to, subject, htmlContent, options = {}) {
       mailOptions.replyTo = options.replyTo;
     }
 
+    if (options.headers) {
+      mailOptions.headers = options.headers;
+    }
+
     const result = await getTransporter().sendMail(mailOptions);
 
     log.info({ to, subject }, 'Email sent');
@@ -230,8 +234,8 @@ async function sendEmail(to, subject, htmlContent, options = {}) {
 // ─── sendQuestionNotification ────────────────────────────────────────────────
 
 /**
- * שליחת התראה על שאלה חדשה לרב — כותרת + כפתור "קבל שאלה" כ-mailto.
- * לחיצה על "קבל שאלה" פותחת לקוח מייל עם subject=[CLAIM:ID] מוכן לשליחה.
+ * שליחת התראה על שאלה חדשה לרב — כותרת + כפתור מעבר למערכת.
+ * לתפיסת השאלה — הרב משיב למייל עם המילה "תפוס" בלבד.
  *
  * @param {string} rabbiEmail  אימייל הרב
  * @param {object} question    אובייקט השאלה
@@ -248,11 +252,7 @@ async function sendQuestionNotification(rabbiEmail, question) {
     id:          question.id,
   };
 
-  const claimSubject = resolveTemplate(templates.rabbi_claim_subject, vars);
-  const claimUrl = mailtoLink(
-    claimSubject,
-    'שלח מייל זה כדי לקבל את השאלה לטיפולך'
-  );
+  const questionUrl = `${appUrl()}/questions/${question.id}`;
 
   const bodyText = resolveTemplate(templates.rabbi_new_question_body, vars);
   const bodyContent = `
@@ -274,20 +274,93 @@ async function sendQuestionNotification(rabbiEmail, question) {
     </div>
 
     <p style="margin: 0 0 4px; font-size: 13px; color: #555;">
-      לחץ על "קבל שאלה" — ייפתח לקוח המייל שלך עם הנושא מוכן, פשוט לחץ שלח.
+      לחץ על "צפה בשאלה" כדי להיכנס למערכת ולראות את השאלה המלאה.
     </p>
     <p style="margin: 0 0 16px; font-size: 13px; color: #888;">
-      השאלה תוקצה לרב הראשון ששולח.
+      השאלה תוקצה לרב הראשון שיתפוס אותה.
     </p>
+
+    <div style="
+      background-color: #fffbf0;
+      border: 1px solid #e8d88a;
+      border-right: 4px solid ${BRAND_GOLD};
+      padding: 14px 18px;
+      margin: 20px 0 0;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #444;
+      line-height: 1.8;
+    ">
+      <p style="margin: 0 0 8px; font-weight: bold; color: ${BRAND_NAVY};">הנחיות לתגובה מהמייל:</p>
+      <p style="margin: 0 0 4px;">• לתפיסת השאלה — השב למייל זה עם המילה: <strong>תפוס</strong></p>
+      <p style="margin: 0; color: #cc4444; font-size: 12px;">
+        ⚠ כל תוכן אחר חוץ מ"תפוס" ייחשב כתשובה לשאלה ויפורסם מיידית.
+      </p>
+    </div>
   `;
 
   const html = createEmailHTML('שאלה חדשה ממתינה', bodyContent, [
-    { label: 'קבל שאלה', url: claimUrl, color: BRAND_GOLD },
+    { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
   ]);
 
   const subject = `${isUrgent ? '[דחוף] ' : ''}${resolveTemplate(templates.rabbi_new_question_subject, vars)}`;
 
-  return sendEmail(rabbiEmail, subject, html);
+  return sendEmail(rabbiEmail, subject, html, { replyTo: inboundEmail() });
+}
+
+// ─── sendFollowUpNotification ─────────────────────────────────────────────────
+
+/**
+ * שליחת התראה לרב על שאלת המשך מהשואל.
+ * אם השאלה המקורית נשמרה עם email_message_id, האימייל נשלח עם כותרות
+ * In-Reply-To ו-References כדי לקשר אותו לשרשור הקיים בתוכנת המייל.
+ *
+ * @param {string} rabbiEmail  אימייל הרב
+ * @param {object} question    אובייקט השאלה (כולל id, title, email_message_id)
+ * @param {string} followUpContent  תוכן שאלת ההמשך
+ */
+async function sendFollowUpNotification(rabbiEmail, question, followUpContent) {
+  const questionUrl = `${appUrl()}/questions/${question.id}`;
+  const subject     = `[ID: ${question.id}] שאלת המשך — ${question.title || 'שאלה'}`;
+
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">השואל הוסיף שאלת המשך לשאלה שטיפלת בה:</p>
+
+    <div style="
+      background-color: #f8f8fb;
+      border-right: 4px solid ${BRAND_GOLD};
+      padding: 16px 20px;
+      margin: 16px 0;
+      border-radius: 4px;
+    ">
+      <p style="margin: 0 0 8px; font-weight: bold; font-size: 15px; color: ${BRAND_NAVY};">
+        ${question.title || 'שאלה'}
+        <span style="font-weight: normal; color: #888; font-size: 13px; margin-right: 8px;">[ID: ${question.id}]</span>
+      </p>
+      <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.7;">${followUpContent || ''}</p>
+    </div>
+
+    <p style="margin: 12px 0 4px; font-size: 13px; color: #888;">
+      ניתן להשיב ישירות למייל זה — הכותרת כבר מכילה את [ID: ${question.id}].
+    </p>
+  `;
+
+  const html = createEmailHTML('שאלת המשך מהשואל', bodyContent, [
+    { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
+  ]);
+
+  const options = { replyTo: inboundEmail() };
+
+  // Thread this email under the original broadcast if we have its Message-ID
+  if (question.email_message_id) {
+    options.headers = {
+      'In-Reply-To': question.email_message_id,
+      'References':  question.email_message_id,
+    };
+  }
+
+  return sendEmail(rabbiEmail, subject, html, options);
 }
 
 // ─── sendFullQuestion ────────────────────────────────────────────────────────
@@ -295,14 +368,14 @@ async function sendQuestionNotification(rabbiEmail, question) {
 /**
  * שליחת תוכן שאלה מלא לרב — לאחר שהשאלה נתפסה.
  *
- * כל הכפתורים הם mailto: links — ללא תלות באתר.
- *   "ענה"       → reply-to כבר מוגדר, כפתור פותח compose עם [ID:X] בנושא
- *   "שחרר"      → compose עם [RELEASE:X] בנושא
+ * כפתור "ענה על השאלה" מפנה למערכת.
+ * לשחרור — הרב משיב למייל עם המילה "שחרר" בלבד.
  *
  * @param {string} rabbiEmail  אימייל הרב
  * @param {object} question    אובייקט השאלה
  */
 async function sendFullQuestion(rabbiEmail, question) {
+  const { query } = require('../db/pool');
   const templates  = await getEmailTemplates();
   const systemName = templates.rabbi_system_name;
   const vars = {
@@ -312,10 +385,15 @@ async function sendFullQuestion(rabbiEmail, question) {
     name:        question.asker_name || '',
   };
 
-  const subject    = resolveTemplate(templates.rabbi_full_question_subject, vars);
-  const answerUrl  = mailtoLink(subject, '');   // reply keeps same subject → [ID:X] parsed
-  const releaseSubject = resolveTemplate(templates.rabbi_release_subject, vars);
-  const releaseUrl = mailtoLink(releaseSubject, '');
+  // Fetch auto-release timeout from sla_config
+  let timeoutHours = 4;
+  try {
+    const slaRes = await query('SELECT hours_to_timeout FROM sla_config WHERE id = 1');
+    if (slaRes.rows[0]) timeoutHours = slaRes.rows[0].hours_to_timeout;
+  } catch (_) { /* use default */ }
+
+  const subject     = resolveTemplate(templates.rabbi_full_question_subject, vars);
+  const questionUrl = `${appUrl()}/questions/${question.id}`;
 
   const bodyText = resolveTemplate(templates.rabbi_full_question_body, vars);
   const bodyContent = `
@@ -337,14 +415,29 @@ async function sendFullQuestion(rabbiEmail, question) {
       ${question.asker_name ? `<p style="margin: 12px 0 0; color: #888; font-size: 13px;">שואל/ת: ${question.asker_name}</p>` : ''}
     </div>
 
-    <p style="margin: 0 0 16px; font-size: 14px; color: #444; font-weight: 500;">
-      <strong>להשיב:</strong> לחץ על "ענה על השאלה" — ייפתח מייל עם הנושא הנכון, כתוב את תשובתך ושלח.
-    </p>
+    <div style="
+      background-color: #fffbf0;
+      border: 1px solid #e8d88a;
+      border-right: 4px solid ${BRAND_GOLD};
+      padding: 14px 18px;
+      margin: 20px 0 0;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #444;
+      line-height: 1.9;
+    ">
+      <p style="margin: 0 0 8px; font-weight: bold; color: ${BRAND_NAVY};">הנחיות לתגובה מהמייל:</p>
+      <p style="margin: 0 0 4px;">• לענות — כתוב את תשובתך בגוף המייל החוזר ושלח</p>
+      <p style="margin: 0 0 4px;">• לשחרר את השאלה — השב עם המילה: <strong>שחרר</strong></p>
+      <p style="margin: 0 0 4px; color: #888;">• השאלה תשתחרר אוטומטית לאחר <strong>${timeoutHours} שעות</strong> אם לא תענה</p>
+      <p style="margin: 8px 0 0; color: #cc4444; font-size: 12px;">
+        ⚠ כל תוכן אחר חוץ מ"שחרר" ייחשב כתשובה ויפורסם מיידית.
+      </p>
+    </div>
   `;
 
   const html = createEmailHTML('שאלה לטיפולך', bodyContent, [
-    { label: 'ענה על השאלה', url: answerUrl,  color: BRAND_GOLD },
-    { label: 'שחרר שאלה',   url: releaseUrl, color: '#cc4444'  },
+    { label: 'ענה על השאלה', url: questionUrl, color: BRAND_GOLD },
   ]);
 
   // Reply-To → inbound parser catches replies automatically
@@ -696,6 +789,51 @@ async function sendNewDeviceAlert(email, deviceInfo) {
   return sendEmail(email, `התחברות ממכשיר חדש — ${systemName}`, html);
 }
 
+// ─── sendSupportReply ─────────────────────────────────────────────────────────
+
+/**
+ * שליחת אימייל לרב כאשר ההנהלה מגיבה לפנייתו.
+ *
+ * @param {string} rabbiEmail   אימייל הרב
+ * @param {string} rabbiName    שם הרב
+ * @param {string} replyContent תוכן תשובת ההנהלה
+ */
+async function sendSupportReply(rabbiEmail, rabbiName, replyContent) {
+  const templates  = await getEmailTemplates();
+  const systemName = templates.rabbi_system_name;
+
+  const bodyContent = `
+    <p style="margin: 0 0 12px; font-size: 15px;">כבוד הרב ${rabbiName},</p>
+    <p style="margin: 0 0 16px; font-size: 15px;">
+      ההנהלה השיבה לפנייתך במערכת.
+    </p>
+
+    <div style="
+      background-color: #f7f5f0;
+      border-right: 4px solid #C9A84C;
+      padding: 16px 20px;
+      margin: 16px 0;
+      border-radius: 4px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #333;
+      white-space: pre-wrap;
+    ">${replyContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+
+    <p style="margin: 16px 0 0; font-size: 14px; color: #666;">
+      להצגת השיחה המלאה היכנס למערכת ועבור לדף "פנייה לניהול".
+    </p>
+  `;
+
+  const html = createEmailHTML(
+    `תשובה מההנהלה`,
+    bodyContent,
+    [{ label: 'צפה בפנייה', url: `${appUrl()}/support` }]
+  );
+
+  return sendEmail(rabbiEmail, `תשובה מההנהלה — ${systemName}`, html);
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -710,6 +848,8 @@ module.exports = {
   sendWeeklyReport,
   sendPasswordReset,
   sendNewDeviceAlert,
+  sendSupportReply,
+  sendFollowUpNotification,
   // Template utilities
   getEmailTemplates,
   resolveTemplate,

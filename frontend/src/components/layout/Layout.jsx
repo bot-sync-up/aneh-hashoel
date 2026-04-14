@@ -20,7 +20,7 @@ function Layout({ children, notificationCount = 0 }) {
   return (
     <div
       className={clsx(
-        'min-h-screen flex',
+        'h-screen flex overflow-hidden',
         'bg-[var(--bg-page)]',
         'font-heebo'
       )}

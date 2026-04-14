@@ -5,7 +5,7 @@ import { MessageSquarePlus, Eye, ChevronLeft, Paperclip } from 'lucide-react';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import CountdownTimer from './CountdownTimer';
-import { truncate, formatRelative, formatDateTime, getCategoryLabel, colorFromCategory } from '../../lib/utils';
+import { truncate, formatRelative, formatDateTime, getCategoryLabel, colorFromCategory, decodeHTML } from '../../lib/utils';
 
 function stripHtml(html) {
   if (!html) return '';
@@ -52,7 +52,7 @@ export default function QuestionCard({
   const hasAttachment = !!(attachment_url || attachmentUrl);
 
   const questionId = _id || id;
-  const titleTruncated = truncate(title || 'שאלה ללא כותרת', 80);
+  const titleTruncated = truncate(decodeHTML(title) || 'שאלה ללא כותרת', 80);
   const categoryLabel   = getCategoryLabel(category);
   const categoryColor   = colorFromCategory(category);
   const dateSource      = createdAt || created_at;

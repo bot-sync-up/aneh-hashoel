@@ -2,6 +2,24 @@ import { clsx } from 'clsx';
 import { format, isValid, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
+// ── HTML entity decoding ───────────────────────────────────────────────────
+
+/**
+ * Decode HTML entities like &quot; &amp; &lt; etc. to their text equivalents.
+ * Uses the browser's built-in HTML parser for correctness.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+let _textarea;
+export function decodeHTML(html) {
+  if (!html || typeof html !== 'string') return html || '';
+  if (!html.includes('&')) return html; // fast path
+  if (!_textarea) _textarea = document.createElement('textarea');
+  _textarea.innerHTML = html;
+  return _textarea.value;
+}
+
 // ── cn — classnames merge ──────────────────────────────────────────────────
 
 /**

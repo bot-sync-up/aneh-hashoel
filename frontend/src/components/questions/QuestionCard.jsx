@@ -17,7 +17,7 @@ import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { formatRelative, getCategoryLabel, colorFromCategory, truncate } from '../../lib/utils';
+import { formatRelative, getCategoryLabel, colorFromCategory, truncate, decodeHTML } from '../../lib/utils';
 
 /**
  * QuestionCard — displays a question summary with contextual action buttons.
@@ -91,7 +91,7 @@ function QuestionCard({
   const isAnswered = status === 'answered';
   const isInProcessByOther = isInProcess && !isMe;
 
-  const truncatedTitle = truncate(title || '', 80);
+  const truncatedTitle = truncate(decodeHTML(title) || '', 80);
 
   const handleCardClick = (e) => {
     // Don't navigate when clicking buttons

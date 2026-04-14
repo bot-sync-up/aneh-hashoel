@@ -647,28 +647,30 @@ export default function DashboardPage() {
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(showAllPending ? pendingQ : pendingQ.slice(0, 10)).map((q) => (
-                <QuestionCard
-                  key={q._id || q.id}
-                  question={q}
-                  mode="pending"
-                  onClaim={handleClaim}
-                  claimLoading={claimingId === (q._id || q.id)}
-                />
-              ))}
-            </div>
-            {!showAllPending && pendingQ.length > 10 && (
-              <div className="text-center mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAllPending(true)}
-                >
-                  {`הצג את כל השאלות (${pendingQ.length})`}
-                </Button>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(showAllPending ? pendingQ : pendingQ.slice(0, 10)).map((q) => (
+                  <QuestionCard
+                    key={q._id || q.id}
+                    question={q}
+                    mode="pending"
+                    onClaim={handleClaim}
+                    claimLoading={claimingId === (q._id || q.id)}
+                  />
+                ))}
               </div>
-            )}
+              {!showAllPending && pendingQ.length > 10 && (
+                <div className="text-center mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllPending(true)}
+                  >
+                    {`הצג את כל השאלות (${pendingQ.length})`}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </section>
 

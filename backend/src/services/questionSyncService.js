@@ -280,6 +280,7 @@ async function syncAnswersToWP(options = {}) {
        WHERE  q.status      = 'answered'
          AND  q.wp_synced_at IS NULL
          AND  q.wp_post_id  IS NOT NULL
+         AND  (a.is_private IS NULL OR a.is_private = false)
        ORDER BY q.answered_at ASC
        LIMIT  $1`,
       [batchLimit]

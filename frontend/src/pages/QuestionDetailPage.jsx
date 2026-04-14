@@ -265,6 +265,7 @@ export default function QuestionDetailPage() {
     attachment_url,
     question_number,
     answer_id,
+    asker_name,
   } = question;
 
   const isMyAnswer = rabbi && answer_rabbi_id && String(answer_rabbi_id) === String(rabbi?.id);
@@ -467,6 +468,13 @@ export default function QuestionDetailPage() {
             )}
             <Badge status={status} withDot className="mr-auto" />
           </div>
+
+          {/* Asker name */}
+          {asker_name && (
+            <p className="text-xs text-[var(--text-muted)] font-heebo mb-1">
+              שואל: <span className="font-medium text-[var(--text-secondary)]">{asker_name}</span>
+            </p>
+          )}
 
           {/* Title */}
           <h1 className="text-xl font-bold text-[var(--text-primary)] font-heebo leading-snug mb-4">

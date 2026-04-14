@@ -173,7 +173,7 @@ function AuditLogModal({ rabbi, onClose }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    get(`/admin/audit-log?entity_type=rabbi&entity_id=${rabbi.id}&limit=20`)
+    get(`/admin/audit-log?rabbi_id=${rabbi.id}&limit=30`)
       .then(data => setLogs(Array.isArray(data) ? data : data.entries ?? data.logs ?? []))
       .catch(() => setLogs([]))
       .finally(() => setLoading(false));

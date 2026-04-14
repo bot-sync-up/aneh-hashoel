@@ -131,13 +131,11 @@ function Layout({ children, notificationCount = 0 }) {
 
         {/* Page content */}
         <main
-          className="flex-1 overflow-y-auto"
+          className="flex-1 overflow-y-auto overscroll-contain"
           tabIndex={-1}
           id="page-main"
         >
-          <div className="min-h-0">
-            {children}
-          </div>
+          {children}
         </main>
       </div>
     </div>

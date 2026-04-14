@@ -317,9 +317,9 @@ export default function AdminQuestionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { load(); }, [load, page]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = questions.filter((q) => {
     const matchSearch = !search || q.title?.includes(search) || String(q.id).includes(search);

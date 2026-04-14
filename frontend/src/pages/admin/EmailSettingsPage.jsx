@@ -6,125 +6,170 @@ import { get, put, post } from '../../lib/api';
 
 // ── Email categories — each is an accordion card ──────────────────────────────
 
-const EMAIL_CATEGORIES = [
+// ── Folder structure for email templates ──────────────────────────────────────
+
+const EMAIL_FOLDERS = [
   {
-    id: 'welcome',
-    title: 'ברוך הבא',
-    icon: '👋',
-    description: 'מייל הצטרפות לרב חדש במערכת',
-    fields: [
-      { key: 'welcome_subject', label: 'נושא', type: 'input' },
-      { key: 'welcome_body', label: 'תוכן (HTML)', type: 'html' },
+    id: 'rabbi',
+    title: 'מיילים לרבנים',
+    icon: '🎓',
+    templates: [
+      {
+        id: 'welcome',
+        title: 'ברוך הבא',
+        icon: '👋',
+        description: 'מייל הצטרפות לרב חדש במערכת',
+        fields: [
+          { key: 'welcome_subject', label: 'נושא', type: 'input' },
+          { key: 'welcome_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{email}', '{password}', '{login_url}'],
+      },
+      {
+        id: 'new_question',
+        title: 'שאלה חדשה',
+        icon: '📩',
+        description: 'התראה לרב על שאלה חדשה שהתקבלה',
+        fields: [
+          { key: 'rabbi_new_question_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_new_question_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}', '{category}', '{system_name}'],
+      },
+      {
+        id: 'full_question',
+        title: 'שאלה מלאה (אחרי תפיסה)',
+        icon: '📄',
+        description: 'השאלה המלאה שנשלחת לרב אחרי שתפס אותה',
+        fields: [
+          { key: 'rabbi_full_question_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_full_question_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}', '{content}', '{timeout_hours}', '{system_name}'],
+      },
+      {
+        id: 'thank',
+        title: 'תודה מגולש',
+        icon: '❤️',
+        description: 'הודעה לרב כשמישהו מודה לו על תשובה',
+        fields: [
+          { key: 'rabbi_thank_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_thank_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}', '{system_name}'],
+      },
+      {
+        id: 'weekly_report',
+        title: 'דוח שבועי',
+        icon: '📊',
+        description: 'סיכום שבועי לרב על פעילותו',
+        fields: [
+          { key: 'rabbi_weekly_report_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_weekly_report_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{answered_count}', '{avg_response_time}', '{thank_count}', '{system_name}'],
+      },
+      {
+        id: 'already_claimed',
+        title: 'שאלה כבר נתפסה',
+        icon: '🔒',
+        description: 'הודעה לרב שהשאלה כבר נתפסה ע"י רב אחר',
+        fields: [
+          { key: 'rabbi_already_claimed_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_already_claimed_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}', '{system_name}'],
+      },
+      {
+        id: 'release_confirm',
+        title: 'אישור שחרור שאלה',
+        icon: '🔓',
+        description: 'אישור לרב ששחרר שאלה בהצלחה',
+        fields: [
+          { key: 'rabbi_release_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}'],
+      },
+      {
+        id: 'answer_confirm',
+        title: 'אישור קליטת תשובה',
+        icon: '📝',
+        description: 'אישור לרב שתשובתו ממייל נקלטה בהצלחה',
+        fields: [
+          { key: 'rabbi_answer_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}'],
+      },
     ],
-    variables: ['{name}', '{email}', '{password}', '{login_url}'],
   },
   {
-    id: 'new_question',
-    title: 'שאלה חדשה',
-    icon: '📩',
-    description: 'התראה לרב על שאלה חדשה שהתקבלה',
-    fields: [
-      { key: 'rabbi_new_question_subject', label: 'נושא', type: 'input' },
-      { key: 'rabbi_new_question_body', label: 'תוכן (HTML)', type: 'html' },
+    id: 'asker',
+    title: 'מיילים לשואלים',
+    icon: '👤',
+    templates: [
+      {
+        id: 'question_received',
+        title: 'אישור קבלת שאלה',
+        icon: '✅',
+        description: 'אישור לשואל שהשאלה התקבלה',
+        fields: [
+          { key: 'asker_question_received_subject', label: 'נושא', type: 'input' },
+          { key: 'asker_question_received_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{system_name}'],
+      },
+      {
+        id: 'answer_ready',
+        title: 'תשובה מוכנה',
+        icon: '📬',
+        description: 'הודעה לשואל שהתקבלה תשובה לשאלתו',
+        fields: [
+          { key: 'asker_answer_ready_subject', label: 'נושא', type: 'input' },
+          { key: 'asker_answer_ready_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{rabbi_name}', '{system_name}'],
+      },
+      {
+        id: 'follow_up',
+        title: 'שאלת המשך',
+        icon: '🔄',
+        description: 'הודעה לשואל על שאלת המשך',
+        fields: [
+          { key: 'asker_follow_up_subject', label: 'נושא', type: 'input' },
+          { key: 'asker_follow_up_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{system_name}'],
+      },
     ],
-    variables: ['{name}', '{title}', '{id}', '{category}', '{system_name}'],
   },
   {
-    id: 'full_question',
-    title: 'שאלה מלאה (אחרי תפיסה)',
-    icon: '📄',
-    description: 'השאלה המלאה שנשלחת לרב אחרי שתפס אותה',
-    fields: [
-      { key: 'rabbi_full_question_subject', label: 'נושא', type: 'input' },
-      { key: 'rabbi_full_question_body', label: 'תוכן (HTML)', type: 'html' },
+    id: 'system',
+    title: 'מיילים מערכתיים',
+    icon: '⚙️',
+    templates: [
+      {
+        id: 'password_reset',
+        title: 'איפוס סיסמה',
+        icon: '🔑',
+        description: 'קישור לאיפוס סיסמה',
+        fields: [
+          { key: 'password_reset_subject', label: 'נושא', type: 'input' },
+          { key: 'password_reset_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{reset_url}', '{system_name}'],
+      },
+      {
+        id: 'new_device',
+        title: 'התראת מכשיר חדש',
+        icon: '🔔',
+        description: 'התראת אבטחה בכניסה ממכשיר חדש',
+        fields: [
+          { key: 'new_device_subject', label: 'נושא', type: 'input' },
+          { key: 'new_device_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{device}', '{ip}', '{time}', '{system_name}'],
+      },
     ],
-    variables: ['{name}', '{title}', '{id}', '{content}', '{timeout_hours}', '{system_name}'],
-  },
-  {
-    id: 'thank',
-    title: 'תודה מגולש',
-    icon: '❤️',
-    description: 'הודעה לרב כשמישהו מודה לו על תשובה',
-    fields: [
-      { key: 'rabbi_thank_subject', label: 'נושא', type: 'input' },
-      { key: 'rabbi_thank_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{id}', '{system_name}'],
-  },
-  {
-    id: 'question_received',
-    title: 'אישור קבלת שאלה (לשואל)',
-    icon: '✅',
-    description: 'אישור לשואל שהשאלה התקבלה',
-    fields: [
-      { key: 'asker_question_received_subject', label: 'נושא', type: 'input' },
-      { key: 'asker_question_received_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{system_name}'],
-  },
-  {
-    id: 'answer_ready',
-    title: 'תשובה מוכנה (לשואל)',
-    icon: '📬',
-    description: 'הודעה לשואל שהתקבלה תשובה לשאלתו',
-    fields: [
-      { key: 'asker_answer_ready_subject', label: 'נושא', type: 'input' },
-      { key: 'asker_answer_ready_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{rabbi_name}', '{system_name}'],
-  },
-  {
-    id: 'follow_up',
-    title: 'שאלת המשך',
-    icon: '🔄',
-    description: 'הודעה לשואל ולרב על שאלת המשך',
-    fields: [
-      { key: 'asker_follow_up_subject', label: 'נושא (לשואל)', type: 'input' },
-      { key: 'asker_follow_up_body', label: 'תוכן (לשואל)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{system_name}'],
-  },
-  {
-    id: 'weekly_report',
-    title: 'דוח שבועי',
-    icon: '📊',
-    description: 'סיכום שבועי לרב על פעילותו',
-    fields: [
-      { key: 'rabbi_weekly_report_subject', label: 'נושא', type: 'input' },
-      { key: 'rabbi_weekly_report_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{answered_count}', '{avg_response_time}', '{thank_count}', '{system_name}'],
-  },
-  {
-    id: 'already_claimed',
-    title: 'שאלה כבר נתפסה',
-    icon: '🔒',
-    description: 'הודעה לרב שהשאלה כבר נתפסה ע"י רב אחר',
-    fields: [
-      { key: 'rabbi_already_claimed_subject', label: 'נושא', type: 'input' },
-      { key: 'rabbi_already_claimed_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{id}', '{system_name}'],
-  },
-  {
-    id: 'release_confirm',
-    title: 'אישור שחרור שאלה',
-    icon: '🔓',
-    description: 'אישור לרב ששחרר שאלה בהצלחה',
-    fields: [
-      { key: 'rabbi_release_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{id}'],
-  },
-  {
-    id: 'answer_confirm',
-    title: 'אישור קליטת תשובה',
-    icon: '📝',
-    description: 'אישור לרב שתשובתו ממייל נקלטה בהצלחה',
-    fields: [
-      { key: 'rabbi_answer_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
-    ],
-    variables: ['{name}', '{title}', '{id}'],
   },
 ];
 
@@ -459,17 +504,29 @@ export default function EmailSettingsPage() {
         </div>
       </div>
 
-      {/* Template cards */}
-      {EMAIL_CATEGORIES.map((cat) => (
-        <TemplateCard
-          key={cat.id}
-          category={cat}
-          templates={templates}
-          onChange={handleChange}
-          onSave={handleSave}
-          saving={saving}
-          savedId={savedId}
-        />
+      {/* Template folders */}
+      {EMAIL_FOLDERS.map((folder) => (
+        <div key={folder.id} className="space-y-3">
+          {/* Folder header */}
+          <div className="flex items-center gap-2 pt-4">
+            <span className="text-lg">{folder.icon}</span>
+            <h3 className="text-base font-bold text-[var(--text-primary)] font-heebo">{folder.title}</h3>
+            <span className="text-xs text-[var(--text-muted)] font-heebo">({folder.templates.length} תבניות)</span>
+          </div>
+
+          {/* Templates inside folder */}
+          {folder.templates.map((cat) => (
+            <TemplateCard
+              key={cat.id}
+              category={cat}
+              templates={templates}
+              onChange={handleChange}
+              onSave={handleSave}
+              saving={saving}
+              savedId={savedId}
+            />
+          ))}
+        </div>
       ))}
 
       {/* Locked footer notice */}

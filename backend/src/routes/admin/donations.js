@@ -92,7 +92,7 @@ router.get('/recent', async (req, res) => {
         u.name  AS rabbi_name
       FROM donations d
       LEFT JOIN questions q ON q.id = d.question_id
-      LEFT JOIN users     u ON u.id = d.rabbi_id
+      LEFT JOIN rabbis    u ON u.id = d.rabbi_id
       ORDER BY d.created_at DESC
       LIMIT 10
     `);
@@ -140,7 +140,7 @@ router.get('/', async (req, res) => {
            u.name  AS rabbi_name
          FROM donations d
          LEFT JOIN questions q ON q.id = d.question_id
-         LEFT JOIN users     u ON u.id = d.rabbi_id
+         LEFT JOIN rabbis    u ON u.id = d.rabbi_id
          ORDER BY d.created_at DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]

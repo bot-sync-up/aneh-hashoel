@@ -726,16 +726,16 @@ export default function QuestionDetailPage() {
             )}
 
             {/* Rabbi signature */}
-            {assigned_rabbi && (
+            {(assignedRabbiName || assigned_rabbi) && (
               <div className="mt-6 pt-4 border-t border-[var(--border-default)] flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-brand-navy/10 flex items-center justify-center">
                   <User size={16} className="text-brand-navy" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)] font-heebo">
-                    הרב {assignedRabbiName}
+                    {assignedRabbiName ? `תשובת הרב ${assignedRabbiName}` : 'תשובת הרב'}
                   </p>
-                  {assigned_rabbi.title && (
+                  {assigned_rabbi?.title && (
                     <p className="text-xs text-[var(--text-muted)] font-heebo">
                       {assigned_rabbi.title}
                     </p>

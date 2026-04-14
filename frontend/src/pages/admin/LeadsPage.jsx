@@ -119,7 +119,7 @@ function LeadRow({ lead, onUpdate }) {
           {/* Contact info */}
           <div className="flex items-center gap-4 flex-wrap text-xs text-[var(--text-muted)] font-heebo">
             {lead.email && (
-              <a href={`mailto:${lead.email}`} className="flex items-center gap-1 hover:text-brand-navy dark:hover:text-dark-accent transition-colors">
+              <a href={`mailto:${lead.email}`} dir="ltr" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }} className="flex items-center gap-1 hover:text-brand-navy dark:hover:text-dark-accent transition-colors">
                 <Mail size={11} />
                 {lead.email}
               </a>

@@ -1,196 +1,337 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Save, CheckCircle, Info, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Mail, Save, CheckCircle, Info, RotateCcw, ChevronDown, ChevronUp, Eye, Lock } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import { get, put } from '../../lib/api';
 
-const TEMPLATE_FIELDS = [
+// ── Email categories — each is an accordion card ──────────────────────────────
+
+const EMAIL_CATEGORIES = [
   {
-    key: 'asker_system_name',
-    label: 'שם מערכת לשואלים',
-    description: 'השם שמופיע באימיילים לשואלים',
-    type: 'input',
+    id: 'welcome',
+    title: 'ברוך הבא',
+    icon: '👋',
+    description: 'מייל הצטרפות לרב חדש במערכת',
+    fields: [
+      { key: 'welcome_subject', label: 'נושא', type: 'input' },
+      { key: 'welcome_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{email}', '{password}', '{login_url}'],
   },
   {
-    key: 'rabbi_system_name',
-    label: 'שם מערכת לרבנים',
-    description: 'השם שמופיע באימיילים לרבנים',
-    type: 'input',
-  },
-  { type: 'divider', label: 'תבניות לשואלים' },
-  {
-    key: 'asker_question_received_subject',
-    label: 'נושא — שאלה התקבלה',
-    type: 'input',
-  },
-  {
-    key: 'asker_question_received_body',
-    label: 'גוף — שאלה התקבלה',
-    type: 'textarea',
+    id: 'new_question',
+    title: 'שאלה חדשה',
+    icon: '📩',
+    description: 'התראה לרב על שאלה חדשה שהתקבלה',
+    fields: [
+      { key: 'rabbi_new_question_subject', label: 'נושא', type: 'input' },
+      { key: 'rabbi_new_question_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}', '{category}', '{system_name}'],
   },
   {
-    key: 'asker_answer_ready_subject',
-    label: 'נושא — תשובה מוכנה',
-    type: 'input',
+    id: 'full_question',
+    title: 'שאלה מלאה (אחרי תפיסה)',
+    icon: '📄',
+    description: 'השאלה המלאה שנשלחת לרב אחרי שתפס אותה',
+    fields: [
+      { key: 'rabbi_full_question_subject', label: 'נושא', type: 'input' },
+      { key: 'rabbi_full_question_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}', '{content}', '{timeout_hours}', '{system_name}'],
   },
   {
-    key: 'asker_answer_ready_body',
-    label: 'גוף — תשובה מוכנה',
-    type: 'textarea',
-  },
-  { type: 'divider', label: 'תבניות לרבנים' },
-  {
-    key: 'rabbi_new_question_subject',
-    label: 'נושא — שאלה חדשה',
-    type: 'input',
-  },
-  {
-    key: 'rabbi_new_question_body',
-    label: 'גוף — שאלה חדשה',
-    type: 'textarea',
+    id: 'thank',
+    title: 'תודה מגולש',
+    icon: '❤️',
+    description: 'הודעה לרב כשמישהו מודה לו על תשובה',
+    fields: [
+      { key: 'rabbi_thank_subject', label: 'נושא', type: 'input' },
+      { key: 'rabbi_thank_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}', '{system_name}'],
   },
   {
-    key: 'rabbi_thank_subject',
-    label: 'נושא — תודה מגולש',
-    type: 'input',
+    id: 'question_received',
+    title: 'אישור קבלת שאלה (לשואל)',
+    icon: '✅',
+    description: 'אישור לשואל שהשאלה התקבלה',
+    fields: [
+      { key: 'asker_question_received_subject', label: 'נושא', type: 'input' },
+      { key: 'asker_question_received_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{system_name}'],
   },
   {
-    key: 'rabbi_thank_body',
-    label: 'גוף — תודה מגולש',
-    type: 'textarea',
+    id: 'answer_ready',
+    title: 'תשובה מוכנה (לשואל)',
+    icon: '📬',
+    description: 'הודעה לשואל שהתקבלה תשובה לשאלתו',
+    fields: [
+      { key: 'asker_answer_ready_subject', label: 'נושא', type: 'input' },
+      { key: 'asker_answer_ready_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{rabbi_name}', '{system_name}'],
   },
   {
-    key: 'rabbi_full_question_subject',
-    label: 'נושא — שאלה מלאה',
-    type: 'input',
+    id: 'follow_up',
+    title: 'שאלת המשך',
+    icon: '🔄',
+    description: 'הודעה לשואל ולרב על שאלת המשך',
+    fields: [
+      { key: 'asker_follow_up_subject', label: 'נושא (לשואל)', type: 'input' },
+      { key: 'asker_follow_up_body', label: 'תוכן (לשואל)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{system_name}'],
   },
   {
-    key: 'rabbi_full_question_body',
-    label: 'גוף — שאלה מלאה',
-    type: 'textarea',
+    id: 'weekly_report',
+    title: 'דוח שבועי',
+    icon: '📊',
+    description: 'סיכום שבועי לרב על פעילותו',
+    fields: [
+      { key: 'rabbi_weekly_report_subject', label: 'נושא', type: 'input' },
+      { key: 'rabbi_weekly_report_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{answered_count}', '{avg_response_time}', '{thank_count}', '{system_name}'],
   },
   {
-    key: 'rabbi_claim_subject',
-    label: 'נושא — קבלת שאלה (CLAIM)',
-    type: 'input',
+    id: 'already_claimed',
+    title: 'שאלה כבר נתפסה',
+    icon: '🔒',
+    description: 'הודעה לרב שהשאלה כבר נתפסה ע"י רב אחר',
+    fields: [
+      { key: 'rabbi_already_claimed_subject', label: 'נושא', type: 'input' },
+      { key: 'rabbi_already_claimed_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}', '{system_name}'],
   },
   {
-    key: 'rabbi_release_subject',
-    label: 'נושא — שחרור שאלה (RELEASE)',
-    type: 'input',
-  },
-  { type: 'divider', label: 'תבניות נוספות לרבנים' },
-  {
-    key: 'rabbi_already_claimed_subject',
-    label: 'נושא — שאלה כבר נתפסה',
-    type: 'input',
-  },
-  {
-    key: 'rabbi_already_claimed_body',
-    label: 'גוף — שאלה כבר נתפסה',
-    type: 'textarea',
+    id: 'release_confirm',
+    title: 'אישור שחרור שאלה',
+    icon: '🔓',
+    description: 'אישור לרב ששחרר שאלה בהצלחה',
+    fields: [
+      { key: 'rabbi_release_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}'],
   },
   {
-    key: 'rabbi_release_confirmation_body',
-    label: 'גוף — אישור שחרור שאלה',
-    type: 'textarea',
-  },
-  {
-    key: 'rabbi_answer_confirmation_body',
-    label: 'גוף — אישור קליטת תשובה ממייל',
-    type: 'textarea',
-  },
-  {
-    key: 'rabbi_weekly_report_subject',
-    label: 'נושא — דוח שבועי',
-    type: 'input',
-  },
-  {
-    key: 'rabbi_weekly_report_body',
-    label: 'גוף — דוח שבועי',
-    description: 'משתנים נוספים: {answered_count}, {avg_response_time}, {thank_count}',
-    type: 'textarea',
-  },
-  { type: 'divider', label: 'תבניות נוספות לשואלים' },
-  {
-    key: 'asker_follow_up_subject',
-    label: 'נושא — שאלת המשך',
-    type: 'input',
-  },
-  {
-    key: 'asker_follow_up_body',
-    label: 'גוף — שאלת המשך',
-    type: 'textarea',
+    id: 'answer_confirm',
+    title: 'אישור קליטת תשובה',
+    icon: '📝',
+    description: 'אישור לרב שתשובתו ממייל נקלטה בהצלחה',
+    fields: [
+      { key: 'rabbi_answer_confirmation_body', label: 'תוכן (HTML)', type: 'html' },
+    ],
+    variables: ['{name}', '{title}', '{id}'],
   },
 ];
 
 const DEFAULT_TEMPLATES = {
   asker_system_name: 'שאל את הרב',
   rabbi_system_name: 'ענה את השואל',
+  welcome_subject: 'ברוכים הבאים למערכת ענה את השואל',
+  welcome_body: '<p>שלום {name},</p><p>נוצר עבורך חשבון במערכת <strong>"ענה את השואל"</strong>.</p><p>פרטי כניסה זמניים:</p><p><strong>אימייל:</strong> {email}<br/><strong>סיסמה זמנית:</strong> {password}</p><p style="color:#cc4444;font-weight:bold;">יש לשנות את הסיסמה בכניסה הראשונה.</p>',
   asker_question_received_subject: 'שאלתך התקבלה — {system_name}',
-  asker_question_received_body: 'שלום {name},\nשאלתך "{title}" התקבלה בהצלחה.\nנודיע לך כשתתקבל תשובה.',
+  asker_question_received_body: '<p>שלום {name},</p><p>שאלתך <strong>"{title}"</strong> התקבלה בהצלחה.</p><p>נודיע לך כשתתקבל תשובה.</p>',
   asker_answer_ready_subject: 'התקבלה תשובה לשאלתך — {system_name}',
-  asker_answer_ready_body: 'שלום {name},\nהרב {rabbi_name} ענה על שאלתך "{title}".\nלצפייה בתשובה:',
+  asker_answer_ready_body: '<p>שלום {name},</p><p>הרב {rabbi_name} ענה על שאלתך <strong>"{title}"</strong>.</p><p>לצפייה בתשובה:</p>',
   rabbi_new_question_subject: 'שאלה חדשה — {system_name}',
-  rabbi_new_question_body: 'שאלה חדשה התקבלה במערכת.\nכותרת: {title}',
+  rabbi_new_question_body: '<p>שאלה חדשה התקבלה במערכת.</p><p><strong>כותרת:</strong> {title}</p>',
   rabbi_thank_subject: 'תודה מגולש — {system_name}',
-  rabbi_thank_body: 'כבוד הרב,\nגולש הודה לך על תשובתך לשאלה: "{title}".\nהמשך במלאכת הקודש!',
+  rabbi_thank_body: '<p>כבוד הרב,</p><p>גולש הודה לך על תשובתך לשאלה: <strong>"{title}"</strong>.</p><p>המשך במלאכת הקודש!</p>',
   rabbi_full_question_subject: '[ID: {id}] {title} — {system_name}',
-  rabbi_full_question_body: 'להלן השאלה המלאה.\nניתן להשיב ישירות למייל זה.',
-  rabbi_claim_subject: '[CLAIM:{id}] קבלת שאלה — {system_name}',
-  rabbi_release_subject: '[RELEASE:{id}] שחרור שאלה — {system_name}',
+  rabbi_full_question_body: '<p>להלן השאלה המלאה.</p><p>ניתן להשיב ישירות למייל זה.</p>',
   rabbi_already_claimed_subject: 'שאלה כבר נתפסה — {system_name}',
-  rabbi_already_claimed_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) כבר נתפסה על ידי רב אחר.\nניתן לבחור שאלה אחרת מהרשימה.',
-  rabbi_release_confirmation_body: 'כבוד הרב,\nהשאלה "{title}" (ID: {id}) שוחררה בהצלחה וזמינה כעת לרבנים אחרים.',
-  rabbi_answer_confirmation_body: 'כבוד הרב,\nתשובתך לשאלה "{title}" (ID: {id}) התקבלה ונקלטה בהצלחה במערכת.\nתודה על המענה!',
+  rabbi_already_claimed_body: '<p>כבוד הרב,</p><p>השאלה <strong>"{title}"</strong> (ID: {id}) כבר נתפסה על ידי רב אחר.</p><p>ניתן לבחור שאלה אחרת מהרשימה.</p>',
+  rabbi_release_confirmation_body: '<p>כבוד הרב,</p><p>השאלה <strong>"{title}"</strong> (ID: {id}) שוחררה בהצלחה וזמינה כעת לרבנים אחרים.</p>',
+  rabbi_answer_confirmation_body: '<p>כבוד הרב,</p><p>תשובתך לשאלה <strong>"{title}"</strong> (ID: {id}) התקבלה ונקלטה בהצלחה במערכת.</p><p>תודה על המענה!</p>',
   rabbi_weekly_report_subject: 'דוח שבועי — {system_name}',
-  rabbi_weekly_report_body: 'כבוד הרב,\nלהלן סיכום הפעילות שלך השבוע.\nשאלות שנענו: {answered_count}\nזמן תגובה ממוצע: {avg_response_time}\nתודות שהתקבלו: {thank_count}',
+  rabbi_weekly_report_body: '<p>כבוד הרב,</p><p>להלן סיכום הפעילות שלך השבוע:</p><p><strong>שאלות שנענו:</strong> {answered_count}<br/><strong>זמן תגובה ממוצע:</strong> {avg_response_time}<br/><strong>תודות שהתקבלו:</strong> {thank_count}</p>',
   asker_follow_up_subject: 'שאלת המשך — {system_name}',
-  asker_follow_up_body: 'שלום {name},\nנרשמה שאלת המשך לשאלתך "{title}".\nהרב יענה בהקדם.',
+  asker_follow_up_body: '<p>שלום {name},</p><p>נרשמה שאלת המשך לשאלתך <strong>"{title}"</strong>.</p><p>הרב יענה בהקדם.</p>',
 };
+
+// ── Single accordion card ────────────────────────────────────────────────────
+
+function TemplateCard({ category, templates, onChange, onSave, saving, savedId }) {
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(false);
+
+  const isSaved = savedId === category.id;
+
+  return (
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
+      {/* Header — click to toggle */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-[var(--bg-muted)] transition-colors duration-150"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">{category.icon}</span>
+          <div className="text-right">
+            <p className="text-sm font-bold text-[var(--text-primary)] font-heebo">{category.title}</p>
+            <p className="text-xs text-[var(--text-muted)] font-heebo">{category.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isSaved && (
+            <span className="flex items-center gap-1 text-xs text-emerald-600 font-heebo animate-fade-in">
+              <CheckCircle size={14} /> נשמר
+            </span>
+          )}
+          {open ? <ChevronUp size={18} className="text-[var(--text-muted)]" /> : <ChevronDown size={18} className="text-[var(--text-muted)]" />}
+        </div>
+      </button>
+
+      {/* Body — expanded */}
+      {open && (
+        <div className="border-t border-[var(--border-default)] px-5 py-4 space-y-4 animate-fade-in">
+          {/* Variables */}
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-xs text-[var(--text-muted)] font-heebo ml-1">משתנים:</span>
+            {category.variables.map((v) => (
+              <code key={v} className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[11px] font-mono cursor-pointer hover:bg-blue-100"
+                onClick={() => navigator.clipboard.writeText(v)}
+                title="לחץ להעתקה"
+              >
+                {v}
+              </code>
+            ))}
+          </div>
+
+          {/* Fields */}
+          {category.fields.map((field) => (
+            <div key={field.key}>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1.5">
+                {field.label}
+              </label>
+              {field.type === 'html' ? (
+                <textarea
+                  value={templates[field.key] || ''}
+                  onChange={(e) => onChange(field.key, e.target.value)}
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-brand-gold/40 resize-y leading-relaxed"
+                  dir="rtl"
+                  placeholder="<p>תוכן ה-HTML כאן...</p>"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={templates[field.key] || ''}
+                  onChange={(e) => onChange(field.key, e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
+                  dir="rtl"
+                />
+              )}
+            </div>
+          ))}
+
+          {/* Preview + Save */}
+          <div className="flex items-center justify-between pt-2 border-t border-[var(--border-default)]">
+            <button
+              type="button"
+              onClick={() => setPreview((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-heebo hover:text-[var(--text-primary)] transition-colors"
+            >
+              <Eye size={14} /> {preview ? 'הסתר תצוגה מקדימה' : 'תצוגה מקדימה'}
+            </button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={saving === category.id}
+              onClick={() => onSave(category.id)}
+              leftIcon={<Save size={14} />}
+            >
+              שמור תבנית
+            </Button>
+          </div>
+
+          {/* Preview panel */}
+          {preview && (
+            <div className="rounded-lg border border-[var(--border-default)] bg-white p-4 mt-2">
+              <p className="text-xs text-[var(--text-muted)] font-heebo mb-2">תצוגה מקדימה:</p>
+              {category.fields.filter((f) => f.type === 'html').map((f) => (
+                <div
+                  key={f.key}
+                  className="prose prose-sm max-w-none font-heebo text-right"
+                  dir="rtl"
+                  dangerouslySetInnerHTML={{
+                    __html: (templates[f.key] || '')
+                      .replace(/\{name\}/g, 'הרב ישראל כהן')
+                      .replace(/\{title\}/g, 'שאלה לדוגמה')
+                      .replace(/\{id\}/g, 'abc123')
+                      .replace(/\{rabbi_name\}/g, 'הרב ישראל כהן')
+                      .replace(/\{system_name\}/g, templates.rabbi_system_name || 'ענה את השואל')
+                      .replace(/\{email\}/g, 'rabbi@example.com')
+                      .replace(/\{password\}/g, '••••••')
+                      .replace(/\{answered_count\}/g, '12')
+                      .replace(/\{avg_response_time\}/g, '2.5 שעות')
+                      .replace(/\{thank_count\}/g, '8')
+                      .replace(/\{category\}/g, 'הלכה')
+                      .replace(/\{content\}/g, 'תוכן השאלה המלא...')
+                      .replace(/\{timeout_hours\}/g, '4')
+                      .replace(/\{login_url\}/g, '#')
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function EmailSettingsPage() {
   const [templates, setTemplates] = useState({ ...DEFAULT_TEMPLATES });
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(null); // category id being saved
+  const [savedId, setSavedId] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     get('/admin/email-settings')
       .then((data) => {
         if (data.templates) {
-          setTemplates({ ...DEFAULT_TEMPLATES, ...data.templates });
+          setTemplates((prev) => ({ ...prev, ...data.templates }));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const handleChange = (key) => (e) => {
-    setTemplates((prev) => ({ ...prev, [key]: e.target.value }));
-  };
+  const handleChange = useCallback((key, value) => {
+    setTemplates((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
-  const handleReset = () => {
-    setTemplates({ ...DEFAULT_TEMPLATES });
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = useCallback(async (categoryId) => {
+    setSaving(categoryId);
     setError('');
     try {
       await put('/admin/email-settings', { templates });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setSavedId(categoryId);
+      setTimeout(() => setSavedId(null), 3000);
     } catch (err) {
-      setError(err?.response?.data?.error || 'שגיאה בשמירת הגדרות האימייל');
+      setError(err?.response?.data?.error || 'שגיאה בשמירת התבנית');
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
-  };
+  }, [templates]);
+
+  const handleResetAll = useCallback(() => {
+    if (window.confirm('האם לשחזר את כל התבניות לברירת מחדל?')) {
+      setTemplates({ ...DEFAULT_TEMPLATES });
+    }
+  }, []);
 
   if (loading) {
     return (
-      <div className="space-y-4 max-w-3xl">
+      <div className="space-y-4 max-w-3xl mx-auto p-6">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-6">
             <div className="skeleton h-4 w-40 rounded mb-4" />
@@ -202,11 +343,15 @@ export default function EmailSettingsPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl" dir="rtl">
+    <div className="space-y-5 max-w-3xl mx-auto p-6" dir="rtl">
+      {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">הגדרות תבניות אימייל</h2>
-        <p className="text-sm text-[var(--text-muted)] font-heebo mt-0.5">
-          עריכת תבניות האימיילים הנשלחים מהמערכת
+        <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo flex items-center gap-2">
+          <Mail size={22} className="text-brand-gold" />
+          תבניות אימייל
+        </h2>
+        <p className="text-sm text-[var(--text-muted)] font-heebo mt-1">
+          ערוך את תבניות האימיילים הנשלחים מהמערכת. לחץ על כל תבנית כדי לערוך את התוכן.
         </p>
       </div>
 
@@ -216,100 +361,97 @@ export default function EmailSettingsPage() {
         </div>
       )}
 
-      {saved && (
-        <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 font-heebo animate-fade-in">
-          <CheckCircle size={16} /> תבניות האימייל נשמרו בהצלחה
-        </div>
-      )}
-
-      {/* Available variables info */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/50 overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-3 border-b border-blue-200 bg-blue-50">
-          <Info size={16} className="text-blue-600" />
-          <span className="text-sm font-bold text-blue-800 font-heebo">משתנים זמינים</span>
-        </div>
-        <div className="px-6 py-3">
-          <div className="flex flex-wrap gap-2">
-            {['{name}', '{title}', '{id}', '{rabbi_name}', '{system_name}'].map((v) => (
-              <code
-                key={v}
-                className="px-2 py-1 rounded bg-blue-100 text-blue-800 text-xs font-mono"
-              >
-                {v}
-              </code>
-            ))}
+      {/* System names */}
+      <Card className="!p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1">
+              שם מערכת לשואלים
+            </label>
+            <input
+              type="text"
+              value={templates.asker_system_name || ''}
+              onChange={(e) => handleChange('asker_system_name', e.target.value)}
+              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo"
+              dir="rtl"
+            />
           </div>
-          <p className="text-xs text-blue-600 font-heebo mt-2">
-            השתמש במשתנים אלו בתוך הנושאים והגוף — הם יוחלפו אוטומטית בערכים בזמן השליחה
-          </p>
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1">
+              שם מערכת לרבנים
+            </label>
+            <input
+              type="text"
+              value={templates.rabbi_system_name || ''}
+              onChange={(e) => handleChange('rabbi_system_name', e.target.value)}
+              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo"
+              dir="rtl"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Available variables */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-5 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Info size={14} className="text-blue-600" />
+          <span className="text-xs font-bold text-blue-800 font-heebo">משתנים זמינים בכל התבניות</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {['{name}', '{title}', '{id}', '{rabbi_name}', '{system_name}', '{email}', '{category}'].map((v) => (
+            <code key={v} className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-mono">{v}</code>
+          ))}
         </div>
       </div>
 
-      {/* Template fields */}
-      {TEMPLATE_FIELDS.map((field, idx) => {
-        if (field.type === 'divider') {
-          return (
-            <div key={idx} className="divider-text my-2">{field.label}</div>
-          );
-        }
+      {/* Template cards */}
+      {EMAIL_CATEGORIES.map((cat) => (
+        <TemplateCard
+          key={cat.id}
+          category={cat}
+          templates={templates}
+          onChange={handleChange}
+          onSave={handleSave}
+          saving={saving}
+          savedId={savedId}
+        />
+      ))}
 
-        return (
-          <div
-            key={field.key}
-            className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]"
-          >
-            <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)]">
-              <div className="w-7 h-7 rounded-lg bg-[#1B2B5E]/10 flex items-center justify-center">
-                <Mail size={14} className="text-[#1B2B5E]" />
-              </div>
-              <div>
-                <label className="font-bold text-[var(--text-primary)] font-heebo text-sm">
-                  {field.label}
-                </label>
-                {field.description && (
-                  <p className="text-xs text-[var(--text-muted)] font-heebo">{field.description}</p>
-                )}
-              </div>
-            </div>
-            <div className="px-6 py-4">
-              {field.type === 'textarea' ? (
-                <textarea
-                  value={templates[field.key] || ''}
-                  onChange={handleChange(field.key)}
-                  rows={4}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] resize-none"
-                  dir="rtl"
-                />
-              ) : (
-                <input
-                  type="text"
-                  value={templates[field.key] || ''}
-                  onChange={handleChange(field.key)}
-                  className="w-full h-10 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
-                  dir="rtl"
-                />
-              )}
-            </div>
+      {/* Locked footer notice */}
+      <div className="rounded-xl border-2 border-dashed border-[var(--border-default)] bg-[var(--bg-muted)] overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border-default)]">
+          <Lock size={16} className="text-[var(--text-muted)]" />
+          <div>
+            <p className="text-sm font-bold text-[var(--text-secondary)] font-heebo">פוטר מייל</p>
+            <p className="text-xs text-[var(--text-muted)] font-heebo">הפוטר נוסף אוטומטית לכל מייל ואינו ניתן לעריכה</p>
           </div>
-        );
-      })}
+        </div>
+        <div className="px-5 py-4 bg-[var(--bg-surface)]">
+          <div className="rounded-lg bg-[#1B2B5E] p-4 text-center">
+            <p className="text-[12px] text-[#a0a0b8] font-heebo mb-1">
+              מייל זה נשלח ממערכת "ענה את השואל"
+            </p>
+            <p className="text-[12px] text-[#a0a0b8] font-heebo">
+              לשינוי העדפות התראות, ניתן לפנות למנהל המערכת
+            </p>
+          </div>
+          <div className="rounded-b-lg bg-[#f0f0f0] px-4 py-2 text-center mt-2">
+            <p className="text-[11px] text-[#999] font-heebo">
+              פותח ע"י <strong style={{ color: '#1B2B5E' }}>SyncUp</strong> — טכנולוגיה שמניעה עסקים
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between">
+      {/* Reset all */}
+      <div className="flex justify-start">
         <Button
           variant="ghost"
-          onClick={handleReset}
-          leftIcon={<RotateCcw size={15} />}
+          size="sm"
+          onClick={handleResetAll}
+          leftIcon={<RotateCcw size={14} />}
         >
-          שחזר ברירות מחדל
-        </Button>
-        <Button
-          variant="primary"
-          loading={saving}
-          onClick={handleSave}
-          leftIcon={<Save size={16} />}
-        >
-          שמור תבניות
+          שחזר הכל לברירות מחדל
         </Button>
       </div>
     </div>

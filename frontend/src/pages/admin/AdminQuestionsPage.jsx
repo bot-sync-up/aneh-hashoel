@@ -13,12 +13,14 @@ import {
   RefreshCw,
   Trash2,
   X,
+  CheckCircle,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
 import { get, patch, del } from '../../lib/api';
 import api from '../../lib/api';
+import { decodeHTML } from '../../lib/utils';
 
 // ─── Status map ────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
@@ -73,6 +75,11 @@ function RowActions({ question, onStatusChange, onAssign, onHide, onDelete, onOp
             <button className="flex w-full items-center gap-2 px-4 py-2 hover:bg-[var(--bg-muted)] text-[var(--text-primary)]" onClick={act(onAssign)}>
               <UserCheck size={14} /> הצמד לרב
             </button>
+            {question.status !== 'answered' && (
+              <button className="flex w-full items-center gap-2 px-4 py-2 hover:bg-emerald-50 text-emerald-600" onClick={act(() => onStatusChange('answered'))}>
+                <CheckCircle size={14} /> סמן כנענה
+              </button>
+            )}
             <button className="flex w-full items-center gap-2 px-4 py-2 hover:bg-[var(--bg-muted)] text-amber-600" onClick={act(onHide)}>
               <EyeOff size={14} /> הסתר שאלה
             </button>
@@ -277,6 +284,14 @@ export default function AdminQuestionsPage() {
       await patch(`/admin/questions/${question.id}`, { status });
       setQuestions((prev) => prev.map((q) => q.id === question.id ? { ...q, status } : q));
       showToast('הסטטוס עודכן');
+    } catch { showToast('שגיאה בפעולה', 'error'); }
+  };
+
+  const handleStatusChange = async (questionId, newStatus) => {
+    try {
+      await patch(`/admin/questions/${questionId}`, { status: newStatus });
+      setQuestions((prev) => prev.map((q) => q.id === questionId ? { ...q, status: newStatus } : q));
+      showToast(newStatus === 'answered' ? 'השאלה סומנה כנענה' : 'הסטטוס עודכן');
     } catch { showToast('שגיאה בפעולה', 'error'); }
   };
 
@@ -523,7 +538,7 @@ export default function AdminQuestionsPage() {
                     </td>
                     <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{index + 1}</td>
                     <td className="px-3 py-3 max-w-[260px]">
-                      <span className="text-[var(--text-primary)] font-medium line-clamp-1">{q.title}</span>
+                      <span className="text-[var(--text-primary)] font-medium line-clamp-1">{decodeHTML(q.title)}</span>
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">{q.category ?? '—'}</td>
                     <td className="px-3 py-3">
@@ -545,7 +560,13 @@ export default function AdminQuestionsPage() {
                     <td className="px-3 py-3">
                       <RowActions
                         question={q}
-                        onStatusChange={() => setStatusModal(q)}
+                        onStatusChange={(directStatus) => {
+                          if (directStatus) {
+                            handleStatusChange(q.id, directStatus);
+                          } else {
+                            setStatusModal(q);
+                          }
+                        }}
                         onAssign={() => setAssignModal(q)}
                         onHide={() => handleHide(q)}
                         onDelete={() => setDeleteModal(q)}

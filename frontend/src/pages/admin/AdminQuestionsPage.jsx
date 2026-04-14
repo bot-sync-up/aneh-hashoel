@@ -280,6 +280,10 @@ export default function AdminQuestionsPage() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [bulkAssignModal, setBulkAssignModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 50;
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -290,11 +294,14 @@ export default function AdminQuestionsPage() {
     setLoading(true);
     try {
       const [qData, catData, rabbiData] = await Promise.all([
-        get('/admin/questions'),
+        get(`/admin/questions?page=${page}&limit=${PAGE_SIZE}`),
         get('/categories').catch(() => ({ categories: [] })),
         get('/admin/rabbis').catch(() => ({ rabbis: [] })),
       ]);
       const rawQuestions = Array.isArray(qData) ? qData : qData.questions ?? [];
+      const total = qData.total ?? rawQuestions.length;
+      setTotalCount(total);
+      setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)));
       setQuestions(rawQuestions.map((q) => ({
         ...q,
         createdAt:      q.createdAt      ?? q.created_at,
@@ -312,7 +319,7 @@ export default function AdminQuestionsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, page]);
 
   const filtered = questions.filter((q) => {
     const matchSearch = !search || q.title?.includes(search) || String(q.id).includes(search);
@@ -660,7 +667,16 @@ export default function AdminQuestionsPage() {
                       </Badge>
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      {q.assignedRabbi ?? <span className="text-[var(--text-muted)] italic">לא נתפסה</span>}
+                      {q.assignedRabbi ? (
+                        <button
+                          className="text-[var(--text-primary)] hover:text-brand-navy hover:underline transition-colors"
+                          onClick={() => navigate(`/admin/rabbis?highlight=${q.assigned_rabbi_id || ''}`)}
+                        >
+                          {q.assignedRabbi}
+                        </button>
+                      ) : (
+                        <span className="text-[var(--text-muted)] italic">לא נתפסה</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-muted)] text-xs whitespace-nowrap">
                       {q.createdAt ? new Date(q.createdAt).toLocaleDateString('he-IL') : '—'}
@@ -692,6 +708,31 @@ export default function AdminQuestionsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 pt-4 font-heebo text-sm">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              הקודם
+            </Button>
+            <span className="text-[var(--text-secondary)]">
+              עמוד {page} מתוך {totalPages} ({totalCount} שאלות)
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              הבא
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

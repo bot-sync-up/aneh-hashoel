@@ -196,7 +196,11 @@ const DEFAULT_TEMPLATES = {
   rabbi_weekly_report_body: '<p>כבוד הרב,</p><p>להלן סיכום הפעילות שלך השבוע:</p><p><strong>שאלות שנענו:</strong> {answered_count}<br/><strong>זמן תגובה ממוצע:</strong> {avg_response_time}<br/><strong>תודות שהתקבלו:</strong> {thank_count}</p>',
   asker_follow_up_subject: 'שאלת המשך — {system_name}',
   asker_follow_up_body: '<p>שלום {name},</p><p>נרשמה שאלת המשך לשאלתך <strong>"{title}"</strong>.</p><p>הרב יענה בהקדם.</p>',
-  footer_body: '<p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;line-height:1.5;">מייל זה נשלח ממערכת "ענה את השואל"</p><p style="margin:0;color:#a0a0b8;font-size:12px;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>',
+  password_reset_subject: 'איפוס סיסמה — {system_name}',
+  password_reset_body: '<p>שלום {name},</p><p>התקבלה בקשה לאיפוס הסיסמה שלך.</p><p>לחץ על הכפתור למטה לאיפוס:</p>',
+  new_device_subject: 'כניסה ממכשיר חדש — {system_name}',
+  new_device_body: '<p>שלום {name},</p><p>זוהתה כניסה למערכת ממכשיר חדש:</p><p><strong>מכשיר:</strong> {device}<br/><strong>כתובת IP:</strong> {ip}<br/><strong>זמן:</strong> {time}</p><p>אם זה לא אתה, שנה את הסיסמה מיידית.</p>',
+  footer_body: '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.15);"><a href="https://moreshet-maran.com" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">אתר המרכז למורשת מרן</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="{login_url}" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">כניסה למערכת</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="https://moreshet-maran.com/ask" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">שאל את הרב</a></div><p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;line-height:1.5;">מייל זה נשלח ממערכת "{system_name}"</p><p style="margin:0;color:#a0a0b8;font-size:12px;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>',
 };
 
 // ── Single accordion card ────────────────────────────────────────────────────

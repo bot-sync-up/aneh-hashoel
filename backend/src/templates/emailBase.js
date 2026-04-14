@@ -57,7 +57,7 @@ function renderButton(button) {
 function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
   const systemName = options.systemName || 'ענה את השואל';
   const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-  const defaultFooter = `<p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;font-family:'Heebo',Arial,sans-serif;line-height:1.5;">מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;</p><p style="margin:0;color:#a0a0b8;font-size:12px;font-family:'Heebo',Arial,sans-serif;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>`;
+  const defaultFooter = `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.15);"><a href="https://moreshet-maran.com" style="color:${BRAND_GOLD};text-decoration:none;font-size:12px;margin:0 10px;">אתר המרכז למורשת מרן</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="${appUrl}/login" style="color:${BRAND_GOLD};text-decoration:none;font-size:12px;margin:0 10px;">כניסה למערכת</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="https://moreshet-maran.com/ask" style="color:${BRAND_GOLD};text-decoration:none;font-size:12px;margin:0 10px;">שאל את הרב</a></div><p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;line-height:1.5;">מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;</p><p style="margin:0;color:#a0a0b8;font-size:12px;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>`;
   const footerBody = options.footerBody || defaultFooter;
   const buttonsHTML = actionButtons.length > 0
     ? `
@@ -203,16 +203,9 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
               background-color: ${BRAND_NAVY};
               padding: 20px 32px;
               text-align: center;
+              font-family: 'Heebo', Arial, sans-serif;
             ">
-              <!-- Quick links -->
-              <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.15);">
-                <a href="${appUrl}" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">אתר המרכז למורשת מרן</a>
-                <span style="color: rgba(255,255,255,0.3);">|</span>
-                <a href="${appUrl}/login" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">כניסה למערכת</a>
-                <span style="color: rgba(255,255,255,0.3);">|</span>
-                <a href="https://moreshet-maran.com" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">שאל את הרב</a>
-              </div>
-              ${footerBody}
+              ${footerBody.replace(/\{login_url\}/g, appUrl + '/login').replace(/\{system_name\}/g, systemName)}
             </td>
           </tr>
 

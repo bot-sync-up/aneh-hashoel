@@ -52,8 +52,13 @@ api.interceptors.response.use(
       error.message = 'לא ניתן להתחבר לשרת. בדוק את החיבור לאינטרנט.';
     }
 
-    // Retry on 500 errors, up to MAX_RETRIES attempts
+    // Retry on 500 errors, up to MAX_RETRIES attempts.
+    // Skip retries for polling endpoints — those will be re-fetched automatically.
+    const requestUrl = config?.url || '';
+    const isPollingEndpoint = /dashboard|stats/.test(requestUrl);
+
     if (
+      !isPollingEndpoint &&
       error.response?.status === 500 &&
       config &&
       !config._retryCount
@@ -62,6 +67,7 @@ api.interceptors.response.use(
     }
 
     if (
+      !isPollingEndpoint &&
       error.response?.status === 500 &&
       config &&
       config._retryCount < MAX_RETRIES

@@ -184,7 +184,8 @@ export default function AnswersPage() {
       setAnswers((prev) => (append ? [...prev, ...items] : items));
       setHasMore(items.length === PAGE_SIZE);
     } catch (err) {
-      setError(err.message || 'שגיאה בטעינת התשובות.');
+      setError('שגיאה בטעינת התשובות. נסה לרענן את הדף.');
+      setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -237,7 +238,7 @@ export default function AnswersPage() {
         title="שאלות שנענו"
         subtitle={
           total > 0
-            ? `${total.toLocaleString('he-IL')} שאלות נענו`
+            ? (total === 1 ? 'שאלה אחת נענתה' : `${total.toLocaleString('he-IL')} שאלות נענו`)
             : 'כל השאלות שנענו על ידי הרבנים'
         }
         actions={
@@ -299,7 +300,7 @@ export default function AnswersPage() {
 
         {!hasMore && answers.length > 0 && !loadingMore && (
           <p className="text-center text-sm text-[var(--text-muted)] font-heebo py-4">
-            הגעת לסוף הרשימה · {answers.length} שאלות שנענו
+            הגעת לסוף הרשימה · {answers.length === 1 ? 'שאלה אחת נענתה' : `${answers.length} שאלות שנענו`}
           </p>
         )}
       </div>

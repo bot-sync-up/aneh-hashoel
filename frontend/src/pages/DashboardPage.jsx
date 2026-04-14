@@ -174,6 +174,9 @@ export default function DashboardPage() {
   const [pendingQ,    setPendingQ]    = useState([]);
   const [claimingId,  setClaimingId]  = useState(null);
 
+  // Show all pending questions toggle
+  const [showAllPending, setShowAllPending] = useState(false);
+
   // Emergency banner
   const [emergency, setEmergency] = useState({ message: null, id: null });
 
@@ -182,6 +185,9 @@ export default function DashboardPage() {
 
   // Pulse tracking for live stat updates
   const pulseTimerRef = useRef(null);
+
+  // Polling interval ref for error-aware backoff
+  const pollingIntervalRef = useRef(30_000);
 
   // Track whether initial load has completed to avoid showing
   // skeleton shimmer on subsequent re-fetches (e.g. theme toggle, auto-refresh)
@@ -303,11 +309,15 @@ export default function DashboardPage() {
       }
 
       setLastRefreshed(new Date());
+      // Reset polling interval on success
+      pollingIntervalRef.current = 30_000;
     } catch (err) {
       setError(
         err?.response?.data?.message ||
         'לא ניתן לטעון את נתוני לוח הבקרה. אנא נסה שוב.'
       );
+      // Backoff polling interval on error (30s -> 60s -> 120s max)
+      pollingIntervalRef.current = Math.min(pollingIntervalRef.current * 2, 120_000);
     } finally {
       setLoading(false);
       hasLoadedOnce.current = true;
@@ -317,8 +327,19 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboard();
 
-    // Auto-refresh every 30 seconds, paused when tab is hidden
-    let autoRefresh = setInterval(() => fetchDashboard(), 30_000);
+    // Auto-refresh with error-aware backoff, paused when tab is hidden
+    let autoRefresh = null;
+
+    function scheduleNextPoll() {
+      clearInterval(autoRefresh);
+      autoRefresh = setInterval(() => {
+        fetchDashboard();
+        // Re-schedule with potentially updated interval
+        scheduleNextPoll();
+      }, pollingIntervalRef.current);
+    }
+
+    scheduleNextPoll();
 
     function handleVisibilityChange() {
       if (document.hidden) {
@@ -327,7 +348,7 @@ export default function DashboardPage() {
       } else {
         // Refresh immediately when tab becomes visible, then resume interval
         fetchDashboard();
-        autoRefresh = setInterval(() => fetchDashboard(), 30_000);
+        scheduleNextPoll();
       }
     }
 
@@ -553,7 +574,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="p-6 space-y-8">
+      <div className="p-6 space-y-6">
 
         {/* Error state */}
         {error && !loading && (
@@ -627,7 +648,7 @@ export default function DashboardPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {pendingQ.map((q) => (
+              {(showAllPending ? pendingQ : pendingQ.slice(0, 10)).map((q) => (
                 <QuestionCard
                   key={q._id || q.id}
                   question={q}
@@ -637,6 +658,17 @@ export default function DashboardPage() {
                 />
               ))}
             </div>
+            {!showAllPending && pendingQ.length > 10 && (
+              <div className="text-center mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllPending(true)}
+                >
+                  {`הצג את כל השאלות (${pendingQ.length})`}
+                </Button>
+              </div>
+            )}
           )}
         </section>
 

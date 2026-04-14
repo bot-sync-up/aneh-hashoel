@@ -142,7 +142,7 @@ function CategoryNode({ cat, depth = 0, onAdd, onRename, onDelete, onDragStart, 
 
         {/* Question count */}
         <span className="text-xs text-[var(--text-muted)] font-heebo tabular-nums px-2 py-0.5 rounded-full bg-[var(--bg-muted)]">
-          {cat.questionCount ?? 0} שאלות
+          {(cat.questionCount ?? 0) === 1 ? 'שאלה אחת' : `${cat.questionCount ?? 0} שאלות`}
         </span>
 
         {/* Actions */}

@@ -62,7 +62,7 @@ export default function MyQuestionsPage() {
     } catch (err) {
       setError((prev) => ({
         ...prev,
-        [tab]: err.message || 'שגיאה בטעינת השאלות.',
+        [tab]: 'שגיאה בטעינת השאלות. נסה לרענן את הדף.',
       }));
     } finally {
       setLoading((prev) => ({ ...prev, [tab]: false }));

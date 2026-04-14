@@ -312,7 +312,7 @@ export default function SupportPage() {
                       {req.message_count > 1 && (
                         <span className="flex items-center gap-0.5">
                           <MessageSquare size={10} />
-                          {req.message_count} הודעות
+                          {req.message_count === 1 ? 'הודעה אחת' : `${req.message_count} הודעות`}
                         </span>
                       )}
                     </div>

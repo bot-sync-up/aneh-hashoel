@@ -93,6 +93,7 @@ const Input = React.forwardRef(function Input(
               : undefined
           }
           dir={type === 'email' ? 'ltr' : undefined}
+          style={type === 'email' ? { direction: 'ltr', textAlign: 'left' } : undefined}
           className={clsx(
             // Base
             'w-full rounded-md border font-heebo text-sm',

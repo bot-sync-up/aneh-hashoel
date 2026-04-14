@@ -226,6 +226,7 @@ function PersonalTab({ rabbi }) {
 function CategoriesTab({ rabbi }) {
   const { updateRabbi } = useAuth();
   const [categories, setCategories] = useState([]);
+  const [categoriesError, setCategoriesError] = useState(null);
   const [selected, setSelected] = useState(
     new Set((rabbi?.preferred_categories || rabbi?.preferredCategories || []).map(Number))
   );
@@ -233,6 +234,7 @@ function CategoriesTab({ rabbi }) {
   const [saveStatus, setSaveStatus] = useState(null);
 
   useEffect(() => {
+    setCategoriesError(null);
     api.get('/categories')
       .then(({ data }) => {
         // flatten tree to flat list
@@ -244,7 +246,9 @@ function CategoriesTab({ rabbi }) {
         const raw = data?.categories ?? (Array.isArray(data) ? data : []);
         setCategories(flatten(raw));
       })
-      .catch(() => {});
+      .catch(() => {
+        setCategoriesError('שגיאה בטעינת קטגוריות');
+      });
   }, []);
 
   const toggle = (id) => {
@@ -276,7 +280,9 @@ function CategoriesTab({ rabbi }) {
       <p className="text-sm text-[var(--text-muted)] font-heebo">
         הקטגוריות שבהן תרצה לקבל שאלות בעדיפות
       </p>
-      {categories.length === 0 ? (
+      {categoriesError ? (
+        <p className="text-sm text-red-600 dark:text-red-400 font-heebo">{categoriesError}</p>
+      ) : categories.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)] font-heebo">טוען קטגוריות...</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">

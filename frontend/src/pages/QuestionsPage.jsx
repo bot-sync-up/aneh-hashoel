@@ -227,7 +227,7 @@ export default function QuestionsPage() {
         title="שאלות פתוחות"
         subtitle={
           total > 0
-            ? `${total.toLocaleString('he-IL')} שאלות ממתינות לטיפול`
+            ? (total === 1 ? 'שאלה אחת ממתינה לטיפול' : `${total.toLocaleString('he-IL')} שאלות ממתינות לטיפול`)
             : 'שאלות הממתינות לטיפול'
         }
         actions={
@@ -388,7 +388,7 @@ export default function QuestionsPage() {
         {/* End of list indicator */}
         {!hasMore && questions.length > 0 && !loadingMore && (
           <p className="text-center text-sm text-[var(--text-muted)] font-heebo py-4">
-            הגעת לסוף הרשימה · {questions.length} שאלות
+            הגעת לסוף הרשימה · {questions.length === 1 ? 'שאלה אחת' : `${questions.length} שאלות`}
           </p>
         )}
       </div>

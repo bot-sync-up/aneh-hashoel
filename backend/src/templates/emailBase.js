@@ -57,6 +57,8 @@ function renderButton(button) {
 function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
   const systemName = options.systemName || 'ענה את השואל';
   const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const footerLine1 = options.footerLine1 || `מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;`;
+  const footerLine2 = options.footerLine2 || 'לשינוי העדפות התראות, ניתן לפנות למנהל המערכת';
   const buttonsHTML = actionButtons.length > 0
     ? `
       <div style="
@@ -217,7 +219,7 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.5;
               ">
-                מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;
+                ${footerLine1}
               </p>
               <p style="
                 margin: 0;
@@ -226,7 +228,7 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
                 font-family: 'Heebo', Arial, sans-serif;
                 line-height: 1.5;
               ">
-                לשינוי העדפות התראות, ניתן לפנות למנהל המערכת
+                ${footerLine2}
               </p>
             </td>
           </tr>

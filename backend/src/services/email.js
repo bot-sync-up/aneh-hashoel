@@ -109,6 +109,18 @@ function resolveTemplate(template, vars = {}) {
   });
 }
 
+/**
+ * Build footer options from saved templates (for createEmailHTML).
+ * @param {object} templates - loaded email templates
+ * @returns {object} { footerLine1, footerLine2 }
+ */
+function footerOptions(templates) {
+  const opts = {};
+  if (templates.footer_line_1) opts.footerLine1 = templates.footer_line_1;
+  if (templates.footer_line_2) opts.footerLine2 = templates.footer_line_2;
+  return opts;
+}
+
 // ─── Transporter (lazy singleton) ─────────────────────────────────────────────
 
 let _transporter = null;
@@ -320,7 +332,7 @@ async function sendQuestionNotification(rabbiEmail, question) {
 
   const html = createEmailHTML('שאלה חדשה ממתינה', bodyContent, [
     { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
-  ]);
+  ], footerOptions(templates));
 
   const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${question.title || 'שאלה חדשה'} — ${systemName}`;
 

@@ -529,25 +529,66 @@ export default function EmailSettingsPage() {
         </div>
       ))}
 
-      {/* Locked footer notice */}
+      {/* Editable footer text */}
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)]">
+          <Mail size={16} className="text-[var(--text-muted)]" />
+          <div>
+            <p className="text-sm font-bold text-[var(--text-secondary)] font-heebo">טקסט פוטר מייל</p>
+            <p className="text-xs text-[var(--text-muted)] font-heebo">הטקסט שמופיע בתחתית כל מייל (ניתן לעריכה)</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1.5">שורה ראשונה</label>
+            <input
+              type="text"
+              value={templates.footer_line_1 || ''}
+              onChange={(e) => handleChange('footer_line_1', e.target.value)}
+              placeholder='מייל זה נשלח ממערכת "ענה את השואל"'
+              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
+              dir="rtl"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1.5">שורה שנייה</label>
+            <input
+              type="text"
+              value={templates.footer_line_2 || ''}
+              onChange={(e) => handleChange('footer_line_2', e.target.value)}
+              placeholder="לשינוי העדפות התראות, ניתן לפנות למנהל המערכת"
+              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
+              dir="rtl"
+            />
+          </div>
+          {/* Preview */}
+          <div className="rounded-lg bg-[#1B2B5E] p-4 text-center mt-2">
+            <p className="text-[12px] text-[#a0a0b8] font-heebo mb-1">
+              {templates.footer_line_1 || 'מייל זה נשלח ממערכת "ענה את השואל"'}
+            </p>
+            <p className="text-[12px] text-[#a0a0b8] font-heebo">
+              {templates.footer_line_2 || 'לשינוי העדפות התראות, ניתן לפנות למנהל המערכת'}
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="primary" size="sm" loading={saving === 'footer'} onClick={() => handleSave('footer')} leftIcon={<Save size={14} />}>
+              שמור פוטר
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Locked SyncUp branding */}
       <div className="rounded-xl border-2 border-dashed border-[var(--border-default)] bg-[var(--bg-muted)] overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border-default)]">
           <Lock size={16} className="text-[var(--text-muted)]" />
           <div>
-            <p className="text-sm font-bold text-[var(--text-secondary)] font-heebo">פוטר מייל</p>
-            <p className="text-xs text-[var(--text-muted)] font-heebo">הפוטר נוסף אוטומטית לכל מייל ואינו ניתן לעריכה</p>
+            <p className="text-sm font-bold text-[var(--text-secondary)] font-heebo">חתימת מפתח</p>
+            <p className="text-xs text-[var(--text-muted)] font-heebo">חתימה זו נוספת אוטומטית ואינה ניתנת לעריכה</p>
           </div>
         </div>
         <div className="px-5 py-4 bg-[var(--bg-surface)]">
-          <div className="rounded-lg bg-[#1B2B5E] p-4 text-center">
-            <p className="text-[12px] text-[#a0a0b8] font-heebo mb-1">
-              מייל זה נשלח ממערכת "ענה את השואל"
-            </p>
-            <p className="text-[12px] text-[#a0a0b8] font-heebo">
-              לשינוי העדפות התראות, ניתן לפנות למנהל המערכת
-            </p>
-          </div>
-          <div className="rounded-b-lg bg-[#f0f0f0] px-4 py-2 text-center mt-2">
+          <div className="rounded-lg bg-[#f0f0f0] px-4 py-3 text-center">
             <p className="text-[11px] text-[#999] font-heebo">
               פותח ע"י <strong style={{ color: '#1B2B5E' }}>SyncUp</strong> — טכנולוגיה שמניעה עסקים
             </p>

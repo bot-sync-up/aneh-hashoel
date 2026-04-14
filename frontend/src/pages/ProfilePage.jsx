@@ -196,6 +196,7 @@ function PersonalTab({ rabbi }) {
           כתובת מייל
         </label>
         <input id="rabbi-email" type="email" value={form.email} readOnly dir="ltr"
+          style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'plaintext' }}
           className={clsx(inputCls('email'), 'opacity-60 cursor-not-allowed bg-[var(--bg-muted)]')}
           tabIndex={-1} aria-readonly="true" />
         <p className="mt-1 text-xs text-[var(--text-muted)] font-heebo">

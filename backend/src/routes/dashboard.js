@@ -9,8 +9,12 @@
  */
 
 const express = require("express");
+const he = require("he");
 const { authenticate } = require("../middleware/auth");
 const { query: db } = require("../db/pool");
+
+/** Decode HTML entities in question titles from WordPress */
+function decodeTitle(t) { return t ? he.decode(t) : t; }
 
 const router = express.Router();
 router.use(authenticate);
@@ -117,11 +121,12 @@ router.get("/activity", async (req, res) => {
     );
     const activities = rows.map((r) => ({
       ...r,
+      title: decodeTitle(r.title),
       message: r.status === 'answered'
-        ? `${r.rabbi_name || 'רב'} ענה על: ${r.title}`
+        ? `${r.rabbi_name || 'רב'} ענה על: ${decodeTitle(r.title)}`
         : r.status === 'in_process'
-        ? `${r.rabbi_name || 'רב'} תפס: ${r.title}`
-        : `שאלה חדשה: ${r.title}`,
+        ? `${r.rabbi_name || 'רב'} תפס: ${decodeTitle(r.title)}`
+        : `שאלה חדשה: ${decodeTitle(r.title)}`,
     }));
     return res.json({ activities });
   } catch (err) {

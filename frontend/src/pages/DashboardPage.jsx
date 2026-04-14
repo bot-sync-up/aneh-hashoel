@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -31,8 +31,9 @@ import EmergencyBanner from '../components/dashboard/EmergencyBanner';
 // New dashboard sub-components
 import AdminStatCards        from '../components/dashboard/AdminStatCards';
 import RabbiStatCards        from '../components/dashboard/RabbiStatCards';
-import ActivityChart         from '../components/dashboard/ActivityChart';
-import CategoryChart         from '../components/dashboard/CategoryChart';
+// Lazy-loaded chart components (recharts is heavy)
+const ActivityChart  = lazy(() => import('../components/dashboard/ActivityChart'));
+const CategoryChart  = lazy(() => import('../components/dashboard/CategoryChart'));
 import RecentActivity        from '../components/dashboard/RecentActivity';
 import PendingQuestionsAlert from '../components/dashboard/PendingQuestionsAlert';
 import OnlineRabbis          from '../components/dashboard/OnlineRabbis';
@@ -315,9 +316,27 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
-    // Auto-refresh every 30 seconds
-    const autoRefresh = setInterval(() => fetchDashboard(), 30_000);
-    return () => clearInterval(autoRefresh);
+
+    // Auto-refresh every 30 seconds, paused when tab is hidden
+    let autoRefresh = setInterval(() => fetchDashboard(), 30_000);
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        clearInterval(autoRefresh);
+        autoRefresh = null;
+      } else {
+        // Refresh immediately when tab becomes visible, then resume interval
+        fetchDashboard();
+        autoRefresh = setInterval(() => fetchDashboard(), 30_000);
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(autoRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchDashboard]);
 
   // ── Claim question ─────────────────────────────────────────────────────
@@ -710,9 +729,13 @@ export default function DashboardPage() {
               isAdmin ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
             )}
           >
-            <ActivityChart data={weeklyActivity} loading={loading} />
+            <Suspense fallback={<div className="skeleton h-[280px] w-full rounded-xl" />}>
+              <ActivityChart data={weeklyActivity} loading={loading} />
+            </Suspense>
             {isAdmin && (
-              <CategoryChart data={categoryBreakdown} loading={loading} />
+              <Suspense fallback={<div className="skeleton h-[280px] w-full rounded-xl" />}>
+                <CategoryChart data={categoryBreakdown} loading={loading} />
+              </Suspense>
             )}
           </div>
         </section>

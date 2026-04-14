@@ -191,7 +191,6 @@ function QuestionCard({
 
         {/* Title */}
         <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy transition-colors">
-          {qNumber && <span className="text-xs text-[var(--text-muted)] font-normal ml-2">#{qNumber}</span>}
           {truncatedTitle}
         </h3>
 

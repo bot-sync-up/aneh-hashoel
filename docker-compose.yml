@@ -94,8 +94,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-https://aneh.syncup.co.il}
-        VITE_WS_URL: ${VITE_WS_URL:-wss://aneh.syncup.co.il}
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_WS_URL: ${VITE_WS_URL:-}
     container_name: aneh-frontend
     restart: unless-stopped
     networks:

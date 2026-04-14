@@ -47,8 +47,8 @@ function RoleBadge({ role }) {
   return <Badge status={cfg.status} label={cfg.label} withDot />;
 }
 
-// ─── Edit Rabbi Modal ──────────────────────────────────────────────────────
-function EditRabbiModal({ rabbi, onClose, onSave }) {
+// ─── Edit Rabbi Modal (with action buttons) ──────────────────────────────
+function EditRabbiModal({ rabbi, onClose, onSave, onToggleActive, onChangeRole, onAuditLog, onDelete, isSelf }) {
   const [form, setForm] = useState({
     name: rabbi.name || '',
     email: rabbi.email || '',
@@ -75,19 +75,51 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
-      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="bg-[var(--bg-surface)] rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        {/* Header with avatar */}
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">עריכת פרטי רב</h3>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#1B2B5E] text-white flex items-center justify-center text-sm font-bold">
+              {rabbi.name?.charAt(0) ?? '?'}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">{rabbi.name}</h3>
+              <p className="text-xs text-[var(--text-muted)] font-heebo">{rabbi.email}</p>
+            </div>
+          </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
         </div>
+
+        {/* Quick info */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <RoleBadge role={rabbi.role} />
+          <Badge status={rabbi.isActive ? 'success' : 'default'} withDot>{rabbi.isActive ? 'מופעל' : 'מושבת'}</Badge>
+          {rabbi.answersThisMonth > 0 && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full font-heebo">{rabbi.answersThisMonth} תשובות החודש</span>}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2 mb-5 pb-4 border-b border-[var(--border-default)]">
+          <Button variant="outline" size="sm" onClick={() => { onClose(); onToggleActive(); }}>
+            {rabbi.isActive ? <><UserX size={13} className="ml-1" /> השבת</> : <><UserCheck size={13} className="ml-1" /> הפעל</>}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { onClose(); onChangeRole(); }}>
+            <Shield size={13} className="ml-1" /> שנה תפקיד
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { onClose(); onAuditLog(); }}>
+            <ScrollText size={13} className="ml-1" /> יומן פעילות
+          </Button>
+          {!isSelf && (
+            <Button variant="danger" size="sm" onClick={() => { onClose(); onDelete(); }}>
+              <Trash2 size={13} className="ml-1" /> מחק
+            </Button>
+          )}
+        </div>
+
+        {/* Edit form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">שם מלא *</label>
             <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
-          </div>
-          <div>
-            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">וואטסאפ</label>
-            <Input type="tel" inputMode="numeric" pattern="[0-9]*" value={form.whatsapp_number} onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value.replace(/[^0-9]/g, '') }))} onInput={(e) => e.target.value = e.target.value.replace(/[^0-9+\-\s]/g, '')} placeholder="0500000000" dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">אימייל *</label>
@@ -95,12 +127,16 @@ function EditRabbiModal({ rabbi, onClose, onSave }) {
           </div>
           <div>
             <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">טלפון</label>
-            <Input type="tel" inputMode="numeric" pattern="[0-9]*" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/[^0-9]/g, '') }))} onInput={(e) => e.target.value = e.target.value.replace(/[^0-9+\-\s]/g, '')} placeholder="0500000000" />
+            <Input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="0500000000" />
+          </div>
+          <div>
+            <label className="block text-sm font-heebo text-[var(--text-secondary)] mb-1">וואטסאפ</label>
+            <Input type="tel" value={form.whatsapp_number} onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="0500000000" dir="ltr" />
           </div>
           {error && <p className="text-sm text-red-500 font-heebo">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-heebo border border-[var(--border-default)] hover:bg-[var(--bg-muted)]">בטל</button>
-            <Button variant="primary" type="submit" loading={loading} leftIcon={<Save size={14} />}>שמור</Button>
+            <Button variant="primary" type="submit" loading={loading} leftIcon={<Save size={14} />}>שמור שינויים</Button>
           </div>
         </form>
       </div>
@@ -462,7 +498,16 @@ export default function RabbisAdminPage() {
 
       {/* Modals */}
       {editRabbi && (
-        <EditRabbiModal rabbi={editRabbi} onClose={() => setEditRabbi(null)} onSave={handleEditSave} />
+        <EditRabbiModal
+          rabbi={editRabbi}
+          onClose={() => setEditRabbi(null)}
+          onSave={handleEditSave}
+          onToggleActive={() => { setEditRabbi(null); handleToggleActive(editRabbi); }}
+          onChangeRole={() => { setEditRabbi(null); setChangeRoleRabbi(editRabbi); }}
+          onAuditLog={() => { setEditRabbi(null); setAuditRabbi(editRabbi); }}
+          onDelete={() => { setEditRabbi(null); setDeleteRabbi(editRabbi); }}
+          isSelf={currentUser && String(currentUser.id) === String(editRabbi.id)}
+        />
       )}
       {changeRoleRabbi && (
         <ChangeRoleModal rabbi={changeRoleRabbi} onClose={() => setChangeRoleRabbi(null)} onSave={handleRoleSave} />

@@ -326,6 +326,15 @@ export default function AdminQuestionsPage() {
     } catch { showToast('שגיאה בפעולה', 'error'); }
   };
 
+  const handleBulkMarkAnswered = async () => {
+    try {
+      await Promise.all([...selected].map((id) => patch(`/admin/questions/${id}`, { status: 'answered' })));
+      setQuestions((prev) => prev.map((q) => selected.has(q.id) ? { ...q, status: 'answered' } : q));
+      setSelected(new Set());
+      showToast('השאלות סומנו כנענו');
+    } catch { showToast('שגיאה בפעולה', 'error'); }
+  };
+
   const handleDelete = async () => {
     if (!deleteModal) return;
     setDeleteLoading(true);
@@ -474,13 +483,17 @@ export default function AdminQuestionsPage() {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[#1B2B5E] text-white font-heebo text-sm animate-fade-in">
           <span>{selected.size} נבחרו</span>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBulkMarkAnswered}>
+            <CheckCircle size={14} className="ml-1" />
+            סמן כנענה
+          </Button>
           <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBulkRelease}>
             שחרר נבחרים
           </Button>
           <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={() => setBulkAssignModal(true)}>
             העבר לרב
           </Button>
-          <Button variant="danger" size="sm" onClick={handleBulkHide}>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-white/10" onClick={handleBulkHide}>
             הסתר נבחרים
           </Button>
           <Button variant="danger" size="sm" onClick={() => setDeleteModal({ bulk: true, count: selected.size })}>

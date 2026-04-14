@@ -222,16 +222,16 @@ async function notifyAskerNewAnswer(questionId) {
   `;
 
   const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];
-  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons, { systemName: 'מערכת שאל את הרב' });
+  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons, { systemName: 'שאל את הרב' });
 
   // Send email
   if (email) {
     try {
       await sendEmail(
         email,
-        'התשובה לשאלתך מוכנה — מערכת שאל את הרב',
+        'התשובה לשאלתך מוכנה — שאל את הרב',
         html,
-        { fromName: 'מערכת שאל את הרב' }
+        { fromName: 'שאל את הרב' }
       );
     } catch (err) {
       console.error(`[askerNotification] שגיאה בשליחת אימייל לשואל (שאלה ${questionId}):`, err.message);
@@ -306,13 +306,13 @@ async function notifyAskerFollowUp(questionId) {
           ${data.follow_up_answer || ''}
         </div>`,
         answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [],
-        { systemName: 'מערכת שאל את הרב' }
+        { systemName: 'שאל את הרב' }
       );
       await sendEmail(
         email,
         'תשובת המשך לשאלתך — ענה את השואל',
         followUpHtml,
-        { fromName: 'מערכת שאל את הרב' }
+        { fromName: 'שאל את הרב' }
       );
     } catch (err) {
       console.error(`[askerNotification] שגיאה בשליחת אימייל המשך (שאלה ${questionId}):`, err.message);
@@ -393,12 +393,12 @@ async function notifyAskerPrivateAnswer(questionId) {
         <p style="color:#666; font-size:12px;">תשובה זו נשלחה אליך באופן אישי ואינה מפורסמת באתר.</p>
         <p>בברכה,<br><strong>הרב ${data.rabbi_name}</strong></p>
       `;
-      const html = createEmailHTML('תשובה אישית לשאלתך', bodyContent, [], { systemName: 'מערכת שאל את הרב' });
+      const html = createEmailHTML('תשובה אישית לשאלתך', bodyContent, [], { systemName: 'שאל את הרב' });
       await sendEmail(
         email,
-        `תשובה לשאלתך — מערכת שאל את הרב`,
+        `תשובה לשאלתך — שאל את הרב`,
         html,
-        { fromName: 'מערכת שאל את הרב' }
+        { fromName: 'שאל את הרב' }
       );
       console.log(`[askerNotification] תשובה פרטית נשלחה במייל לשואל (שאלה ${questionId})`);
     } catch (err) {
@@ -429,9 +429,10 @@ async function notifyAskerQuestionReceived(question) {
 
   const { createEmailHTML } = require('../templates/emailBase');
 
-  const subject = 'קיבלנו את שאלתך — מערכת שאל את הרב';
+  const systemName = 'שאל את הרב';
+  const subject = `קיבלנו את שאלתך — ${systemName}`;
   const bodyContent = `
-    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${question.asker_name || 'שואל יקר'},</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">שלום ${question.asker_name || 'שואל/ת יקר/ה'},</p>
     <p style="margin: 0 0 16px; font-size: 15px;">
       קיבלנו את שאלתך ונענה בהקדם האפשרי.
     </p>
@@ -443,9 +444,9 @@ async function notifyAskerQuestionReceived(question) {
       נשלח לך מייל נוסף כאשר תתקבל תשובה מהרב.
     </p>
   `;
-  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], { systemName: 'מערכת שאל את הרב' });
+  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], { systemName });
 
-  await sendEmail(email, subject, html, { fromName: 'מערכת שאל את הרב' });
+  await sendEmail(email, subject, html, { fromName: systemName });
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────

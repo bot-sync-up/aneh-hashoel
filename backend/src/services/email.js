@@ -253,6 +253,10 @@ async function sendQuestionNotification(rabbiEmail, question) {
   };
 
   const questionUrl = `${appUrl()}/questions/${question.id}`;
+  const questionNumber = question.question_number || question.wp_post_id || question.id;
+  const questionContent = question.content || '';
+  // Strip HTML tags for plain text preview
+  const contentPreview = questionContent.replace(/<[^>]*>/g, '').trim();
 
   const bodyText = resolveTemplate(templates.rabbi_new_question_body, vars);
   const bodyContent = `
@@ -273,9 +277,23 @@ async function sendQuestionNotification(rabbiEmail, question) {
       <p style="margin: 0; color: #666; font-size: 13px;">קטגוריה: ${categoryLabel}</p>
     </div>
 
-    <p style="margin: 0 0 4px; font-size: 13px; color: #555;">
-      לחץ על "צפה בשאלה" כדי להיכנס למערכת ולראות את השאלה המלאה.
-    </p>
+    ${contentPreview ? `
+    <div style="
+      background-color: #ffffff;
+      border: 1px solid #e5e5e5;
+      border-right: 4px solid ${BRAND_NAVY};
+      padding: 16px 20px;
+      margin: 12px 0 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #333;
+      line-height: 1.7;
+    ">
+      <p style="margin: 0 0 6px; font-weight: bold; font-size: 12px; color: #999;">תוכן השאלה:</p>
+      <p style="margin: 0;">${contentPreview.replace(/\n/g, '<br/>')}</p>
+    </div>
+    ` : ''}
+
     <p style="margin: 0 0 16px; font-size: 13px; color: #888;">
       השאלה תוקצה לרב הראשון שיתפוס אותה.
     </p>
@@ -293,8 +311,9 @@ async function sendQuestionNotification(rabbiEmail, question) {
     ">
       <p style="margin: 0 0 8px; font-weight: bold; color: ${BRAND_NAVY};">הנחיות לתגובה מהמייל:</p>
       <p style="margin: 0 0 4px;">• לתפיסת השאלה — השב למייל זה עם המילה: <strong>תפוס</strong></p>
+      <p style="margin: 0 0 4px;">• לשחרור שאלה שתפסת — השב עם המילה: <strong>שחרר</strong></p>
       <p style="margin: 0; color: #cc4444; font-size: 12px;">
-        ⚠ כל תוכן אחר חוץ מ"תפוס" ייחשב כתשובה לשאלה ויפורסם מיידית.
+        ⚠ כל תוכן אחר חוץ מ"תפוס" או "שחרר" ייחשב כתשובה לשאלה ויפורסם מיידית.
       </p>
     </div>
   `;
@@ -303,7 +322,7 @@ async function sendQuestionNotification(rabbiEmail, question) {
     { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
   ]);
 
-  const subject = `${isUrgent ? '[דחוף] ' : ''}${resolveTemplate(templates.rabbi_new_question_subject, vars)}`;
+  const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${resolveTemplate(templates.rabbi_new_question_subject, vars)}`;
 
   return sendEmail(rabbiEmail, subject, html, { replyTo: inboundEmail() });
 }

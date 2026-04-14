@@ -109,8 +109,24 @@ router.post('/inbound', async (req, res) => {
       return res.status(200).json({ ok: true });   // silent ignore — not our email
     }
 
-    const { action, questionId, followUpId } = emailAction;
+    let { action, questionId, followUpId } = emailAction;
     console.info(`[emailInbound] action=${action} questionId=${questionId}${followUpId ? ` followUpId=${followUpId}` : ''} from=${sender}`);
+
+    // The ID from subject may be a short number (question_number or wp_post_id).
+    // Resolve to the actual UUID primary key.
+    if (questionId && typeof questionId === 'number') {
+      const { rows: resolved } = await query(
+        `SELECT id FROM questions WHERE question_number = $1 OR wp_post_id = $1 LIMIT 1`,
+        [questionId]
+      );
+      if (resolved.length > 0) {
+        console.info(`[emailInbound] resolved numeric ID ${questionId} → UUID ${resolved[0].id}`);
+        questionId = resolved[0].id;
+      } else {
+        console.warn(`[emailInbound] could not resolve numeric ID ${questionId} to a question`);
+        return res.status(200).json({ ok: true });
+      }
+    }
 
     // ─── 4a. CLAIM ───────────────────────────────────────────────────
     if (action === 'claim') {

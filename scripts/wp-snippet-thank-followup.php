@@ -4,7 +4,7 @@
  * Injected into the answer container (data-id="425ccb7") via wp_footer.
  */
 
-define('ANEH_API_URL', 'https://aneh.syncup.co.il/api');
+define('ANEH_API_URL', 'https://ask.moreshet-maran.com/api');
 
 // Register thank_count meta so it's writable via WP REST API
 add_action('init', function() {

@@ -17,7 +17,7 @@ add_action('wp_footer', function() {
 ?>
 <script>
 (function() {
-    var API = 'https://aneh.syncup.co.il/api';
+    var API = 'https://ask.moreshet-maran.com/api';
     var PID = <?php echo $pid; ?>;
     var TC = <?php echo $tc; ?>;
     var SHOW_FU = <?php echo ($fc < 1) ? 'true' : 'false'; ?>;

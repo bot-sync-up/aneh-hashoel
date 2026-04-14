@@ -630,7 +630,12 @@ export default function RabbisAdminPage() {
                           {rabbi.name?.charAt(0) ?? '?'}
                         </div>
                         <div>
-                          <div className="font-medium text-[var(--text-primary)]">{rabbi.name}</div>
+                          <button
+                            className="font-medium text-[var(--text-primary)] hover:text-brand-navy hover:underline transition-colors text-right"
+                            onClick={() => setEditRabbi(rabbi)}
+                          >
+                            {rabbi.name}
+                          </button>
                           {rabbi.display_name && rabbi.display_name !== rabbi.name && (
                             <div className="text-xs text-[var(--text-muted)]">{rabbi.display_name}</div>
                           )}

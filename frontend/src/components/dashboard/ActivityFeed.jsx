@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clsx } from 'clsx';
 import { HandHeart, BookOpen, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketContext';
-import { formatRelative } from '../../lib/utils';
+import { formatRelative, decodeHTML } from '../../lib/utils';
 
 // ── Activity type configuration ────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ function ActivityItem({ activity, isNew = false }) {
       {/* Text */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium font-heebo text-[var(--text-primary)] leading-snug">
-          {message}
+          {decodeHTML(message)}
         </p>
         {timeAgo && (
           <p className="text-xs text-[var(--text-muted)] font-heebo mt-0.5">

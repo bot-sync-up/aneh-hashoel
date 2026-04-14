@@ -81,7 +81,11 @@ function QuestionCard({
     private_notes,
     discussion_count = 0,
     attachment_url,
+    question_number,
+    wp_post_id,
   } = question;
+
+  const qNumber = question_number || wp_post_id;
 
   // API may return flat fields (assigned_rabbi_id) or nested object (assigned_rabbi.id)
   const resolvedRabbiId = assigned_rabbi?.id ?? assigned_rabbi_id;
@@ -187,6 +191,7 @@ function QuestionCard({
 
         {/* Title */}
         <h3 className="text-base font-semibold text-[var(--text-primary)] font-heebo leading-snug mb-2 group-hover:text-brand-navy transition-colors">
+          {qNumber && <span className="text-xs text-[var(--text-muted)] font-normal ml-2">#{qNumber}</span>}
           {truncatedTitle}
         </h3>
 

@@ -390,7 +390,7 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
           leftIcon={<Pencil size={13} />}
           onClick={(e) => { e.stopPropagation(); navigate(`/questions/${id}?answer=1`); }}
         >
-          המשך לענות
+          ענה
         </Button>
         <Button
           variant="ghost"

@@ -113,11 +113,19 @@ function stripReplyContent(text) {
 // ── Claim-only keywords ──────────────────────────────────────────────────────
 
 const CLAIM_KEYWORDS = ['תפוס', 'תפיסה', 'קבל', 'אני לוקח', 'claim'];
+const RELEASE_KEYWORDS = ['שחרר', 'שחרור', 'release'];
 
 function isClaimOnly(text) {
   if (!text) return false;
-  const trimmed = text.trim().toLowerCase();
-  return CLAIM_KEYWORDS.some((kw) => trimmed === kw || trimmed === kw + '.');
+  // Take only the first line (ignore signatures, quoted text, etc.)
+  const firstLine = text.split('\n')[0].trim().replace(/[.\s!]+$/, '');
+  return CLAIM_KEYWORDS.some((kw) => firstLine === kw);
+}
+
+function isReleaseOnly(text) {
+  if (!text) return false;
+  const firstLine = text.split('\n')[0].trim().replace(/[.\s!]+$/, '');
+  return RELEASE_KEYWORDS.some((kw) => firstLine === kw);
 }
 
 // ── Send confirmation email back to rabbi ────────────────────────────────────
@@ -130,18 +138,34 @@ async function sendConfirmation(rabbiEmail, type, questionTitle, questionId) {
     const messages = {
       claimed:  `השאלה "${questionTitle}" נתפסה בהצלחה ומחכה לתשובתך. תוכל לענות בהשב למייל זה או דרך המערכת.`,
       answered: `התשובה שלך לשאלה "${questionTitle}" נקלטה ופורסמה בהצלחה!`,
+      released: `השאלה "${questionTitle}" שוחררה בהצלחה וזמינה כעת לרבנים אחרים.`,
       already_answered: `השאלה "${questionTitle}" כבר נענתה על ידי רב אחר.`,
       already_claimed:  `השאלה "${questionTitle}" כבר נתפסה על ידי רב אחר.`,
       not_found: `השאלה שניסית לענות עליה לא נמצאה במערכת.`,
     };
 
+    // Lookup short question number for subject
+    let shortId = questionId;
+    try {
+      const { rows } = await db(
+        `SELECT question_number, wp_post_id FROM questions WHERE id = $1`,
+        [questionId]
+      );
+      if (rows[0]) shortId = rows[0].question_number || rows[0].wp_post_id || questionId;
+    } catch (_) {}
+
     const msg = messages[type] || messages.answered;
-    const subject = type === 'answered'
-      ? `[Q:${questionId}] תשובתך נקלטה — ${questionTitle}`
-      : `[Q:${questionId}] ${questionTitle}`;
+    const titleMap = {
+      claimed: 'השאלה נתפסה בהצלחה',
+      answered: 'תשובתך נקלטה בהצלחה',
+      released: 'השאלה שוחררה',
+      already_answered: 'השאלה כבר נענתה',
+      already_claimed: 'השאלה כבר נתפסה',
+    };
+    const subject = `[ID:${shortId}] ${titleMap[type] || 'עדכון שאלה'} — ${questionTitle}`;
 
     const html = createEmailHTML(
-      type === 'answered' ? 'תשובתך נקלטה בהצלחה' : 'עדכון שאלה',
+      titleMap[type] || 'עדכון שאלה',
       `<p style="font-size:15px;line-height:1.7;">${msg}</p>`,
       [],
       { systemName: 'ענה את השואל' }
@@ -245,6 +269,21 @@ async function processEmail(parsed) {
 
   // Extract and clean the reply text
   const rawText = stripReplyContent(textBody);
+
+  // Check if this is a release request
+  if (isReleaseOnly(rawText)) {
+    if (question.status === 'in_process' && String(question.assigned_rabbi_id) === String(rabbi.id)) {
+      await db(
+        `UPDATE questions SET status = 'pending', assigned_rabbi_id = NULL, lock_timestamp = NULL WHERE id = $1`,
+        [questionId]
+      );
+      log.info({ questionId, rabbiName: rabbi.name }, 'Release via email');
+      await sendConfirmation(from, 'released', questionTitle, questionId);
+      return true;
+    }
+    log.debug({ questionId }, 'Release request but question not assigned to this rabbi');
+    return false;
+  }
 
   // Check if this is a claim-only request
   if (isClaimOnly(rawText)) {

@@ -56,6 +56,7 @@ function renderButton(button) {
  */
 function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
   const systemName = options.systemName || 'ענה את השואל';
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
   const buttonsHTML = actionButtons.length > 0
     ? `
       <div style="
@@ -200,8 +201,15 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
               background-color: ${BRAND_NAVY};
               padding: 20px 32px;
               text-align: center;
-              border-radius: 0 0 8px 8px;
             ">
+              <!-- Quick links -->
+              <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.15);">
+                <a href="${appUrl}" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">אתר המרכז למורשת מרן</a>
+                <span style="color: rgba(255,255,255,0.3);">|</span>
+                <a href="${appUrl}/login" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">כניסה למערכת</a>
+                <span style="color: rgba(255,255,255,0.3);">|</span>
+                <a href="https://moreshet-maran.com" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">שאל את הרב</a>
+              </div>
               <p style="
                 margin: 0 0 4px;
                 color: #a0a0b8;

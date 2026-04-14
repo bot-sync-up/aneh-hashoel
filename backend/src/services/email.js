@@ -322,7 +322,7 @@ async function sendQuestionNotification(rabbiEmail, question) {
     { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
   ]);
 
-  const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${resolveTemplate(templates.rabbi_new_question_subject, vars)}`;
+  const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${question.title || 'שאלה חדשה'} — ${systemName}`;
 
   return sendEmail(rabbiEmail, subject, html, { replyTo: inboundEmail() });
 }

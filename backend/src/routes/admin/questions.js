@@ -131,6 +131,7 @@ router.get('/', async (req, res) => {
       `SELECT
          q.id,
          q.wp_post_id,
+         q.question_number,
          q.title,
          q.content,
          q.status,

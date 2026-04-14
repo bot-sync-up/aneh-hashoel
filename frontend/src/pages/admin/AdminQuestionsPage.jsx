@@ -651,7 +651,7 @@ export default function AdminQuestionsPage() {
                     <td className="px-3 py-3">
                       <input type="checkbox" checked={selected.has(q.id)} onChange={() => toggleOne(q.id)} className="rounded" />
                     </td>
-                    <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{index + 1}</td>
+                    <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{q.question_number || q.wp_post_id || index + 1}</td>
                     <td className="px-3 py-3 max-w-[260px]">
                       <button
                         className="text-[var(--text-primary)] font-medium line-clamp-1 hover:text-brand-navy hover:underline transition-colors text-right"

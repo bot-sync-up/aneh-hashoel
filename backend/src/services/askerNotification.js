@@ -68,8 +68,8 @@ async function sendEmail(to, subject, html, options = {}) {
   });
 
   const fromName = options.fromName || 'ענה את השואל';
-  const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@aneh-hashoel.co.il';
-  const fromField = process.env.SMTP_FROM || `"${fromName}" <${fromEmail}>`;
+  const fromEmail = process.env.SMTP_FROM || process.env.EMAIL_FROM_ADDRESS || 'noreply@aneh-hashoel.co.il';
+  const fromField = `"${fromName}" <${fromEmail}>`;
 
   await transporter.sendMail({
     from:    fromField,

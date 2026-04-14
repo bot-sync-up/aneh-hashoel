@@ -41,6 +41,7 @@ import {
   colorFromCategory,
   stripHtml,
   truncate,
+  decodeHTML,
 } from '../lib/utils';
 
 export default function QuestionDetailPage() {
@@ -469,7 +470,7 @@ export default function QuestionDetailPage() {
 
           {/* Title */}
           <h1 className="text-xl font-bold text-[var(--text-primary)] font-heebo leading-snug mb-4">
-            {title}
+            {decodeHTML(title)}
           </h1>
 
           {/* Content */}

@@ -160,6 +160,46 @@ const EMAIL_FOLDERS = [
       },
     ],
   },
+  {
+    id: 'onboarding',
+    title: 'מיילים היכרות (אונבורדינג)',
+    icon: '🤝',
+    templates: [
+      {
+        id: 'onboarding_1',
+        title: 'מייל היכרות #1 — ברוך הבא',
+        icon: '1️⃣',
+        description: 'נשלח מיד אחרי השאלה הראשונה — הכרת המערכת',
+        fields: [
+          { key: 'onboarding_1_subject', label: 'נושא', type: 'input' },
+          { key: 'onboarding_1_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{system_name}'],
+      },
+      {
+        id: 'onboarding_2',
+        title: 'מייל היכרות #2 — עקוב אחרי שאלתך',
+        icon: '2️⃣',
+        description: 'נשלח יום אחרי השאלה — תזכורת לעקוב',
+        fields: [
+          { key: 'onboarding_2_subject', label: 'נושא', type: 'input' },
+          { key: 'onboarding_2_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{system_name}'],
+      },
+      {
+        id: 'onboarding_3',
+        title: 'מייל היכרות #3 — שאל עוד שאלות',
+        icon: '3️⃣',
+        description: 'נשלח 3 ימים אחרי — עידוד לשאול עוד',
+        fields: [
+          { key: 'onboarding_3_subject', label: 'נושא', type: 'input' },
+          { key: 'onboarding_3_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{system_name}'],
+      },
+    ],
+  },
 ];
 
 const DEFAULT_TEMPLATES = {
@@ -189,6 +229,12 @@ const DEFAULT_TEMPLATES = {
   password_reset_body: '<p>שלום {name},</p><p>התקבלה בקשה לאיפוס הסיסמה שלך.</p><p>לחץ על הכפתור למטה לאיפוס:</p>',
   new_device_subject: 'כניסה ממכשיר חדש — {system_name}',
   new_device_body: '<p>שלום {name},</p><p>זוהתה כניסה למערכת ממכשיר חדש:</p><p><strong>מכשיר:</strong> {device}<br/><strong>כתובת IP:</strong> {ip}<br/><strong>זמן:</strong> {time}</p><p>אם זה לא אתה, שנה את הסיסמה מיידית.</p>',
+  onboarding_1_subject: 'ברוך הבא למרכז למורשת מרן — {system_name}',
+  onboarding_1_body: '<p>שלום {name},</p><p>תודה ששלחת שאלה דרך המרכז למורשת מרן!</p><p>השאלה שלך התקבלה ותועבר לרבנים המומחים שלנו. ברגע שתתקבל תשובה, תקבל/י על כך הודעה במייל.</p><p><strong>מי אנחנו?</strong></p><p>המרכז למורשת מרן מרכז צוות של רבנים תלמידי חכמים שעונים על שאלות הלכתיות בנושאים מגוונים.</p>',
+  onboarding_2_subject: 'השאלה שלך בטיפול — {system_name}',
+  onboarding_2_body: '<p>שלום {name},</p><p>רצינו לעדכן שהשאלה <strong>"{title}"</strong> שלך נמצאת בטיפול.</p><p>הרבנים שלנו עובדים על מענה מקצועי ומדויק. ברוב המקרים התשובה מגיעה תוך 24-48 שעות.</p><p>בינתיים, אתה מוזמן לעיין בתשובות נוספות באתר שלנו.</p>',
+  onboarding_3_subject: 'יש לך עוד שאלה? אנחנו כאן — {system_name}',
+  onboarding_3_body: '<p>שלום {name},</p><p>רצינו להזכיר שאנחנו תמיד כאן בשבילך!</p><p>אם יש לך שאלה נוספת בנושא הלכה, מנהגים, או כל נושא תורני — אל תהסס לשלוח אותה דרך האתר שלנו.</p><p>צוות הרבנים שלנו ישמח לעזור.</p>',
   footer_body: '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.15);"><a href="https://moreshet-maran.com" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">אתר המרכז למורשת מרן</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="{login_url}" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">כניסה למערכת</a><span style="color:rgba(255,255,255,0.3);">|</span><a href="https://moreshet-maran.com/ask" style="color:#B8973A;text-decoration:none;font-size:12px;margin:0 10px;">שאל את הרב</a></div><p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;line-height:1.5;">מייל זה נשלח ממערכת "{system_name}"</p><p style="margin:0;color:#a0a0b8;font-size:12px;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>',
 };
 

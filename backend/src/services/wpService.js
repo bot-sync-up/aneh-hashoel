@@ -182,7 +182,7 @@ async function getNewQuestions() {
     const response = await withRateLimitRetry(
       () => client.get('/ask-rabai', {
         params: {
-          status:   'publish',
+          status:   'publish,pending',
           _fields:  'id,title,content,meta,date,acf,link',
           per_page: 50,
           orderby:  'date',

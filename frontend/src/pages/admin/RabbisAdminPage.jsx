@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import {
   Search,
@@ -236,14 +236,25 @@ function ConfirmModal({ title, message, confirmLabel, confirmVariant = 'danger',
 // ─── Row actions dropdown ──────────────────────────────────────────────────
 function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onDelete, onAuditLog, isSelf }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const [dropUp, setDropUp] = useState(false);
 
   const action = (fn) => () => { setOpen(false); fn(); };
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropUp(window.innerHeight - rect.bottom < 280);
+    }
+    setOpen((o) => !o);
+  };
 
   return (
     <div className="relative inline-block" dir="rtl">
       <button
+        ref={btnRef}
         className="p-2 rounded-md hover:bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         aria-label="פעולות"
       >
         <MoreVertical size={16} />
@@ -252,7 +263,10 @@ function RowActions({ rabbi, onEdit, onToggleActive, onChangeRole, onDelete, onA
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-9 z-20 w-48 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)] py-1 font-heebo text-sm">
+          <div className={clsx(
+            "absolute left-0 z-20 w-48 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)] py-1 font-heebo text-sm",
+            dropUp ? 'bottom-9' : 'top-9'
+          )}>
             <button
               className="flex w-full items-center gap-2 px-4 py-2 hover:bg-[var(--bg-muted)] text-[var(--text-primary)] transition-colors"
               onClick={action(onEdit)}

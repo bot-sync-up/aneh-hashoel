@@ -57,8 +57,8 @@ function renderButton(button) {
 function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
   const systemName = options.systemName || 'ענה את השואל';
   const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-  const footerLine1 = options.footerLine1 || `מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;`;
-  const footerLine2 = options.footerLine2 || 'לשינוי העדפות התראות, ניתן לפנות למנהל המערכת';
+  const defaultFooter = `<p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;font-family:'Heebo',Arial,sans-serif;line-height:1.5;">מייל זה נשלח ממערכת &#x0022;${systemName}&#x0022;</p><p style="margin:0;color:#a0a0b8;font-size:12px;font-family:'Heebo',Arial,sans-serif;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>`;
+  const footerBody = options.footerBody || defaultFooter;
   const buttonsHTML = actionButtons.length > 0
     ? `
       <div style="
@@ -212,24 +212,7 @@ function createEmailHTML(title, bodyContent, actionButtons = [], options = {}) {
                 <span style="color: rgba(255,255,255,0.3);">|</span>
                 <a href="https://moreshet-maran.com" style="color: ${BRAND_GOLD}; text-decoration: none; font-size: 12px; font-family: 'Heebo', Arial, sans-serif; margin: 0 10px;">שאל את הרב</a>
               </div>
-              <p style="
-                margin: 0 0 4px;
-                color: #a0a0b8;
-                font-size: 12px;
-                font-family: 'Heebo', Arial, sans-serif;
-                line-height: 1.5;
-              ">
-                ${footerLine1}
-              </p>
-              <p style="
-                margin: 0;
-                color: #a0a0b8;
-                font-size: 12px;
-                font-family: 'Heebo', Arial, sans-serif;
-                line-height: 1.5;
-              ">
-                ${footerLine2}
-              </p>
+              ${footerBody}
             </td>
           </tr>
 

@@ -116,8 +116,7 @@ function resolveTemplate(template, vars = {}) {
  */
 function footerOptions(templates) {
   const opts = {};
-  if (templates.footer_line_1) opts.footerLine1 = templates.footer_line_1;
-  if (templates.footer_line_2) opts.footerLine2 = templates.footer_line_2;
+  if (templates.footer_body) opts.footerBody = templates.footer_body;
   return opts;
 }
 

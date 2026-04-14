@@ -196,6 +196,7 @@ const DEFAULT_TEMPLATES = {
   rabbi_weekly_report_body: '<p>כבוד הרב,</p><p>להלן סיכום הפעילות שלך השבוע:</p><p><strong>שאלות שנענו:</strong> {answered_count}<br/><strong>זמן תגובה ממוצע:</strong> {avg_response_time}<br/><strong>תודות שהתקבלו:</strong> {thank_count}</p>',
   asker_follow_up_subject: 'שאלת המשך — {system_name}',
   asker_follow_up_body: '<p>שלום {name},</p><p>נרשמה שאלת המשך לשאלתך <strong>"{title}"</strong>.</p><p>הרב יענה בהקדם.</p>',
+  footer_body: '<p style="margin:0 0 4px;color:#a0a0b8;font-size:12px;line-height:1.5;">מייל זה נשלח ממערכת "ענה את השואל"</p><p style="margin:0;color:#a0a0b8;font-size:12px;line-height:1.5;">לשינוי העדפות התראות, ניתן לפנות למנהל המערכת</p>',
 };
 
 // ── Single accordion card ────────────────────────────────────────────────────
@@ -529,53 +530,29 @@ export default function EmailSettingsPage() {
         </div>
       ))}
 
-      {/* Editable footer text */}
-      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)]">
-          <Mail size={16} className="text-[var(--text-muted)]" />
-          <div>
-            <p className="text-sm font-bold text-[var(--text-secondary)] font-heebo">טקסט פוטר מייל</p>
-            <p className="text-xs text-[var(--text-muted)] font-heebo">הטקסט שמופיע בתחתית כל מייל (ניתן לעריכה)</p>
-          </div>
+      {/* Editable footer — as a TemplateCard like the others */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 pt-4">
+          <span className="text-lg">📧</span>
+          <h3 className="text-base font-bold text-[var(--text-primary)] font-heebo">פוטר מייל</h3>
         </div>
-        <div className="px-5 py-4 space-y-3">
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1.5">שורה ראשונה</label>
-            <input
-              type="text"
-              value={templates.footer_line_1 || ''}
-              onChange={(e) => handleChange('footer_line_1', e.target.value)}
-              placeholder='מייל זה נשלח ממערכת "ענה את השואל"'
-              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
-              dir="rtl"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] font-heebo mb-1.5">שורה שנייה</label>
-            <input
-              type="text"
-              value={templates.footer_line_2 || ''}
-              onChange={(e) => handleChange('footer_line_2', e.target.value)}
-              placeholder="לשינוי העדפות התראות, ניתן לפנות למנהל המערכת"
-              className="w-full h-9 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
-              dir="rtl"
-            />
-          </div>
-          {/* Preview */}
-          <div className="rounded-lg bg-[#1B2B5E] p-4 text-center mt-2">
-            <p className="text-[12px] text-[#a0a0b8] font-heebo mb-1">
-              {templates.footer_line_1 || 'מייל זה נשלח ממערכת "ענה את השואל"'}
-            </p>
-            <p className="text-[12px] text-[#a0a0b8] font-heebo">
-              {templates.footer_line_2 || 'לשינוי העדפות התראות, ניתן לפנות למנהל המערכת'}
-            </p>
-          </div>
-          <div className="flex justify-end">
-            <Button variant="primary" size="sm" loading={saving === 'footer'} onClick={() => handleSave('footer')} leftIcon={<Save size={14} />}>
-              שמור פוטר
-            </Button>
-          </div>
-        </div>
+        <TemplateCard
+          category={{
+            id: 'footer',
+            title: 'טקסט פוטר',
+            icon: '📝',
+            description: 'הטקסט שמופיע בתחתית כל מייל שנשלח מהמערכת',
+            fields: [
+              { key: 'footer_body', label: 'תוכן הפוטר (HTML)', type: 'html' },
+            ],
+            variables: ['{system_name}'],
+          }}
+          templates={templates}
+          onChange={handleChange}
+          onSave={handleSave}
+          saving={saving}
+          savedId={savedId}
+        />
       </div>
 
       {/* Locked SyncUp branding */}

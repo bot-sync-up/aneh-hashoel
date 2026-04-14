@@ -771,6 +771,45 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
     // Delegate to the existing submitFollowUp service (validates status + count)
     const followUp = await questionService.submitFollowUp(questionId, content);
 
+    // Notify the assigned rabbi (socket + email)
+    setImmediate(async () => {
+      try {
+        const { rows: qRows } = await dbQuery(
+          `SELECT q.title, q.assigned_rabbi_id, r.email AS rabbi_email, r.name AS rabbi_name
+           FROM questions q
+           LEFT JOIN rabbis r ON r.id = q.assigned_rabbi_id
+           WHERE q.id = $1`,
+          [questionId]
+        );
+        const q = qRows[0];
+        if (q && q.assigned_rabbi_id) {
+          // Socket notification
+          const io = _getIO(req);
+          if (io) {
+            io.to(`rabbi:${q.assigned_rabbi_id}`).emit('question:followUpReceived', {
+              questionId,
+              followUp: { asker_content: content },
+            });
+          }
+          // Email notification
+          if (q.rabbi_email) {
+            try {
+              const { sendFollowUpNotification } = require('../services/email');
+              await sendFollowUpNotification(q.rabbi_email, {
+                title: q.title,
+                id: questionId,
+                rabbi_name: q.rabbi_name,
+              });
+            } catch (emailErr) {
+              console.error('[wp-follow-up] email notification failed:', emailErr.message);
+            }
+          }
+        }
+      } catch (notifErr) {
+        console.error('[wp-follow-up] notification error:', notifErr.message);
+      }
+    });
+
     return res.status(201).json({
       message: 'שאלת ההמשך נשמרה בהצלחה',
       followUp,

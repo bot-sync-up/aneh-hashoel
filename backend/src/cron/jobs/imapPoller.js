@@ -49,11 +49,14 @@ function getImapConfig() {
 
 // ── Extract question ID from subject ─────────────────────────────────────────
 
-// Match [Q:uuid], [ID:uuid], [CLAIM:uuid], or Re: versions of these
+// Match [Q:id], [ID:id], [CLAIM:id] — supports both UUID and numeric IDs
 const QUESTION_ID_PATTERNS = [
-  /\[Q[:\-]?\s*([a-f0-9\-]{36})\]/i,
-  /\[ID[:\-]?\s*([a-f0-9\-]{36})\]/i,
-  /\[CLAIM[:\-]?\s*([a-f0-9\-]{36})\]/i,
+  /\[Q[:\-]?\s*([a-f0-9\-]{36})\]/i,       // UUID
+  /\[ID[:\-]?\s*([a-f0-9\-]{36})\]/i,      // UUID
+  /\[CLAIM[:\-]?\s*([a-f0-9\-]{36})\]/i,   // UUID
+  /\[Q[:\-]?\s*(\d+)\]/i,                   // Numeric
+  /\[ID[:\-]?\s*(\d+)\]/i,                  // Numeric
+  /\[CLAIM[:\-]?\s*(\d+)\]/i,              // Numeric
 ];
 const FOLLOWUP_PATTERN = /\[FOLLOWUP[:\-]?\s*(\d+)[:\-]?\s*(\d+)\]/i;
 
@@ -180,10 +183,26 @@ async function processEmail(parsed) {
   }
 
   // Extract question ID from subject
-  const questionId = extractQuestionId(subject);
+  let questionId = extractQuestionId(subject);
   if (!questionId) {
     log.debug({ from, subject }, 'Skipping email — no question ID in subject');
     return false;
+  }
+
+  // If numeric ID, resolve to UUID via question_number or wp_post_id
+  if (/^\d+$/.test(questionId)) {
+    const numId = parseInt(questionId, 10);
+    const { rows: resolved } = await db(
+      `SELECT id FROM questions WHERE question_number = $1 OR wp_post_id = $1 LIMIT 1`,
+      [numId]
+    );
+    if (resolved.length > 0) {
+      log.info({ numericId: numId, uuid: resolved[0].id }, 'Resolved numeric ID to UUID');
+      questionId = resolved[0].id;
+    } else {
+      log.warn({ numericId: numId }, 'Could not resolve numeric question ID');
+      return false;
+    }
   }
 
   // Find rabbi by email

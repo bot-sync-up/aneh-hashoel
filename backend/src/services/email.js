@@ -21,6 +21,7 @@
  */
 
 const nodemailer = require('nodemailer');
+const he = require('he');
 const { createEmailHTML, BRAND_NAVY, BRAND_GOLD } = require('../templates/emailBase');
 const { logger } = require('../utils/logger');
 
@@ -333,7 +334,8 @@ async function sendQuestionNotification(rabbiEmail, question) {
     { label: 'צפה בשאלה', url: questionUrl, color: BRAND_GOLD },
   ], footerOptions(templates));
 
-  const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${question.title || 'שאלה חדשה'} — ${systemName}`;
+  const decodedTitle = he.decode(question.title || 'שאלה חדשה');
+  const subject = `${isUrgent ? '[דחוף] ' : ''}[ID:${questionNumber}] ${decodedTitle} — ${systemName}`;
 
   return sendEmail(rabbiEmail, subject, html, { replyTo: inboundEmail() });
 }

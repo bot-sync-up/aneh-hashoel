@@ -7,10 +7,8 @@
 CREATE TABLE IF NOT EXISTS follow_up_questions (
   id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   question_id     UUID         NOT NULL REFERENCES questions (id) ON DELETE CASCADE,
-  content         TEXT         NOT NULL,
-  asker_name      TEXT,
-  asker_email     TEXT,
-  answer_content  TEXT,
+  asker_content   TEXT         NOT NULL,
+  rabbi_answer    TEXT,
   answered_by     UUID         REFERENCES rabbis (id) ON DELETE SET NULL,
   answered_at     TIMESTAMPTZ,
   created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()

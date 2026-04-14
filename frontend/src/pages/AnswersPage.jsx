@@ -167,6 +167,7 @@ export default function AnswersPage() {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
 
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
@@ -176,7 +177,9 @@ export default function AnswersPage() {
     else setLoading(true);
     setError(null);
     try {
-      const data = await get('/questions', { status: 'answered', page: pageNum, limit: PAGE_SIZE, sort: 'answered_at_desc' });
+      const params = { status: 'answered', page: pageNum, limit: PAGE_SIZE, sort: 'answered_at_desc' };
+      if (search.trim()) params.search = search.trim();
+      const data = await get('/questions', params);
       const items = data.questions || data.data || data || [];
       const totalCount = data.total ?? data.totalCount ?? items.length;
 
@@ -190,11 +193,21 @@ export default function AnswersPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced search
   useEffect(() => {
-    fetchPage(1);
-  }, [fetchPage]);
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initial load (no search)
+  useEffect(() => {
+    if (!search) fetchPage(1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Infinite scroll
   useEffect(() => {
@@ -255,6 +268,23 @@ export default function AnswersPage() {
       />
 
       <div className="p-6 space-y-5">
+        {/* Search */}
+        <div className="relative max-w-md">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+              setAnswers([]);
+            }}
+            placeholder="חיפוש לפי כותרת..."
+            className="w-full h-10 pr-10 pl-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm font-heebo text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
+            dir="rtl"
+          />
+          <Eye size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+        </div>
+
         {loading && <BlockSpinner label="טוען שאלות שנענו..." />}
 
         {!loading && error && (

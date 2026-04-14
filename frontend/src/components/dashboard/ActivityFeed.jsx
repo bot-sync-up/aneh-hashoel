@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { HandHeart, BookOpen, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useSocket } from '../../contexts/SocketContext';
@@ -42,18 +43,26 @@ const ACTIVITY_CONFIG = {
 // ── Single activity item ────────────────────────────────────────────────────
 
 function ActivityItem({ activity, isNew = false }) {
-  const { type, message, timestamp } = activity;
+  const navigate = useNavigate();
+  const { type, message, timestamp, id, question_id } = activity;
   const config = ACTIVITY_CONFIG[type] || ACTIVITY_CONFIG.question_released;
   const { Icon, iconClasses, bgClasses } = config;
   const timeAgo = formatRelative(timestamp || activity.createdAt || new Date());
+  const questionId = question_id || id;
+
+  const handleClick = () => {
+    if (questionId) navigate(`/questions/${questionId}`);
+  };
 
   return (
     <li
       className={clsx(
         'flex items-start gap-3 py-3 px-1 rounded-lg transition-colors duration-500',
         isNew && 'bg-[var(--bg-surface-raised)] animate-fade-in',
+        questionId && 'cursor-pointer hover:bg-[var(--bg-muted)]',
       )}
       aria-label={`${config.label}: ${message}`}
+      onClick={handleClick}
     >
       {/* Icon container */}
       <div

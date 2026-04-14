@@ -210,11 +210,18 @@ async function getQuestionById(id, requestingRabbiId = null) {
   row.asker_email = decryptField(row.asker_email);
   row.asker_phone = decryptField(row.asker_phone);
 
-  // Privacy filter: if answer is private and requester is not the answering rabbi,
-  // hide the content (but keep is_private flag so UI can show a badge).
+  // Privacy filter: if answer is private and requester is not the answering rabbi
+  // AND not an admin, hide the content (but keep is_private flag so UI can show a badge).
   if (row.answer_is_private && requestingRabbiId) {
+    // Look up requester's role
+    let isAdmin = false;
+    try {
+      const { rows: rabbiRows } = await query('SELECT role FROM rabbis WHERE id = $1', [requestingRabbiId]);
+      isAdmin = rabbiRows[0]?.role === 'admin';
+    } catch {}
+
     const isAnsweringRabbi = String(row.answer_rabbi_id) === String(requestingRabbiId);
-    if (!isAnsweringRabbi) {
+    if (!isAnsweringRabbi && !isAdmin) {
       row.answer_content = null; // hide content
     }
   }

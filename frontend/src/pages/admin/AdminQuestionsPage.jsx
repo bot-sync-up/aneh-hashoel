@@ -22,6 +22,97 @@ import { get, patch, del } from '../../lib/api';
 import api from '../../lib/api';
 import { decodeHTML } from '../../lib/utils';
 
+// ─── Question Preview Modal ───────────────────────────────────────────────
+function QuestionPreviewModal({ question, onClose }) {
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    get(`/questions/${question.id}`)
+      .then((data) => setDetails(data.question || data))
+      .catch(() => setDetails(null))
+      .finally(() => setLoading(false));
+  }, [question.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="relative bg-[var(--bg-surface)] rounded-xl shadow-2xl w-[95vw] max-w-[700px] max-h-[85vh] overflow-hidden"
+        dir="rtl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)]">
+          <div>
+            <h3 className="text-base font-bold text-[var(--text-primary)] font-heebo">
+              {decodeHTML(question.title)}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge status={question.status} withDot />
+              {question.category && <span className="text-xs text-[var(--text-muted)] font-heebo">{question.category}</span>}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)] transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-5 space-y-4" style={{ maxHeight: 'calc(85vh - 60px)' }}>
+          {loading ? (
+            <div className="text-center py-8 text-[var(--text-muted)] font-heebo">טוען...</div>
+          ) : !details ? (
+            <div className="text-center py-8 text-red-500 font-heebo">שגיאה בטעינת השאלה</div>
+          ) : (
+            <>
+              {/* Question content */}
+              <div>
+                <h4 className="text-xs font-bold text-[var(--text-muted)] font-heebo mb-2">תוכן השאלה</h4>
+                <div
+                  className="prose prose-sm max-w-none text-[var(--text-secondary)] font-heebo leading-relaxed bg-[var(--bg-muted)] rounded-lg p-4"
+                  dangerouslySetInnerHTML={{ __html: details.content || '<em>אין תוכן</em>' }}
+                />
+              </div>
+
+              {/* Answer (including private — visible to admin) */}
+              {details.answer_content && (
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-muted)] font-heebo mb-2 flex items-center gap-2">
+                    תשובת הרב {details.rabbi_name || ''}
+                    {details.answer_is_private && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">פרטי — גלוי רק למנהל</span>
+                    )}
+                  </h4>
+                  <div
+                    className="prose prose-sm max-w-none text-[var(--text-primary)] font-heebo leading-relaxed bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800"
+                    dangerouslySetInnerHTML={{ __html: details.answer_content }}
+                  />
+                </div>
+              )}
+
+              {/* Meta info */}
+              <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)] font-heebo pt-2 border-t border-[var(--border-default)]">
+                {details.asker_name && <span>שואל: {details.asker_name}</span>}
+                {details.rabbi_name && <span>רב: {details.rabbi_name}</span>}
+                {details.created_at && <span>נוצר: {new Date(details.created_at).toLocaleDateString('he-IL')}</span>}
+                {details.view_count > 0 && <span>צפיות: {details.view_count}</span>}
+                {details.thank_count > 0 && <span>תודות: {details.thank_count}</span>}
+              </div>
+
+              {/* Open in full page */}
+              <div className="text-center pt-2">
+                <Button variant="outline" size="sm" onClick={() => window.open(`/questions/${question.id}`, '_blank')}>
+                  פתח בדף מלא
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Status map ────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
   { value: 'all',        label: 'כל הסטטוסים' },
@@ -184,6 +275,7 @@ export default function AdminQuestionsPage() {
   const [categories, setCategories] = useState([]);
   const [rabbis, setRabbis] = useState([]);
   const [statusModal, setStatusModal] = useState(null);
+  const [previewQuestion, setPreviewQuestion] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -389,6 +481,9 @@ export default function AdminQuestionsPage() {
   return (
     <div className="space-y-5" dir="rtl">
       {/* Modals */}
+      {previewQuestion && (
+        <QuestionPreviewModal question={previewQuestion} onClose={() => setPreviewQuestion(null)} />
+      )}
       {statusModal && (
         <StatusModal question={statusModal} onClose={() => setStatusModal(null)} onSave={handleStatusSave} />
       )}
@@ -551,7 +646,12 @@ export default function AdminQuestionsPage() {
                     </td>
                     <td className="px-3 py-3 text-[var(--text-muted)] tabular-nums">{index + 1}</td>
                     <td className="px-3 py-3 max-w-[260px]">
-                      <span className="text-[var(--text-primary)] font-medium line-clamp-1">{decodeHTML(q.title)}</span>
+                      <button
+                        className="text-[var(--text-primary)] font-medium line-clamp-1 hover:text-brand-navy hover:underline transition-colors text-right"
+                        onClick={() => setPreviewQuestion(q)}
+                      >
+                        {decodeHTML(q.title)}
+                      </button>
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">{q.category ?? '—'}</td>
                     <td className="px-3 py-3">

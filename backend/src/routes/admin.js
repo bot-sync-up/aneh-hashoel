@@ -1037,6 +1037,34 @@ router.put('/email-settings', async (req, res) => {
   }
 });
 
+/**
+ * POST /admin/email-preview
+ * Renders a full email preview using createEmailHTML().
+ * Body: { title, body, buttonLabel?, buttonUrl? }
+ * Returns: { html: "<!DOCTYPE html>..." }
+ */
+router.post('/email-preview', async (req, res) => {
+  try {
+    const { createEmailHTML } = require('../templates/emailBase');
+    const { title, body, buttonLabel, buttonUrl } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ error: 'נדרשים title ו-body' });
+    }
+
+    const buttons = [];
+    if (buttonLabel && buttonUrl) {
+      buttons.push({ label: buttonLabel, url: buttonUrl });
+    }
+
+    const html = createEmailHTML(title, body, buttons);
+    return res.json({ ok: true, html });
+  } catch (err) {
+    console.error('[admin] POST /email-preview error:', err.message);
+    return res.status(500).json({ error: 'שגיאה ביצירת תצוגה מקדימה' });
+  }
+});
+
 // =============================================================================
 // NEWSLETTER ADMIN SELECTION
 // =============================================================================

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mail, Save, CheckCircle, Info, RotateCcw, ChevronDown, ChevronUp, Eye, Lock } from 'lucide-react';
+import { Mail, Save, CheckCircle, Info, RotateCcw, ChevronDown, ChevronUp, Eye, Lock, X } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import { get, put } from '../../lib/api';
+import { get, put, post } from '../../lib/api';
 
 // ── Email categories — each is an accordion card ──────────────────────────────
 
@@ -155,11 +155,60 @@ const DEFAULT_TEMPLATES = {
 
 // ── Single accordion card ────────────────────────────────────────────────────
 
+/** Replace template variables with sample data */
+function fillSampleData(text, templates) {
+  if (!text) return text;
+  return text
+    .replace(/\{name\}/g, 'הרב ישראל כהן')
+    .replace(/\{title\}/g, 'האם מותר להדליק נר בשבת?')
+    .replace(/\{id\}/g, 'abc12345')
+    .replace(/\{rabbi_name\}/g, 'הרב ישראל כהן')
+    .replace(/\{system_name\}/g, templates.rabbi_system_name || 'ענה את השואל')
+    .replace(/\{email\}/g, 'rabbi@example.com')
+    .replace(/\{password\}/g, 'Temp1234!')
+    .replace(/\{login_url\}/g, 'https://ask.moreshet-maran.com/login')
+    .replace(/\{answered_count\}/g, '12')
+    .replace(/\{avg_response_time\}/g, '2.5 שעות')
+    .replace(/\{thank_count\}/g, '8')
+    .replace(/\{category\}/g, 'הלכה')
+    .replace(/\{content\}/g, 'תוכן השאלה המלא כאן...')
+    .replace(/\{timeout_hours\}/g, '4');
+}
+
 function TemplateCard({ category, templates, onChange, onSave, saving, savedId }) {
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const isSaved = savedId === category.id;
+
+  const handlePreview = async () => {
+    if (previewHtml) { setPreviewHtml(null); return; }
+
+    setPreviewLoading(true);
+    try {
+      // Get the body field (first html-type field)
+      const bodyField = category.fields.find(f => f.type === 'html');
+      const subjectField = category.fields.find(f => f.type === 'input');
+      const bodyContent = fillSampleData(templates[bodyField?.key] || '', templates);
+      const title = fillSampleData(
+        templates[subjectField?.key] || category.title,
+        templates
+      );
+
+      const { html } = await post('/admin/email-preview', {
+        title,
+        body: bodyContent,
+        buttonLabel: 'כניסה למערכת',
+        buttonUrl: 'https://ask.moreshet-maran.com/login',
+      });
+      setPreviewHtml(html);
+    } catch (err) {
+      setPreviewHtml('<p style="color:red;text-align:center;padding:20px;">שגיאה בטעינת תצוגה מקדימה</p>');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
@@ -231,13 +280,15 @@ function TemplateCard({ category, templates, onChange, onSave, saving, savedId }
 
           {/* Preview + Save */}
           <div className="flex items-center justify-between pt-2 border-t border-[var(--border-default)]">
-            <button
-              type="button"
-              onClick={() => setPreview((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-heebo hover:text-[var(--text-primary)] transition-colors"
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={previewLoading}
+              onClick={handlePreview}
+              leftIcon={<Eye size={14} />}
             >
-              <Eye size={14} /> {preview ? 'הסתר תצוגה מקדימה' : 'תצוגה מקדימה'}
-            </button>
+              {previewHtml ? 'סגור תצוגה מקדימה' : 'תצוגה מקדימה'}
+            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -249,34 +300,38 @@ function TemplateCard({ category, templates, onChange, onSave, saving, savedId }
             </Button>
           </div>
 
-          {/* Preview panel */}
-          {preview && (
-            <div className="rounded-lg border border-[var(--border-default)] bg-white p-4 mt-2">
-              <p className="text-xs text-[var(--text-muted)] font-heebo mb-2">תצוגה מקדימה:</p>
-              {category.fields.filter((f) => f.type === 'html').map((f) => (
-                <div
-                  key={f.key}
-                  className="prose prose-sm max-w-none font-heebo text-right"
-                  dir="rtl"
-                  dangerouslySetInnerHTML={{
-                    __html: (templates[f.key] || '')
-                      .replace(/\{name\}/g, 'הרב ישראל כהן')
-                      .replace(/\{title\}/g, 'שאלה לדוגמה')
-                      .replace(/\{id\}/g, 'abc123')
-                      .replace(/\{rabbi_name\}/g, 'הרב ישראל כהן')
-                      .replace(/\{system_name\}/g, templates.rabbi_system_name || 'ענה את השואל')
-                      .replace(/\{email\}/g, 'rabbi@example.com')
-                      .replace(/\{password\}/g, '••••••')
-                      .replace(/\{answered_count\}/g, '12')
-                      .replace(/\{avg_response_time\}/g, '2.5 שעות')
-                      .replace(/\{thank_count\}/g, '8')
-                      .replace(/\{category\}/g, 'הלכה')
-                      .replace(/\{content\}/g, 'תוכן השאלה המלא...')
-                      .replace(/\{timeout_hours\}/g, '4')
-                      .replace(/\{login_url\}/g, '#')
-                  }}
-                />
-              ))}
+          {/* Full preview modal */}
+          {previewHtml && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => setPreviewHtml(null)}
+            >
+              <div
+                className="relative bg-[#f4f4f7] rounded-xl shadow-2xl w-[95vw] max-w-[650px] max-h-[90vh] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+                  <span className="text-sm font-bold font-heebo text-[var(--text-primary)]">
+                    תצוגה מקדימה — {category.title}
+                  </span>
+                  <button
+                    onClick={() => setPreviewHtml(null)}
+                    className="p-1 rounded hover:bg-gray-100 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                {/* Email render */}
+                <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 52px)' }}>
+                  <iframe
+                    srcDoc={previewHtml}
+                    title="Email Preview"
+                    className="w-full border-0"
+                    style={{ height: '700px', minHeight: '500px' }}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -295,14 +295,15 @@ CREATE TABLE IF NOT EXISTS message_reactions (
 -- ─── notifications_log ───────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS notifications_log (
-  id       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  rabbi_id UUID         NOT NULL REFERENCES rabbis (id) ON DELETE CASCADE,
-  type     VARCHAR(100) NOT NULL,
-  channel  VARCHAR(20)  NOT NULL,
-  content  JSONB        NOT NULL,
-  sent_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  status   VARCHAR(20)  NOT NULL DEFAULT 'sent'
-             CHECK (status IN ('sent','failed','pending'))
+  id        UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  rabbi_id  UUID         NOT NULL REFERENCES rabbis (id) ON DELETE CASCADE,
+  type      VARCHAR(100) NOT NULL,
+  channel   VARCHAR(20)  NOT NULL,
+  content   JSONB        NOT NULL,
+  entity_id VARCHAR(255),
+  sent_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  status    VARCHAR(20)  NOT NULL DEFAULT 'sent'
+              CHECK (status IN ('sent','failed','pending'))
 );
 
 -- ─── notification_preferences ────────────────────────────────────────────────

@@ -29,23 +29,12 @@ const EMAIL_FOLDERS = [
         id: 'new_question',
         title: 'שאלה חדשה',
         icon: '📩',
-        description: 'התראה לרב על שאלה חדשה שהתקבלה',
+        description: 'מייל עם השאלה המלאה + הנחיות תפוס/שחרר/ענה',
         fields: [
           { key: 'rabbi_new_question_subject', label: 'נושא', type: 'input' },
           { key: 'rabbi_new_question_body', label: 'תוכן (HTML)', type: 'html' },
         ],
-        variables: ['{name}', '{title}', '{id}', '{category}', '{system_name}'],
-      },
-      {
-        id: 'full_question',
-        title: 'שאלה מלאה (אחרי תפיסה)',
-        icon: '📄',
-        description: 'השאלה המלאה שנשלחת לרב אחרי שתפס אותה',
-        fields: [
-          { key: 'rabbi_full_question_subject', label: 'נושא', type: 'input' },
-          { key: 'rabbi_full_question_body', label: 'תוכן (HTML)', type: 'html' },
-        ],
-        variables: ['{name}', '{title}', '{id}', '{content}', '{timeout_hours}', '{system_name}'],
+        variables: ['{name}', '{title}', '{id}', '{content}', '{category}', '{timeout_hours}', '{system_name}'],
       },
       {
         id: 'thank',

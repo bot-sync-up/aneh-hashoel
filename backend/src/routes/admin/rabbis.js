@@ -621,14 +621,37 @@ router.delete('/:id', async (req, res, next) => {
         [targetId]
       );
 
+      // Reassign answers to admin (avoid FK violation)
+      await client.query(
+        `UPDATE answers SET rabbi_id = $2 WHERE rabbi_id = $1`,
+        [targetId, req.rabbi.id]
+      );
+
+      // Reassign follow-up answers
+      try {
+        await client.query(
+          `UPDATE follow_up_questions SET answered_by = NULL WHERE answered_by = $1`,
+          [targetId]
+        );
+      } catch (_) {}
+
       // Delete related records (ignore errors for tables that may not exist)
       const relatedDeletes = [
         'DELETE FROM rabbi_templates WHERE rabbi_id = $1',
+        'DELETE FROM rabbi_categories WHERE rabbi_id = $1',
+        'DELETE FROM rabbi_achievements WHERE rabbi_id = $1',
+        'DELETE FROM rabbi_stats WHERE rabbi_id = $1',
+        'DELETE FROM message_reactions WHERE rabbi_id = $1',
+        'DELETE FROM notification_preferences WHERE rabbi_id = $1',
         'DELETE FROM discussion_members WHERE rabbi_id = $1',
+        'DELETE FROM support_messages WHERE sender_id = $1',
         'DELETE FROM notifications_log WHERE rabbi_id = $1',
+        'DELETE FROM sessions WHERE rabbi_id = $1',
         'DELETE FROM refresh_tokens WHERE rabbi_id = $1',
         'DELETE FROM device_sessions WHERE rabbi_id = $1',
         'DELETE FROM badges WHERE rabbi_id = $1',
+        'DELETE FROM private_notes WHERE rabbi_id = $1',
+        'DELETE FROM answer_templates WHERE rabbi_id = $1',
       ];
       for (const sql of relatedDeletes) {
         try { await client.query(sql, [targetId]); } catch (_) { /* table may not exist */ }

@@ -63,7 +63,7 @@ add_action('wp_footer', function() {
                 <input type="email" id="aneh-fu-email" placeholder="האימייל שלך (כפי ששלחת את השאלה)"
                     style="width:100%; padding:9px 12px; margin-bottom:8px; box-sizing:border-box;
                            border:1px solid #ccc; border-radius:4px; font-size:14px;
-                           font-family:inherit; direction:ltr; text-align:left; outline:none;" />
+                           font-family:inherit; direction:ltr; text-align:right; outline:none;" />
                 <textarea id="aneh-fu-content" rows="3" placeholder="כתוב את שאלת ההמשך שלך..."
                     style="width:100%; padding:9px 12px; margin-bottom:10px; box-sizing:border-box;
                            border:1px solid #ccc; border-radius:4px; font-size:14px;

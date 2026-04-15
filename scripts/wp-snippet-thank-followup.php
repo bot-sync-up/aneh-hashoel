@@ -6,13 +6,21 @@
 
 define('ANEH_API_URL', 'https://ask.moreshet-maran.com/api');
 
-// Register thank_count meta so it's writable via WP REST API
+// Register meta fields so they're writable via WP REST API
 add_action('init', function() {
     register_post_meta('ask-rabai', 'thank_count', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
+        'auth_callback' => '__return_true',
+    ]);
+    register_post_meta('ask-rabai', 'follow_up_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'auth_callback' => '__return_true',
     ]);
 });
 

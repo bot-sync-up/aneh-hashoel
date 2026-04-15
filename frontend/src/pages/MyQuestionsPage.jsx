@@ -275,8 +275,9 @@ const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   const navigate = useNavigate();
-  const { id, title, category_name, answered_at, answer_content, created_at, wp_post_id } = question;
+  const { id, title, category_name, answered_at, answer_content, created_at, wp_post_id, follow_up_count, follow_up_question } = question;
   const wpUrl = wp_post_id ? `https://moreshet-maran.com/ask-rabai/${wp_post_id}` : null;
+  const hasFollowUp = (follow_up_count > 0) || !!follow_up_question;
 
   const canEditAnswer = tab === 'answered' && !!answered_at &&
     (Date.now() - new Date(answered_at).getTime()) < EDIT_WINDOW_MS;
@@ -292,6 +293,12 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
         className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-card shadow-soft overflow-hidden cursor-pointer hover:border-brand-gold/60 hover:shadow-lg transition-all"
         onClick={() => navigate(`/questions/${id}`)}
       >
+        {hasFollowUp && (
+          <div className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-200">
+            <span className="text-amber-600 text-lg">🔄</span>
+            <span className="text-sm font-bold font-heebo text-amber-700">יש שאלת המשך ממתינה!</span>
+          </div>
+        )}
         {/* Header */}
         <div className="px-5 pt-4 pb-2">
           {category_name && (
@@ -378,10 +385,20 @@ function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   // ── "בטיפולי" — כרטיס שאלה רגיל ────────────────────────────────────────
   return (
     <div className="flex flex-col">
+      {hasFollowUp && (
+        <div
+          className="flex items-center gap-2 px-5 py-2.5 bg-amber-50 border border-amber-200 border-b-0 rounded-t-card cursor-pointer hover:bg-amber-100 transition-colors"
+          onClick={() => navigate(`/questions/${id}`)}
+        >
+          <span className="text-amber-600 text-lg">🔄</span>
+          <span className="text-sm font-bold font-heebo text-amber-700">שאלת המשך ממתינה לתשובתך!</span>
+          <span className="mr-auto text-xs font-heebo text-amber-600 underline">לחץ לענות</span>
+        </div>
+      )}
       <QuestionCard
         question={question}
         showActions={false}
-        className="flex-1 rounded-b-none border-b-0"
+        className={clsx('flex-1 border-b-0', hasFollowUp ? 'rounded-t-none rounded-b-none' : 'rounded-b-none')}
       />
       <div className="flex items-center gap-2 flex-wrap px-5 py-3 bg-[var(--bg-surface)] border border-[var(--border-default)] border-t-0 rounded-b-card shadow-soft">
         <Button

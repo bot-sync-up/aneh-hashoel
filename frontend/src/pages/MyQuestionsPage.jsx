@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
-import { Inbox, ClipboardEdit, CheckCircle2, Pencil, Clock, Eye, Lock, ExternalLink } from 'lucide-react';
+import { Inbox, ClipboardEdit, CheckCircle2, Pencil, Clock, Eye, Lock, ExternalLink, MessageCircleQuestion } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatRelative } from '../lib/utils';
 import PageHeader from '../components/layout/PageHeader';
@@ -28,6 +28,13 @@ const TABS = [
     emptyTitle: 'עדיין לא ענית על שאלות',
     emptyDesc: 'שאלות שענית עליהן יופיעו כאן.',
   },
+  {
+    key: 'follow_up',
+    label: 'שאלות המשך',
+    icon: MessageCircleQuestion,
+    emptyTitle: 'אין שאלות המשך ממתינות',
+    emptyDesc: 'כשהשואל ישלח שאלת המשך, היא תופיע כאן.',
+  },
 ];
 
 export default function MyQuestionsPage() {
@@ -39,10 +46,11 @@ export default function MyQuestionsPage() {
   const [questionsByTab, setQuestionsByTab] = useState({
     in_process: [],
     answered: [],
+    follow_up: [],
   });
-  const [loading, setLoading] = useState({ in_process: true, answered: true });
-  const [error, setError] = useState({ in_process: null, answered: null });
-  const [counts, setCounts] = useState({ in_process: 0, answered: 0 });
+  const [loading, setLoading] = useState({ in_process: true, answered: true, follow_up: true });
+  const [error, setError] = useState({ in_process: null, answered: null, follow_up: null });
+  const [counts, setCounts] = useState({ in_process: 0, answered: 0, follow_up: 0 });
 
   // Modals
   const [releaseTarget, setReleaseTarget] = useState(null);
@@ -54,9 +62,18 @@ export default function MyQuestionsPage() {
     setLoading((prev) => ({ ...prev, [tab]: true }));
     setError((prev) => ({ ...prev, [tab]: null }));
     try {
-      const data = await get('/questions/my', { status: tab, limit: 100 });
-      const items = data.questions || data.data || data || [];
-      const total = data.total ?? items.length;
+      let items, total;
+      if (tab === 'follow_up') {
+        // Fetch answered questions and filter to those with pending follow-ups
+        const data = await get('/questions/my', { status: 'answered', limit: 100 });
+        const allItems = data.questions || data.data || data || [];
+        items = allItems.filter((q) => q.pending_follow_up > 0);
+        total = items.length;
+      } else {
+        const data = await get('/questions/my', { status: tab, limit: 100 });
+        items = data.questions || data.data || data || [];
+        total = data.total ?? items.length;
+      }
       setQuestionsByTab((prev) => ({ ...prev, [tab]: items }));
       setCounts((prev) => ({ ...prev, [tab]: total }));
     } catch (err) {
@@ -72,6 +89,7 @@ export default function MyQuestionsPage() {
   useEffect(() => {
     fetchTab('in_process');
     fetchTab('answered');
+    fetchTab('follow_up');
   }, [fetchTab]);
 
   // ── Socket events ────────────────────────────────────────────────────────

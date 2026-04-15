@@ -376,20 +376,9 @@ async function sendFollowUpNotification(rabbiEmail, question, followUpContent) {
       <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.7;">${followUpContent || ''}</p>
     </div>
 
-    <div style="
-      background-color: #fffbf0;
-      border: 1px solid #e8d88a;
-      border-right: 4px solid ${BRAND_GOLD};
-      padding: 14px 18px;
-      margin: 16px 0 0;
-      border-radius: 4px;
-      font-size: 13px;
-      color: #444;
-      line-height: 1.8;
-    ">
-      <p style="margin: 0 0 8px; font-weight: bold; color: ${BRAND_NAVY};">הנחיות לתגובה מהמייל:</p>
-      <p style="margin: 0;">• השב למייל זה עם תשובתך לשאלת ההמשך — היא תפורסם אוטומטית.</p>
-    </div>
+    <p style="margin: 12px 0 0; font-size: 13px; color: #888;">
+      לחץ על "צפה בשאלה" כדי לענות על שאלת ההמשך דרך המערכת.
+    </p>
   `;
 
   const html = createEmailHTML('שאלת המשך מהשואל', bodyContent, [

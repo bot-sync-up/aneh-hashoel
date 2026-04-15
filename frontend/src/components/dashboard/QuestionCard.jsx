@@ -47,9 +47,12 @@ export default function QuestionCard({
     askerName,
     attachment_url,
     attachmentUrl,
+    follow_up_count,
+    follow_up_question,
   } = question;
 
   const hasAttachment = !!(attachment_url || attachmentUrl);
+  const hasFollowUp = (follow_up_count > 0) || !!follow_up_question;
 
   const questionId = _id || id;
   const titleTruncated = truncate(decodeHTML(title) || 'שאלה ללא כותרת', 80);
@@ -102,6 +105,11 @@ export default function QuestionCard({
               size="xs"
               withDot
             />
+            {hasFollowUp && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 font-heebo">
+                🔄 שאלת המשך
+              </span>
+            )}
           </div>
 
           {/* Date & time */}

@@ -90,7 +90,7 @@ add_action('wp_footer', function() {
         <div style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:12px; direction:rtl; text-align:right;">
             <p style="margin:0; padding:8px 14px; background:#f0f7f0; border:1px solid #c3e6c3; border-radius:4px;
                       color:#2d6a2d; font-size:13px; font-family:inherit;">
-                ✅ שאלת המשך כבר נשלחה לשאלה זו. הרב יענה בהקדם.
+                ✅ שאלת המשך כבר נשלחה לשאלה זו.
             </p>
         </div>
         <?php endif; ?>

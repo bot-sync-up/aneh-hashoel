@@ -455,9 +455,31 @@ async function answerFollowUp(questionId, rabbiId, content) {
     null
   );
 
-  // WP sync — fire-and-forget
-  getWPSyncService().syncAnswersToWP().catch((err) => {
-    console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', err.message);
+  // WP sync — append follow-up answer to the WP post (fire-and-forget)
+  setImmediate(async () => {
+    try {
+      const { rows: qRows } = await dbQuery(
+        `SELECT q.wp_post_id, a.content AS original_answer, r.name AS rabbi_name
+         FROM questions q
+         JOIN answers a ON a.question_id = q.id
+         JOIN rabbis r ON r.id = a.rabbi_id
+         WHERE q.id = $1`,
+        [questionId]
+      );
+      if (qRows[0]?.wp_post_id) {
+        const { publishAnswer } = require('./wpService');
+        const combinedContent = qRows[0].original_answer +
+          `\n\n<hr/>\n<h4>שאלת המשך:</h4>\n<p>${updatedFollowUp.asker_content || ''}</p>` +
+          `\n<h4>תשובת הרב:</h4>\n<p>${sanitizedContent}</p>`;
+        await publishAnswer(qRows[0].wp_post_id, {
+          content: combinedContent,
+          rabbiName: qRows[0].rabbi_name,
+          publishedAt: new Date().toISOString(),
+        });
+      }
+    } catch (wpErr) {
+      console.error('[questionService] שגיאה בסנכרון תשובת המשך ל-WordPress:', wpErr.message);
+    }
   });
 
   // Notify asker — fire-and-forget

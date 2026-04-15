@@ -94,6 +94,7 @@ function Sidebar({ notificationCount = 0 }) {
 
   const [pendingCount, setPendingCount] = useState(0);
   const [myOpenCount, setMyOpenCount] = useState(0);
+  const [followUpCount, setFollowUpCount] = useState(0);
   const [unreadDiscussionsCount, setUnreadDiscussionsCount] = useState(0);
 
   const fetchCounts = useCallback(async () => {
@@ -101,6 +102,7 @@ function Sidebar({ notificationCount = 0 }) {
       const data = await get('/questions/counts');
       setPendingCount(data.pendingCount ?? 0);
       setMyOpenCount(data.myOpenCount ?? 0);
+      setFollowUpCount(data.followUpCount ?? 0);
     } catch {}
   }, []);
 
@@ -237,7 +239,7 @@ function Sidebar({ notificationCount = 0 }) {
               item={item}
               collapsed={collapsed}
               notificationCount={
-                item.to === '/my-questions'  ? myOpenCount  :
+                item.to === '/my-questions'  ? (myOpenCount + followUpCount) :
                 item.to === '/questions'     ? pendingCount :
                 item.to === '/discussions'   ? unreadDiscussionsCount :
                 item.badge                  ? notificationCount : 0

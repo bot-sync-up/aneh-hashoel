@@ -234,9 +234,19 @@ router.get('/counts', authenticate, async (req, res, next) => {
        FROM questions`,
       [rabbiId]
     );
+    // Count follow-ups waiting for this rabbi's answer
+    const { rows: fuRows } = await dbQuery(
+      `SELECT COUNT(*)::int AS follow_up_count
+       FROM follow_up_questions fq
+       JOIN questions q ON q.id = fq.question_id
+       WHERE q.assigned_rabbi_id = $1
+         AND fq.rabbi_answer IS NULL`,
+      [rabbiId]
+    );
     return res.json({
-      pendingCount: parseInt(rows[0].pending_count, 10),
-      myOpenCount:  parseInt(rows[0].my_open_count,  10),
+      pendingCount:  parseInt(rows[0].pending_count, 10),
+      myOpenCount:   parseInt(rows[0].my_open_count,  10),
+      followUpCount: fuRows[0]?.follow_up_count || 0,
     });
   } catch (err) {
     return next(err);

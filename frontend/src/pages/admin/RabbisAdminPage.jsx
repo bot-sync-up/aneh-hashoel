@@ -84,7 +84,7 @@ function EditRabbiModal({ rabbi, onClose, onSave, onToggleActive, onChangeRole, 
             </div>
             <div>
               <h3 className="text-lg font-bold font-heebo text-[var(--text-primary)]">{rabbi.name}</h3>
-              <p className="text-xs text-[var(--text-muted)] font-heebo">{rabbi.email}</p>
+              <p className="text-xs text-[var(--text-muted)] font-heebo" dir="ltr" style={{ direction: 'ltr', unicodeBidi: 'plaintext', textAlign: 'right' }}>{rabbi.email}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)]"><X size={18} /></button>
@@ -687,7 +687,7 @@ export default function RabbisAdminPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)]">{rabbi.email}</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)]" dir="ltr" style={{ direction: 'ltr', unicodeBidi: 'plaintext', textAlign: 'right' }}>{rabbi.email}</td>
                     <td className="px-4 py-3">
                       <RoleBadge role={rabbi.role} />
                     </td>

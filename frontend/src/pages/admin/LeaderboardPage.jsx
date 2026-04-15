@@ -71,7 +71,7 @@ function TopRabbiCard({ rabbi, loading }) {
       <div className="grid grid-cols-3 gap-3">
         {[
           { icon: Trophy, label: 'תשובות השבוע', value: rabbi.answersThisWeek, color: 'text-[#B8973A]' },
-          { icon: Clock,  label: 'זמן ממוצע',     value: `${rabbi.avgTimeHours}ש'`, color: 'text-blue-500' },
+          { icon: Clock,  label: 'זמן ממוצע',     value: rabbi.avgTimeHours && parseFloat(rabbi.avgTimeHours) > 0 ? `${rabbi.avgTimeHours}ש'` : 'לא זמין', color: 'text-blue-500' },
           { icon: ThumbsUp, label: 'תודות',        value: rabbi.thanks, color: 'text-emerald-500' },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className="rounded-xl bg-white border border-[var(--border-default)] p-3 text-center">
@@ -221,7 +221,7 @@ export default function LeaderboardPage() {
                         {rabbi.answers}
                       </td>
                       <td className="px-4 py-3 text-[var(--text-secondary)] tabular-nums">
-                        {rabbi.avgTimeHours ? `${rabbi.avgTimeHours}ש'` : '—'}
+                        {rabbi.avgTimeHours && parseFloat(rabbi.avgTimeHours) > 0 ? `${rabbi.avgTimeHours}ש'` : 'לא זמין'}
                       </td>
                       <td className="px-4 py-3 text-[var(--text-secondary)] tabular-nums">
                         {rabbi.thanks ?? 0}

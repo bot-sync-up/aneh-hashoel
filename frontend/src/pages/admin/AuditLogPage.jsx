@@ -76,7 +76,9 @@ function _buildDetails(newValue, oldValue, ip) {
     if (nv.retriedCount != null) parts.push(`${nv.retriedCount} ניסיונות`);
     // If no known keys, show a short JSON snippet
     if (parts.length === 0) {
-      const keys = Object.keys(nv).slice(0, 3);
+      const keys = Object.keys(nv)
+        .filter((k) => nv[k] !== null && nv[k] !== undefined && nv[k] !== '')
+        .slice(0, 3);
       if (keys.length > 0) parts.push(keys.map((k) => `${k}: ${nv[k]}`).join(', '));
     }
   } else if (typeof newValue === 'string') {
@@ -143,7 +145,7 @@ export default function AuditLogPage() {
       const items = rawEntries.map((e) => ({
         id:        e.id,
         timestamp: e.created_at ?? e.createdAt,
-        rabbiName: e.actor_name ?? e.actorName ?? '—',
+        rabbiName: e.actor_name ?? e.actorName ?? 'מערכת',
         action:    _normalizeAction(e.action),
         entity:    _buildEntity(e.entity_type ?? e.entityType, e.entity_id ?? e.entityId),
         details:   _buildDetails(e.new_value ?? e.newValue, e.old_value ?? e.oldValue, e.ip),

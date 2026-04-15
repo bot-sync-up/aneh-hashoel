@@ -117,12 +117,12 @@ export default function MessageBubble({
     const reactions = message.reactions;
     // Backend returns reactions as an object map: { emoji: { count, reacted, rabbis[] } }
     if (reactions && typeof reactions === 'object' && !Array.isArray(reactions)) {
-      // Normalize to { emoji: { count, myReaction } }
       const grouped = {};
       for (const [emoji, data] of Object.entries(reactions)) {
         grouped[emoji] = {
           count: data.count || 0,
           myReaction: data.reacted || false,
+          rabbis: Array.isArray(data.rabbis) ? data.rabbis : [],
         };
       }
       return grouped;
@@ -131,8 +131,9 @@ export default function MessageBubble({
     if (Array.isArray(reactions)) {
       const grouped = {};
       reactions.forEach((r) => {
-        if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, myReaction: false };
+        if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, myReaction: false, rabbis: [] };
         grouped[r.emoji].count += 1;
+        if (r.rabbi_name) grouped[r.emoji].rabbis.push({ id: r.rabbi_id, name: r.rabbi_name });
         if (String(r.rabbi_id) === String(currentRabbiId)) grouped[r.emoji].myReaction = true;
       });
       return grouped;
@@ -185,24 +186,26 @@ export default function MessageBubble({
             onClick={onReply}
           />
 
-          {/* Emoji picker trigger */}
-          <div className="relative">
-            <ActionButton
-              icon={<span className="text-xs leading-none">😀</span>}
-              label="הגב"
-              onClick={() => setShowEmojiPicker((v) => !v)}
-            />
-            {showEmojiPicker && (
-              <EmojiPickerPanel
-                onSelect={(emoji) => {
-                  onReact?.(emoji);
-                  setShowEmojiPicker(false);
-                }}
-                onClose={() => setShowEmojiPicker(false)}
-                isOwn={isOwn}
+          {/* Emoji picker trigger — not on own message */}
+          {!isOwn && (
+            <div className="relative">
+              <ActionButton
+                icon={<span className="text-xs leading-none">😀</span>}
+                label="הגב"
+                onClick={() => setShowEmojiPicker((v) => !v)}
               />
-            )}
-          </div>
+              {showEmojiPicker && (
+                <EmojiPickerPanel
+                  onSelect={(emoji) => {
+                    onReact?.(emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  onClose={() => setShowEmojiPicker(false)}
+                  isOwn={isOwn}
+                />
+              )}
+            </div>
+          )}
 
           {/* Pin (creator / admin) */}
           {canPin && (
@@ -360,23 +363,30 @@ export default function MessageBubble({
                 isOwn ? 'justify-start' : 'justify-end'
               )}
             >
-              {Object.entries(reactionGroups).map(([emoji, { count, myReaction }]) => (
-                <button
-                  key={emoji}
-                  onClick={() => onReact?.(emoji)}
-                  className={clsx(
-                    'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-heebo',
-                    'border transition-colors duration-150',
-                    myReaction
-                      ? 'bg-[#1B2B5E]/10 border-[#1B2B5E]/30 text-[#1B2B5E]'
-                      : 'bg-white border-gray-200 text-[var(--text-secondary)] hover:border-[#1B2B5E]/30'
-                  )}
-                  aria-label={`${emoji} ${count} תגובות`}
-                >
-                  <span>{emoji}</span>
-                  <span>{count}</span>
-                </button>
-              ))}
+              {Object.entries(reactionGroups).map(([emoji, { count, myReaction, rabbis = [] }]) => {
+                const names = rabbis.map((r) => r.name).filter(Boolean).join(', ');
+                return (
+                  <button
+                    key={emoji}
+                    onClick={() => !isOwn && onReact?.(emoji)}
+                    disabled={isOwn}
+                    title={names || `${count} תגובות`}
+                    className={clsx(
+                      'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-heebo',
+                      'border transition-colors duration-150',
+                      isOwn && 'cursor-default',
+                      myReaction
+                        ? 'bg-[#1B2B5E]/10 border-[#1B2B5E]/30 text-[#1B2B5E]'
+                        : 'bg-white border-gray-200 text-[var(--text-secondary)]',
+                      !isOwn && !myReaction && 'hover:border-[#1B2B5E]/30'
+                    )}
+                    aria-label={`${emoji} ${count} תגובות${names ? ': ' + names : ''}`}
+                  >
+                    <span>{emoji}</span>
+                    <span>{count}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

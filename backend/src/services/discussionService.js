@@ -1084,9 +1084,9 @@ async function addReaction(messageId, rabbiId, emoji, io) {
     throw e;
   }
 
-  // Verify the message exists and get its discussion
+  // Verify the message exists and get its discussion + author
   const { rows: msgRows } = await dbQuery(
-    `SELECT id, discussion_id, deleted_at FROM discussion_messages WHERE id = $1`,
+    `SELECT id, discussion_id, deleted_at, rabbi_id AS author_id FROM discussion_messages WHERE id = $1`,
     [messageId]
   );
 
@@ -1098,6 +1098,13 @@ async function addReaction(messageId, rabbiId, emoji, io) {
 
   if (msgRows[0].deleted_at) {
     const e = new Error('לא ניתן להגיב על הודעה שנמחקה');
+    e.status = 400;
+    throw e;
+  }
+
+  // Block reacting to your own message
+  if (String(msgRows[0].author_id) === String(rabbiId)) {
+    const e = new Error('לא ניתן להגיב על הודעה שלך');
     e.status = 400;
     throw e;
   }

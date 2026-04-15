@@ -771,7 +771,7 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
     // Delegate to the existing submitFollowUp service (validates status + count)
     const followUp = await questionService.submitFollowUp(questionId, content);
 
-    // Notify the assigned rabbi (socket + email)
+    // Notify the assigned rabbi (socket + email) + update WP meta
     setImmediate(async () => {
       try {
         const { rows: qRows } = await dbQuery(
@@ -782,6 +782,25 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
            WHERE q.id = $1`,
           [questionId]
         );
+
+        // Update WP post meta so the follow-up form hides on refresh
+        const wpPostId = qRows[0]?.wp_post_id;
+        if (wpPostId) {
+          try {
+            const axios = require('axios');
+            const wpUrl = process.env.WP_API_URL;
+            const wpKey = process.env.WP_API_KEY;
+            if (wpUrl && wpKey) {
+              const cred = Buffer.from(wpKey).toString('base64');
+              await axios.post(`${wpUrl}/ask-rabai/${wpPostId}`,
+                { meta: { follow_up_count: '1' } },
+                { headers: { Authorization: `Basic ${cred}`, 'Content-Type': 'application/json' }, timeout: 10000 }
+              );
+            }
+          } catch (wpErr) {
+            console.warn('[wp-follow-up] failed to update WP follow_up_count meta:', wpErr.message);
+          }
+        }
         const q = qRows[0];
         if (q && q.assigned_rabbi_id) {
           // Socket notification

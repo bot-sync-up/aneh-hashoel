@@ -54,13 +54,16 @@ add_action('wp_footer', function() {
         <!-- Follow-up Form -->
         <div style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:18px; direction:rtl; text-align:right;">
             <h4 style="margin:0 0 4px; font-size:15px; font-weight:700; color:inherit; font-family:inherit;">שאלת המשך</h4>
-            <p style="margin:0 0 12px; font-size:13px; color:#888; font-family:inherit;">ניתן לשלוח שאלת הבהרה אחת בלבד.</p>
+            <p style="margin:0 0 6px; font-size:13px; color:#888; font-family:inherit;">ניתן לשלוח שאלת הבהרה אחת בלבד.</p>
+            <p style="margin:0 0 12px; font-size:12px; color:#B8973A; font-family:inherit; font-weight:600;">
+                * רק מי ששלח את השאלה המקורית יכול לשלוח שאלת המשך (יש להזין את אותו אימייל)
+            </p>
 
             <div id="aneh-followup-form">
                 <input type="email" id="aneh-fu-email" placeholder="האימייל שלך (כפי ששלחת את השאלה)"
                     style="width:100%; padding:9px 12px; margin-bottom:8px; box-sizing:border-box;
                            border:1px solid #ccc; border-radius:4px; font-size:14px;
-                           font-family:inherit; direction:rtl; outline:none;" />
+                           font-family:inherit; direction:ltr; text-align:left; outline:none;" />
                 <textarea id="aneh-fu-content" rows="3" placeholder="כתוב את שאלת ההמשך שלך..."
                     style="width:100%; padding:9px 12px; margin-bottom:10px; box-sizing:border-box;
                            border:1px solid #ccc; border-radius:4px; font-size:14px;
@@ -76,10 +79,12 @@ add_action('wp_footer', function() {
             </div>
         </div>
         <?php else: ?>
-        <p style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:12px;
-                  color:#aaa; font-size:13px; font-family:inherit;">
-            שאלת המשך כבר נשלחה לשאלה זו.
-        </p>
+        <div style="border-top:1px solid #e5e0d8; margin-top:20px; padding-top:12px; direction:rtl; text-align:right;">
+            <p style="margin:0; padding:8px 14px; background:#f0f7f0; border:1px solid #c3e6c3; border-radius:4px;
+                      color:#2d6a2d; font-size:13px; font-family:inherit;">
+                ✅ שאלת המשך כבר נשלחה לשאלה זו. הרב יענה בהקדם.
+            </p>
+        </div>
         <?php endif; ?>
     </div>
 

@@ -469,8 +469,15 @@ async function answerFollowUp(questionId, rabbiId, content) {
       if (qRows[0]?.wp_post_id) {
         const { publishAnswer } = require('./wpService');
         const combinedContent = qRows[0].original_answer +
-          `\n\n<hr/>\n<h4>שאלת המשך:</h4>\n<p>${updatedFollowUp.asker_content || ''}</p>` +
-          `\n<h4>תשובת הרב:</h4>\n<p>${sanitizedContent}</p>`;
+          `\n\n<div style="margin-top:24px; padding-top:20px; border-top:2px solid #B8973A;">` +
+          `<div style="background:#f8f6f1; border-right:4px solid #1B2B5E; padding:14px 18px; margin-bottom:16px; border-radius:4px;">` +
+          `<h4 style="margin:0 0 8px; color:#1B2B5E; font-size:15px; font-weight:700;">שאלת המשך מהשואל:</h4>` +
+          `<p style="margin:0; color:#333; font-size:14px; line-height:1.7;">${updatedFollowUp.asker_content || ''}</p>` +
+          `</div>` +
+          `<div style="background:#f0f7f0; border-right:4px solid #B8973A; padding:14px 18px; border-radius:4px;">` +
+          `<h4 style="margin:0 0 8px; color:#1B2B5E; font-size:15px; font-weight:700;">תשובת הרב ${qRows[0].rabbi_name || ''}:</h4>` +
+          `<p style="margin:0; color:#333; font-size:14px; line-height:1.7;">${sanitizedContent}</p>` +
+          `</div></div>`;
         await publishAnswer(qRows[0].wp_post_id, {
           content: combinedContent,
           rabbiName: qRows[0].rabbi_name,

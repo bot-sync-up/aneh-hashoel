@@ -256,8 +256,35 @@ async function processEmail(parsed) {
   const question = questionRows[0];
   const questionTitle = question.title || 'שאלה';
 
-  // Already answered? Only send confirmation if this is a RECENT email (< 10 min old)
+  // Extract and clean the reply text (needed for both follow-up and regular answer)
+  const rawText = stripReplyContent(textBody);
+
+  // Already answered? Check if there's a pending follow-up to answer
   if (question.status === 'answered') {
+    // Check for unanswered follow-up
+    const { rows: fuRows } = await db(
+      `SELECT id, asker_content FROM follow_up_questions
+       WHERE question_id = $1 AND rabbi_answer IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [questionId]
+    );
+
+    if (fuRows.length > 0 && rawText && rawText.length >= 5) {
+      // This is a follow-up answer!
+      const { answerFollowUp } = require('../../services/questionService');
+      try {
+        await answerFollowUp(questionId, rabbi.id, rawText
+          .split(/\n{2,}/)
+          .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+          .join('\n'));
+        log.info({ questionId, rabbiName: rabbi.name }, 'Follow-up answered via email');
+        await sendConfirmation(from, 'answered', questionTitle, questionId);
+        return true;
+      } catch (fuErr) {
+        log.error({ err: fuErr, questionId }, 'Failed to answer follow-up via email');
+      }
+    }
+
     const emailDate = parsed.date ? new Date(parsed.date).getTime() : 0;
     const isRecent = emailDate && (Date.now() - emailDate) < 10 * 60 * 1000;
     log.debug({ questionId }, 'Question already answered — skipping');
@@ -266,9 +293,6 @@ async function processEmail(parsed) {
     }
     return false;
   }
-
-  // Extract and clean the reply text
-  const rawText = stripReplyContent(textBody);
 
   // Check if this is a release request
   if (isReleaseOnly(rawText)) {

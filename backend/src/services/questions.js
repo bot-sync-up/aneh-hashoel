@@ -727,11 +727,13 @@ async function getMyQuestions(rabbiId, status = null) {
             q.flagged, q.flag_reason,
             q.thank_count, q.view_count,
             q.created_at, q.updated_at, q.answered_at,
-            q.asker_name, q.asker_email,
+            q.asker_name, q.asker_email, q.follow_up_count,
             c.name AS category_name,
             a.content AS answer_content,
             a.created_at AS answer_created_at,
-            CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS has_answer
+            CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS has_answer,
+            (SELECT COUNT(*) FROM follow_up_questions fq
+             WHERE fq.question_id = q.id AND fq.rabbi_answer IS NULL)::int AS pending_follow_up
      FROM   questions q
      LEFT JOIN categories c ON c.id = q.category_id
      LEFT JOIN LATERAL (

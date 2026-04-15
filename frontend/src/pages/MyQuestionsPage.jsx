@@ -275,9 +275,9 @@ const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
 function MyQuestionCard({ question, tab, onRelease, onTransfer }) {
   const navigate = useNavigate();
-  const { id, title, category_name, answered_at, answer_content, created_at, wp_post_id, follow_up_count, follow_up_question } = question;
+  const { id, title, category_name, answered_at, answer_content, created_at, wp_post_id, pending_follow_up, follow_up_question } = question;
   const wpUrl = wp_post_id ? `https://moreshet-maran.com/ask-rabai/${wp_post_id}` : null;
-  const hasFollowUp = (follow_up_count > 0) || !!follow_up_question;
+  const hasFollowUp = (pending_follow_up > 0) || (!!follow_up_question && !question.follow_up_answer);
 
   const canEditAnswer = tab === 'answered' && !!answered_at &&
     (Date.now() - new Date(answered_at).getTime()) < EDIT_WINDOW_MS;

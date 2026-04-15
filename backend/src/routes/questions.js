@@ -785,7 +785,7 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
         const q = qRows[0];
         if (q && q.assigned_rabbi_id) {
           // Socket notification
-          const io = _getIO(req);
+          const io = _io(req);
           if (io) {
             io.to(`rabbi:${q.assigned_rabbi_id}`).emit('question:followUpReceived', {
               questionId,

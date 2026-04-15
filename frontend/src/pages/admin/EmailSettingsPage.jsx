@@ -80,6 +80,17 @@ const EMAIL_FOLDERS = [
         variables: ['{name}', '{title}', '{id}'],
       },
       {
+        id: 'follow_up_to_rabbi',
+        title: 'שאלת המשך מהשואל',
+        icon: '🔄',
+        description: 'התראה לרב ששואל הוסיף שאלת המשך',
+        fields: [
+          { key: 'rabbi_follow_up_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_follow_up_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{name}', '{title}', '{id}', '{follow_up_content}', '{system_name}'],
+      },
+      {
         id: 'answer_confirm',
         title: 'אישור קליטת תשובה',
         icon: '📝',
@@ -225,6 +236,8 @@ const DEFAULT_TEMPLATES = {
   rabbi_weekly_report_body: '<p>כבוד הרב,</p><p>להלן סיכום הפעילות שלך השבוע:</p><p><strong>שאלות שנענו:</strong> {answered_count}<br/><strong>זמן תגובה ממוצע:</strong> {avg_response_time}<br/><strong>תודות שהתקבלו:</strong> {thank_count}</p>',
   asker_follow_up_subject: 'שאלת המשך — {system_name}',
   asker_follow_up_body: '<p>שלום {name},</p><p>נרשמה שאלת המשך לשאלתך <strong>"{title}"</strong>.</p><p>הרב יענה בהקדם.</p>',
+  rabbi_follow_up_subject: '[ID:{id}] שאלת המשך: {title} — {system_name}',
+  rabbi_follow_up_body: '<p>שלום רב,</p><p>השואל הוסיף שאלת המשך לשאלה שטיפלת בה:</p><div style="background:#f8f8fb;border-right:4px solid #B8973A;padding:16px 20px;margin:16px 0;border-radius:4px;"><p style="margin:0 0 8px;font-weight:bold;font-size:15px;color:#1B2B5E;">{title}</p><p style="margin:0;color:#333;font-size:14px;line-height:1.7;">{follow_up_content}</p></div><p style="margin:12px 0;font-size:13px;color:#888;">ניתן להשיב ישירות למייל זה.</p>',
   password_reset_subject: 'איפוס סיסמה — {system_name}',
   password_reset_body: '<p>שלום {name},</p><p>התקבלה בקשה לאיפוס הסיסמה שלך.</p><p>לחץ על הכפתור למטה לאיפוס:</p>',
   new_device_subject: 'כניסה ממכשיר חדש — {system_name}',

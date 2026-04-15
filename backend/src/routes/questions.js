@@ -775,7 +775,8 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
     setImmediate(async () => {
       try {
         const { rows: qRows } = await dbQuery(
-          `SELECT q.title, q.assigned_rabbi_id, r.email AS rabbi_email, r.name AS rabbi_name
+          `SELECT q.title, q.assigned_rabbi_id, q.question_number, q.wp_post_id, q.email_message_id,
+                  r.email AS rabbi_email, r.name AS rabbi_name
            FROM questions q
            LEFT JOIN rabbis r ON r.id = q.assigned_rabbi_id
            WHERE q.id = $1`,
@@ -795,11 +796,14 @@ router.post('/:id/wp-follow-up', wpFollowUpRateLimiter, async (req, res, next) =
           if (q.rabbi_email) {
             try {
               const { sendFollowUpNotification } = require('../services/email');
+              const he = require('he');
               await sendFollowUpNotification(q.rabbi_email, {
-                title: q.title,
+                title: he.decode(q.title || ''),
                 id: questionId,
+                question_number: q.question_number || q.wp_post_id,
                 rabbi_name: q.rabbi_name,
-              });
+                email_message_id: q.email_message_id,
+              }, content);
             } catch (emailErr) {
               console.error('[wp-follow-up] email notification failed:', emailErr.message);
             }

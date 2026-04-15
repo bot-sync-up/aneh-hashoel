@@ -352,8 +352,11 @@ async function sendQuestionNotification(rabbiEmail, question) {
  * @param {string} followUpContent  תוכן שאלת ההמשך
  */
 async function sendFollowUpNotification(rabbiEmail, question, followUpContent) {
-  const questionUrl = `${appUrl()}/questions/${question.id}`;
-  const subject     = `[ID: ${question.id}] שאלת המשך — ${question.title || 'שאלה'}`;
+  const templates     = await getEmailTemplates();
+  const systemName    = templates.rabbi_system_name || 'ענה את השואל';
+  const questionUrl   = `${appUrl()}/questions/${question.id}`;
+  const questionNumber = question.question_number || question.wp_post_id || question.id;
+  const subject       = `[ID:${questionNumber}] שאלת המשך: ${question.title || 'שאלה'} — ${systemName}`;
 
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>

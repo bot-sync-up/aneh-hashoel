@@ -551,13 +551,11 @@ async function _dispatchEmergencyNotifications(message, targetRabbiIds) {
 
   await Promise.allSettled(
     rabbis.map((r) =>
-      sendEmail({
-        to:      r.email,
-        subject: 'הודעה דחופה — ענה את השואל',
-        html,
-      }).catch((err) => {
-        console.error(`[system] Emergency email to ${r.email} failed:`, err.message);
-      })
+      sendEmail(r.email, 'הודעה דחופה — ענה את השואל', html)
+        .then(() => console.log(`[system] Emergency email sent to ${r.email}`))
+        .catch((err) => {
+          console.error(`[system] Emergency email to ${r.email} failed:`, err.message);
+        })
     )
   );
 

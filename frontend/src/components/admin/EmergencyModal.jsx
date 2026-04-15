@@ -25,7 +25,7 @@ export default function EmergencyModal({ isOpen, onClose, message }) {
     setError('');
     setLoading(true);
     try {
-      await post('/admin/emergency-broadcast', { message });
+      await post('/admin/system/emergency', { message });
       setSent(true);
     } catch (err) {
       setError(err?.response?.data?.message || 'שגיאה בשליחת ההודעה. נסה שוב.');

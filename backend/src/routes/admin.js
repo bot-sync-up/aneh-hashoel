@@ -1290,13 +1290,11 @@ async function _broadcastEmergencyEmail(message, targetRabbiIds) {
   );
 
   const sendPromises = rabbis.map((r) =>
-    sendEmail({
-      to:      r.email,
-      subject: 'הודעה דחופה — ענה את השואל',
-      html,
-    }).catch((err) => {
-      console.error(`[admin] Failed to send emergency email to ${r.email}:`, err.message);
-    })
+    sendEmail(r.email, 'הודעה דחופה — ענה את השואל', html)
+      .then(() => console.log(`[system] Emergency email sent to ${r.email}`))
+      .catch((err) => {
+        console.error(`[system] Emergency email to ${r.email} failed:`, err.message);
+      })
   );
 
   await Promise.all(sendPromises);

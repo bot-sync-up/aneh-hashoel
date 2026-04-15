@@ -64,12 +64,18 @@ function registerQuestionEvents(io, socket) {
  */
 function broadcastNewQuestion(io, question, rabbiIds) {
   const payload = {
-    id:        question.id,
-    title:     question.title,
-    category:  question.category_name || question.category || null,
-    isUrgent:  question.urgency === 'urgent' || question.urgency === 'critical',
-    urgency:   question.urgency,
-    timestamp: new Date().toISOString(),
+    id:          question.id,
+    title:       question.title,
+    content:     question.content || '',
+    category:    question.category_name || question.category || null,
+    category_id: question.category_id || null,
+    status:      question.status || 'pending',
+    isUrgent:    question.urgency === 'urgent' || question.urgency === 'critical',
+    urgency:     question.urgency,
+    created_at:  question.created_at || new Date().toISOString(),
+    asker_name:  question.asker_name || null,
+    question_number: question.question_number || question.wp_post_id || null,
+    timestamp:   new Date().toISOString(),
   };
 
   if (Array.isArray(rabbiIds) && rabbiIds.length > 0) {

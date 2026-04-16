@@ -10,6 +10,7 @@ const AuditLogPage         = React.lazy(() => import('./AuditLogPage'));
 const SystemHealthPage     = React.lazy(() => import('./SystemHealthPage'));
 const LeaderboardPage      = React.lazy(() => import('./LeaderboardPage'));
 const AdminLeadsPage       = React.lazy(() => import('./LeadsPage'));
+const LeadDetailPage       = React.lazy(() => import('./LeadDetailPage'));
 const EmailSettingsPage    = React.lazy(() => import('./EmailSettingsPage'));
 const NewsletterPage        = React.lazy(() => import('./NewsletterPage'));
 const NewsletterArchivePage = React.lazy(() => import('./NewsletterArchivePage'));
@@ -117,6 +118,7 @@ export default function AdminLayout() {
             <Route path="health"     element={<SystemHealthPage />} />
             <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="leads"       element={<AdminLeadsPage />} />
+            <Route path="leads/:id"   element={<LeadDetailPage />} />
             <Route path="email-templates" element={<EmailSettingsPage />} />
             <Route path="newsletter"      element={<NewsletterPage />} />
             <Route path="newsletter-archive" element={<NewsletterArchivePage />} />

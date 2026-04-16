@@ -29,7 +29,8 @@ const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'));
 const AnswersPage = React.lazy(() => import('./pages/AnswersPage'));
 const SupportPage = React.lazy(() => import('./pages/SupportPage'));
-const LeadsPage   = React.lazy(() => import('./pages/admin/LeadsPage'));
+const LeadsPage       = React.lazy(() => import('./pages/admin/LeadsPage'));
+const LeadDetailPage  = React.lazy(() => import('./pages/admin/LeadDetailPage'));
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, initializing } = useAuth();
@@ -138,6 +139,14 @@ export default function App() {
                       element={
                         <CSRoute>
                           <LeadsPage />
+                        </CSRoute>
+                      }
+                    />
+                    <Route
+                      path="leads/:id"
+                      element={
+                        <CSRoute>
+                          <LeadDetailPage />
                         </CSRoute>
                       }
                     />

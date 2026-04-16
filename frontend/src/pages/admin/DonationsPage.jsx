@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   Heart, TrendingUp, DollarSign, Calendar,
-  ChevronRight, ChevronLeft, RefreshCw,
+  ChevronRight, ChevronLeft, RefreshCw, User, ExternalLink,
 } from 'lucide-react';
 import { get } from '../../lib/api';
 import { formatDateTime } from '../../lib/utils';
@@ -37,6 +38,7 @@ function StatCard({ icon: Icon, label, value, sub, color = '#B8973A' }) {
 // ── Donation Row ─────────────────────────────────────────────────────────────
 
 function DonationRow({ donation }) {
+  const navigate = useNavigate();
   const amountStr = new Intl.NumberFormat('he-IL', {
     style: 'currency',
     currency: donation.currency || 'ILS',
@@ -80,9 +82,20 @@ function DonationRow({ donation }) {
 
       {/* Linked context */}
       <div className="flex flex-wrap items-center gap-2 text-xs font-heebo shrink-0">
+        {donation.lead_id && (
+          <button
+            onClick={() => navigate(`/admin/leads/${donation.lead_id}`)}
+            title="פתח כרטסת ליד"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 hover:bg-emerald-100"
+          >
+            <User size={10} />
+            {donation.lead_name || 'ליד'}
+            <ExternalLink size={10} />
+          </button>
+        )}
         {donation.rabbi_name && (
           <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-            {donation.rabbi_name}
+            הרב {donation.rabbi_name}
           </span>
         )}
         {donation.question_title && (
@@ -93,9 +106,19 @@ function DonationRow({ donation }) {
             {donation.question_title}
           </span>
         )}
-        {donation.payment_method && (
-          <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-            {donation.payment_method}
+        {donation.transaction_type && (
+          <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+            {donation.transaction_type === 'installments' ? 'תשלומים'
+              : donation.transaction_type === 'standing_order' ? 'הוראת קבע'
+              : 'חד-פעמי'}
+          </span>
+        )}
+        {donation.source && (
+          <span
+            className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+            title={donation.source === 'api_sync' ? 'הגיעה דרך סנכרון API (לא webhook)' : donation.source === 'webhook' ? 'הגיעה דרך webhook בזמן אמת' : donation.source}
+          >
+            {donation.source === 'api_sync' ? 'sync' : donation.source === 'webhook' ? 'live' : donation.source}
           </span>
         )}
       </div>

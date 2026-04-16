@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clsx } from 'clsx';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
   StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
-  CalendarDays, FileText, Bell, MailX,
+  CalendarDays, FileText, Bell, MailX, Heart, ArrowLeft,
 } from 'lucide-react';
 import { get, patch } from '../../lib/api';
 import api from '../../lib/api';
@@ -41,6 +42,7 @@ const STATUS_MAP = {
 };
 
 function LeadRow({ lead, onUpdate }) {
+  const navigate = useNavigate();
   const [notesOpen,     setNotesOpen]     = useState(false);
   const [notes,         setNotes]         = useState(lead.contact_notes || '');
   const [savingNote,    setSavingNote]    = useState(false);
@@ -154,6 +156,12 @@ function LeadRow({ lead, onUpdate }) {
             <MessageSquare size={11} />
             {lead.question_count} שאלות
           </span>
+          {Number(lead.donations_count) > 0 && (
+            <span className="flex items-center gap-1 text-pink-600 dark:text-pink-400 font-semibold">
+              <Heart size={11} fill="currentColor" />
+              {lead.donations_count} · ₪{Math.round(Number(lead.donations_total_ils) || 0)}
+            </span>
+          )}
           {lead.last_category_name && (
             <span className="px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
               {lead.last_category_name}
@@ -163,6 +171,20 @@ function LeadRow({ lead, onUpdate }) {
             <Clock size={11} />
             {formatDate(lead.last_question_at)}
           </span>
+          <button
+            onClick={() => {
+              // Admin navigates within /admin/leads/:id, CS within /leads/:id.
+              // Both routes share the same LeadDetailPage component.
+              const basePath = window.location.pathname.startsWith('/admin')
+                ? '/admin/leads'
+                : '/leads';
+              navigate(`${basePath}/${lead.id}`);
+            }}
+            className="inline-flex items-center gap-1 text-brand-navy dark:text-dark-accent hover:underline font-heebo"
+            title="פתח כרטסת מלאה"
+          >
+            <ArrowLeft size={11} /> כרטסת
+          </button>
         </div>
       </div>
 

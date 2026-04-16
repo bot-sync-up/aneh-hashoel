@@ -85,12 +85,20 @@ router.get('/recent', async (req, res) => {
         d.donor_name,
         d.donor_email,
         d.nedarim_reference,
+        d.transaction_id,
+        d.transaction_type,
+        d.confirmation,
+        d.last_num,
+        d.source,
         d.payment_method,
         d.status,
         d.created_at,
-        q.title AS question_title,
-        u.name  AS rabbi_name
+        d.lead_id,
+        l.asker_name AS lead_name,
+        q.title      AS question_title,
+        u.name       AS rabbi_name
       FROM donations d
+      LEFT JOIN leads     l ON l.id = d.lead_id
       LEFT JOIN questions q ON q.id = d.question_id
       LEFT JOIN rabbis    u ON u.id = d.rabbi_id
       ORDER BY d.created_at DESC
@@ -132,13 +140,21 @@ router.get('/', async (req, res) => {
            d.donor_email,
            d.donor_phone,
            d.nedarim_reference,
+           d.transaction_id,
+           d.transaction_type,
+           d.confirmation,
+           d.last_num,
+           d.source,
            d.payment_method,
            d.status,
            d.notes,
            d.created_at,
-           q.title AS question_title,
-           u.name  AS rabbi_name
+           d.lead_id,
+           l.asker_name AS lead_name,
+           q.title      AS question_title,
+           u.name       AS rabbi_name
          FROM donations d
+         LEFT JOIN leads     l ON l.id = d.lead_id
          LEFT JOIN questions q ON q.id = d.question_id
          LEFT JOIN rabbis    u ON u.id = d.rabbi_id
          ORDER BY d.created_at DESC

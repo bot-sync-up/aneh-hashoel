@@ -136,8 +136,43 @@ function mapNedarimPayload(raw) {
 // ─── upsertDonation ──────────────────────────────────────────────────────────
 
 /**
+ * Best-effort lead lookup for a donation's donor email/phone so we can
+ * attribute the donation to an existing lead automatically.
+ * Returns UUID or null. Never throws.
+ */
+async function _findLeadIdForDonation({ donor_email, donor_phone }) {
+  try {
+    if (donor_email) {
+      const { findLeadByEmail } = require('./leadsService');
+      const lead = await findLeadByEmail(donor_email);
+      if (lead?.id) return lead.id;
+    }
+  } catch (_) { /* non-fatal */ }
+
+  // Phone fallback — match on last 9 digits (Israeli-style normalisation)
+  try {
+    if (donor_phone) {
+      const digits = String(donor_phone).replace(/\D/g, '');
+      if (digits.length >= 7) {
+        const { rows } = await query(
+          `SELECT l.id FROM leads l
+            WHERE l.phone_hash = encode(digest($1, 'sha256'), 'hex')
+            LIMIT 1`,
+          [digits.slice(-9)]
+        );
+        if (rows[0]?.id) return rows[0].id;
+      }
+    }
+  } catch (_) { /* pgcrypto not installed — swallow */ }
+
+  return null;
+}
+
+/**
  * Insert a donation row (idempotent on transaction_id). Returns the row
  * that was inserted, or null if it was a duplicate.
+ *
+ * Auto-attributes to an existing lead (by email or phone hash) when possible.
  *
  * @param {object} mapped   – output of mapNedarimPayload
  * @param {'webhook'|'api_sync'|'manual'} source
@@ -145,9 +180,15 @@ function mapNedarimPayload(raw) {
 async function upsertDonation(mapped, source = 'webhook') {
   if (!mapped) return null;
 
+  // Resolve lead attribution in parallel with the insert preparation.
+  const leadId = await _findLeadIdForDonation({
+    donor_email: mapped.donor_email,
+    donor_phone: mapped.donor_phone,
+  });
+
   const result = await query(
     `INSERT INTO donations (
-       transaction_id, question_id, rabbi_id,
+       transaction_id, question_id, rabbi_id, lead_id,
        amount, currency,
        donor_name, donor_email, donor_phone,
        last_num, confirmation,
@@ -155,16 +196,17 @@ async function upsertDonation(mapped, source = 'webhook') {
        nedarim_reference, payment_method, notes,
        source, raw_payload
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb
      )
      ON CONFLICT (transaction_id)
        WHERE transaction_id IS NOT NULL
        DO NOTHING
-     RETURNING id, amount, currency, transaction_id`,
+     RETURNING id, amount, currency, transaction_id, lead_id`,
     [
       mapped.transaction_id,
       mapped.question_id,
       mapped.rabbi_id,
+      leadId,
       mapped.amount,
       mapped.currency,
       mapped.donor_name,

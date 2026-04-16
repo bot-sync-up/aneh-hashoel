@@ -323,9 +323,20 @@ async function getLeads({ page = 1, limit = 20, filter = 'all', search = '', rol
 
   const { rows } = await query(
     `SELECT l.*,
-            c.name AS last_category_name
+            c.name AS last_category_name,
+            ds.donations_count,
+            ds.donations_total_ils,
+            ds.last_donation_at
      FROM   leads l
      LEFT JOIN categories c ON c.id = l.last_category_id
+     LEFT JOIN LATERAL (
+       SELECT
+         COUNT(*)::int                                                   AS donations_count,
+         COALESCE(SUM(CASE WHEN currency = 'ILS' THEN amount ELSE 0 END), 0)::numeric AS donations_total_ils,
+         MAX(created_at)                                                 AS last_donation_at
+       FROM   donations d
+       WHERE  d.lead_id = l.id
+     ) ds ON TRUE
      ${where}
      ORDER BY l.is_hot DESC, l.interaction_score DESC, l.last_question_at DESC
      LIMIT  $${idx} OFFSET $${idx + 1}`,
@@ -487,6 +498,40 @@ async function getLeadById(id, role = 'admin') {
         answered_at: q.answered_at,
       }))
     : questions;
+
+  // Donation history for this lead (attributed via lead_id OR by email/phone
+  // for legacy donations that don't yet have lead_id set).
+  try {
+    const { rows: donations } = await query(
+      `SELECT d.id, d.amount, d.currency, d.donor_name,
+              d.transaction_type, d.confirmation, d.last_num,
+              d.tashloumim, d.keva_id, d.source, d.notes, d.created_at,
+              q.id AS question_id, q.title AS question_title,
+              r.name AS rabbi_name
+         FROM donations d
+         LEFT JOIN questions q ON q.id = d.question_id
+         LEFT JOIN rabbis    r ON r.id = d.rabbi_id
+        WHERE d.lead_id = $1
+        ORDER BY d.created_at DESC
+        LIMIT 100`,
+      [id]
+    );
+    lead.donations = donations;
+    lead.donations_summary = {
+      count: donations.length,
+      total_ils: donations
+        .filter((d) => (d.currency || 'ILS') === 'ILS')
+        .reduce((s, d) => s + Number(d.amount || 0), 0),
+      total_usd: donations
+        .filter((d) => d.currency === 'USD')
+        .reduce((s, d) => s + Number(d.amount || 0), 0),
+      last_donation_at: donations[0]?.created_at || null,
+    };
+  } catch (err) {
+    console.warn('[leadsService] donations lookup failed:', err.message);
+    lead.donations = [];
+    lead.donations_summary = { count: 0, total_ils: 0, total_usd: 0, last_donation_at: null };
+  }
 
   return lead;
 }

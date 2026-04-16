@@ -23,6 +23,7 @@ const express = require('express');
 const { authenticate, requireAdmin } = require('../../middleware/authenticate');
 const analyticsService = require('../../services/analyticsService');
 const { getOnlineRabbiIds } = require('../../socket/helpers');
+const { query: dbQuery } = require('../../db/pool');
 
 const router = express.Router();
 
@@ -45,11 +46,40 @@ router.use(authenticate, requireAdmin);
 router.get('/stats', async (req, res) => {
   try {
     const stats = await analyticsService.getOverviewStats();
-    // Override onlineRabbis with real-time socket data
+
+    // Override onlineRabbis with real-time socket data + hydrate the LIST
+    // of currently-connected rabbis so the dashboard widget can show who
+    // (previously the list was always empty even when the count said 2).
     const io = req.app.get('io');
     if (io) {
-      stats.onlineRabbis = getOnlineRabbiIds(io).length;
+      const onlineIds = getOnlineRabbiIds(io).map(String);
+      stats.onlineRabbis = onlineIds.length;
+
+      if (onlineIds.length > 0) {
+        try {
+          const { rows } = await dbQuery(
+            `SELECT id, name, role, photo_url
+             FROM   rabbis
+             WHERE  id = ANY($1::uuid[])`,
+            [onlineIds]
+          );
+          stats.onlineRabbisList = rows.map((r) => ({
+            id:       r.id,
+            name:     r.name,
+            role:     r.role,
+            photoUrl: r.photo_url,
+          }));
+        } catch (e) {
+          console.warn('[dashboard] failed to hydrate onlineRabbisList:', e.message);
+          stats.onlineRabbisList = [];
+        }
+      } else {
+        stats.onlineRabbisList = [];
+      }
+    } else {
+      stats.onlineRabbisList = [];
     }
+
     return res.json({ ok: true, data: stats });
   } catch (err) {
     console.error('[dashboard] GET /stats error:', err.message);

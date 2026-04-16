@@ -881,28 +881,74 @@ async function getWPRabbis() {
 }
 
 /**
+ * Normalize a rabbi name for duplicate detection — strips honorific prefixes
+ * ("הרב", "הרה\"ג", "הרה״ג", "הגאון הרב") and collapses whitespace so that
+ * "אליהו דניאל אוזן" and "הרב אליהו דניאל אוזן" match as the same rabbi.
+ */
+function _normalizeRabbiName(name) {
+  if (!name) return '';
+  return String(name)
+    .replace(/^\s*(?:הרב|הרה"ג|הרה״ג|הגאון הרב)\s+/u, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
  * Create a new term in the rabi-add taxonomy on WordPress.
+ *
+ * Before creating, we search existing terms for a match (with or without
+ * "הרב" prefix) and REUSE the existing term if found — prevents the
+ * common duplicate scenario:
+ *   - WP already has "אליהו דניאל אוזן" as a rabi-add term
+ *   - Admin creates rabbi "הרב אליהו דניאל אוזן" in our system
+ *   - Without this check we'd create a SECOND term → two rabbis on site.
  *
  * Endpoint: POST /rabi-add
  *
  * @param {string} name
- * @returns {Promise<{ success: boolean, data?: {id: number, name: string, slug: string}, error?: string }>}
+ * @returns {Promise<{ success: boolean, data?: {id: number, name: string, slug: string}, error?: string, reused?: boolean }>}
  */
 async function createWPRabbi(name) {
   if (!name || typeof name !== 'string' || !name.trim()) {
     return { success: false, error: 'שם הרב נדרש' };
   }
 
+  const trimmedName = name.trim();
+
+  // Duplicate-detection pass — search existing rabi-add terms for a match
+  // by normalised name (stripping "הרב" prefix). Cheap for <100 terms.
+  try {
+    const existing = await getWPRabbis();
+    if (existing.success && Array.isArray(existing.data)) {
+      const needle = _normalizeRabbiName(trimmedName);
+      const match = existing.data.find(
+        (t) => _normalizeRabbiName(t.name) === needle
+      );
+      if (match) {
+        log.info(
+          { requestedName: trimmedName, foundName: match.name, wpTermId: match.id },
+          'createWPRabbi: reusing existing rabi-add term — no duplicate created'
+        );
+        await logSync(null, 'create_wp_rabbi', 'success');
+        return { success: true, data: match, reused: true };
+      }
+    }
+  } catch (err) {
+    // Non-fatal — fall through to the create path if dup check fails
+    log.warn({ err: err.message }, 'createWPRabbi: duplicate check failed, proceeding');
+  }
+
   try {
     const client = buildClient();
 
     const response = await withRateLimitRetry(
-      () => client.post('/rabi-add', { name: name.trim() }),
-      `createWPRabbi(${name})`
+      () => client.post('/rabi-add', { name: trimmedName }),
+      `createWPRabbi(${trimmedName})`
     );
 
     await logSync(null, 'create_wp_rabbi', 'success');
-    log.info({ name, wpTermId: response.data?.id }, "createWPRabbi success");
+    log.info({ name: trimmedName, wpTermId: response.data?.id }, "createWPRabbi success");
     return { success: true, data: response.data };
   } catch (err) {
     const { httpStatus, message } = classifyError(err);

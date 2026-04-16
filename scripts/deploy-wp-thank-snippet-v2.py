@@ -53,7 +53,7 @@ def main():
         'active': True,
     }
 
-    resp = requests.put(API_URL, headers=headers, json=payload, timeout=20)
+    resp = requests.put(API_URL, headers=headers, json=payload, timeout=90)
     print(f'HTTP {resp.status_code}')
     try:
         data = resp.json()

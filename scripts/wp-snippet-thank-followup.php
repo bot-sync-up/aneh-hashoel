@@ -181,7 +181,7 @@ add_action('wp_footer', function() {
                 style="position:absolute; top:6px; left:10px; background:none; border:none;
                        font-size:22px; cursor:pointer; color:#555; line-height:1;">&times;</button>
             <iframe id="aneh-donate-iframe"
-                src="https://www.matara.pro/nedarimplus/online/?S=EdHK&Comments=<?php echo urlencode('q:' . $post_id); ?>"
+                src="https://www.matara.pro/nedarimplus/online/?S=NJxJ&Comments=<?php echo urlencode('q:' . $post_id); ?>"
                 style="width:100%; height:72vh; border:none;"></iframe>
         </div>
     </div>

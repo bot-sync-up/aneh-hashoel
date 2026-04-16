@@ -153,10 +153,11 @@ function startCronJobs(io = null) {
     timezone: TIMEZONE,
   });
 
-  // ─── Every hour — pull Nedarim Plus transaction history as safety net ─────
-  // Backup for missed webhooks (Nedarim does not retry on failure). Idempotent
-  // on TransactionId so duplicates from webhook+sync are harmless.
-  cron.schedule('30 * * * *', safeJob('syncNedarimHistory', runSyncNedarimHistory), {
+  // ─── Every 5 min — pull Nedarim Plus transaction history as primary sync ──
+  // Idempotent on TransactionId. At 5-minute intervals this is the primary
+  // source of donation data (no webhook configured); if a webhook is later
+  // added, the two complement each other — duplicates are harmless.
+  cron.schedule('*/5 * * * *', safeJob('syncNedarimHistory', runSyncNedarimHistory), {
     timezone: TIMEZONE,
   });
 
@@ -237,7 +238,7 @@ function startCronJobs(io = null) {
   console.log('[cron]   sendWeeklyNewsletter:       0 10 * * 5');
   console.log('[cron]   sendHolidayGreetings:       0 8 * * *');
   console.log('[cron]   pendingQuestionsReminder:   15 * * * *');
-  console.log('[cron]   syncNedarimHistory:         30 * * * *');
+  console.log('[cron]   syncNedarimHistory:         */5 * * * *');
 }
 
 // ── Exports ──────────────────────────────────────────────────────────────────

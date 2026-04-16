@@ -2,117 +2,101 @@
 
 /**
  * Nedarim Plus Donations Webhook  —  POST /webhook/nedarim
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Nedarim Plus sends a POST with application/json after every completed
+ * credit-card transaction (and standing-order setup).
  *
- * Receives donation callbacks from Nedarim Plus after a payment is completed.
- * Nedarim Plus handles all payment processing externally; this endpoint
- * only records the donation in our database for tracking/reporting.
+ * IMPORTANT: Nedarim does NOT retry on failure — so in addition to this
+ * webhook we also pull transactions hourly via cron/jobs/syncNedarimHistory.js
+ * as a safety net. Both paths use upsertDonation() which is idempotent on
+ * the Nedarim TransactionId.
  *
- * Authentication: shared secret via NEDARIM_WEBHOOK_SECRET env var.
- * If the env var is not set, the endpoint is open (development convenience).
+ * Fields from Nedarim (see docs/CallBack.pdf for full reference):
+ *   TransactionId, ClientId, Zeout, ClientName, Adresse, Phone, Mail,
+ *   Amount, Currency (1=ILS, 2=USD), TransactionTime, Confirmation,
+ *   LastNum, Tokef, TransactionType, Groupe, Comments, Tashloumim,
+ *   FirstTashloum, MosadNumber, CallId, MasofId, Shovar, CompagnyCard,
+ *   Solek, Tayar, Makor, KevaId, DebitIframe
  *
- * The reference field from Nedarim may encode question/rabbi IDs in the format:
- *   "q:<questionId>"  or  "r:<rabbiId>"  or  "q:<questionId>:r:<rabbiId>"
- * This allows linking a donation to a specific question or rabbi.
+ * Standing-order setup adds: KevaId, NextDate.
+ *
+ * Auth:
+ *   Shared secret via NEDARIM_WEBHOOK_SECRET env var. If unset, the
+ *   endpoint is open (dev convenience). Set it in prod.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const express = require('express');
-const { query: dbQuery } = require('../db/pool');
+const { logger } = require('../utils/logger');
+const { mapNedarimPayload, upsertDonation } = require('../services/nedarimService');
 
+const log = logger.child({ module: 'donations-webhook' });
 const router = express.Router();
 
-// ─── Webhook secret validation ───────────────────────────────────────────────
+// ─── Shared-secret validation ────────────────────────────────────────────────
 
 function validateSecret(req, res, next) {
   const secret = process.env.NEDARIM_WEBHOOK_SECRET;
-  // If no secret configured, skip validation (dev mode)
+  // Dev convenience: if secret not configured, accept all.
   if (!secret) return next();
 
   const provided =
     req.headers['x-nedarim-secret'] ||
-    req.headers['authorization']?.replace('Bearer ', '') ||
-    req.body?.secret;
+    req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+    req.body?.secret ||
+    req.query?.secret;
 
   if (provided !== secret) {
-    console.warn('[donations-webhook] Invalid secret from', req.ip);
+    log.warn({ ip: req.ip }, 'Invalid secret on nedarim webhook');
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();
 }
 
-// ─── Parse reference for question/rabbi IDs ──────────────────────────────────
-
-function parseReference(reference) {
-  const result = { questionId: null, rabbiId: null };
-  if (!reference) return result;
-
-  // Format: "q:<uuid>" and/or "r:<uuid>" separated by ":"
-  const qMatch = reference.match(/q:([0-9a-f-]{36})/i);
-  const rMatch = reference.match(/r:([0-9a-f-]{36})/i);
-
-  if (qMatch) result.questionId = qMatch[1];
-  if (rMatch) result.rabbiId = rMatch[1];
-
-  return result;
-}
-
 // ─── POST /webhook/nedarim ───────────────────────────────────────────────────
 
 router.post('/', validateSecret, async (req, res) => {
+  const payload = req.body || {};
+
+  // Map → unified shape (handles both PascalCase from Nedarim and legacy)
+  const mapped = mapNedarimPayload(payload);
+  if (!mapped) {
+    log.warn({ keys: Object.keys(payload).slice(0, 10) }, 'Nedarim payload rejected');
+    return res.status(400).json({
+      error: 'Invalid payload — Amount is required and must be positive',
+    });
+  }
+
   try {
-    const {
-      amount,
-      currency,
-      donor_name,
-      donor_email,
-      donor_phone,
-      reference,
-      payment_method,
-      notes,
-    } = req.body;
+    const inserted = await upsertDonation(mapped, 'webhook');
 
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      return res.status(400).json({ error: 'amount is required and must be positive' });
-    }
-
-    const { questionId, rabbiId } = parseReference(reference);
-
-    const result = await dbQuery(
-      `INSERT INTO donations
-         (question_id, rabbi_id, amount, currency, donor_name, donor_email,
-          donor_phone, nedarim_reference, payment_method, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT (nedarim_reference) WHERE nedarim_reference IS NOT NULL
-       DO NOTHING
-       RETURNING id`,
-      [
-        questionId,
-        rabbiId,
-        Number(amount),
-        (currency || 'ILS').toUpperCase().slice(0, 3),
-        donor_name || null,
-        donor_email || null,
-        donor_phone || null,
-        reference || null,
-        payment_method || null,
-        notes || null,
-      ]
-    );
-
-    if (result.rows.length === 0) {
-      // Duplicate reference — already recorded
-      console.log('[donations-webhook] Duplicate reference ignored:', reference);
+    if (!inserted) {
+      // TransactionId already exists — our history sync already stored it,
+      // or Nedarim re-sent on manual trigger. Ack OK; don't surface error.
+      log.info(
+        { transactionId: mapped.transaction_id },
+        'Duplicate Nedarim transaction — already stored'
+      );
       return res.json({ ok: true, duplicate: true });
     }
 
-    console.log(
-      '[donations-webhook] Donation recorded:',
-      result.rows[0].id,
-      `${amount} ${currency || 'ILS'}`
+    log.info(
+      {
+        id: inserted.id,
+        amount: inserted.amount,
+        currency: inserted.currency,
+        transactionId: inserted.transaction_id,
+        questionId: mapped.question_id,
+        rabbiId: mapped.rabbi_id,
+      },
+      'Nedarim donation recorded'
     );
 
-    return res.json({ ok: true, id: result.rows[0].id });
+    return res.json({ ok: true, id: inserted.id });
   } catch (err) {
-    console.error('[donations-webhook] Error:', err.message);
+    log.error({ err }, 'Nedarim webhook handler error');
+    // Per docs: Nedarim won't retry — but return 500 anyway so their
+    // alert email gets triggered and the admin notices.
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

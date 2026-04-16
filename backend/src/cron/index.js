@@ -29,6 +29,7 @@ const { runHolidayGreetings }   = require('./jobs/holidayGreetings');
 const { runImapPoller }         = require('./jobs/imapPoller');
 const { runOnboardingDrip }    = require('./jobs/onboardingDrip');
 const { runPendingReminder }   = require('./jobs/pendingReminder');
+const { runSyncNedarimHistory } = require('./jobs/syncNedarimHistory');
 const {
   syncPendingQuestions,
   syncAnswersToWP,
@@ -152,6 +153,13 @@ function startCronJobs(io = null) {
     timezone: TIMEZONE,
   });
 
+  // ─── Every hour — pull Nedarim Plus transaction history as safety net ─────
+  // Backup for missed webhooks (Nedarim does not retry on failure). Idempotent
+  // on TransactionId so duplicates from webhook+sync are harmless.
+  cron.schedule('30 * * * *', safeJob('syncNedarimHistory', runSyncNedarimHistory), {
+    timezone: TIMEZONE,
+  });
+
   // ─── Startup: auto-sync categories from WP if local DB has fewer ─────────
   if (process.env.DISABLE_WP_SYNC !== 'true') {
     setImmediate(async () => {
@@ -229,6 +237,7 @@ function startCronJobs(io = null) {
   console.log('[cron]   sendWeeklyNewsletter:       0 10 * * 5');
   console.log('[cron]   sendHolidayGreetings:       0 8 * * *');
   console.log('[cron]   pendingQuestionsReminder:   15 * * * *');
+  console.log('[cron]   syncNedarimHistory:         30 * * * *');
 }
 
 // ── Exports ──────────────────────────────────────────────────────────────────

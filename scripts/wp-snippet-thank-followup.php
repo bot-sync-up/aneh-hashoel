@@ -170,6 +170,8 @@ add_action('wp_footer', function() {
     </style>
 
     <!-- Donation popup (Nedarim Plus — opens only after user clicks "כן, אשמח לתרום") -->
+    <!-- We embed "q:<post_id>" in the Comments field so our webhook/sync
+         can correlate each donation to the specific question/rabbi being thanked. -->
     <div id="aneh-donate-overlay" style="display:none; position:fixed; inset:0;
          background:rgba(0,0,0,.55); z-index:999999; justify-content:center; align-items:center;">
         <div style="position:relative; background:#fff; border-radius:10px;
@@ -178,7 +180,8 @@ add_action('wp_footer', function() {
             <button id="aneh-donate-close"
                 style="position:absolute; top:6px; left:10px; background:none; border:none;
                        font-size:22px; cursor:pointer; color:#555; line-height:1;">&times;</button>
-            <iframe src="https://www.matara.pro/nedarimplus/online/?S=EdHK"
+            <iframe id="aneh-donate-iframe"
+                src="https://www.matara.pro/nedarimplus/online/?S=EdHK&Comments=<?php echo urlencode('q:' . $post_id); ?>"
                 style="width:100%; height:72vh; border:none;"></iframe>
         </div>
     </div>

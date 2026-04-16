@@ -1283,6 +1283,75 @@ router.get('/:id/notes', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── PUT /:id/title — any authenticated rabbi can edit a question's title ───
+// Per admin decision, allow any rabbi (not just admin) to correct typos in
+// question titles. Mirrors the admin route's WP-sync behavior.
+
+router.put('/:id/title', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'כותרת נדרשת' });
+    }
+    const trimmed = title.trim().slice(0, 500);
+
+    const { rows: existing } = await dbQuery(
+      'SELECT id, title, wp_post_id FROM questions WHERE id = $1',
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה' });
+    }
+
+    if ((existing[0].title || '').trim() === trimmed) {
+      // No-op — save a DB round-trip
+      return res.json({ ok: true, question: existing[0], unchanged: true });
+    }
+
+    const { rows: updated } = await dbQuery(
+      `UPDATE questions SET title = $1, updated_at = NOW()
+       WHERE id = $2 RETURNING id, title, wp_post_id`,
+      [trimmed, id]
+    );
+
+    // Sync title change to WordPress post — fire-and-forget
+    const wpPostId = updated[0]?.wp_post_id;
+    if (wpPostId && process.env.WP_API_URL && process.env.WP_API_KEY) {
+      setImmediate(async () => {
+        try {
+          const axios = require('axios');
+          const cred = Buffer.from(process.env.WP_API_KEY).toString('base64');
+          await axios.post(
+            `${process.env.WP_API_URL}/ask-rabai/${wpPostId}`,
+            { title: trimmed },
+            { headers: { Authorization: `Basic ${cred}`, 'Content-Type': 'application/json' }, timeout: 10000 }
+          );
+        } catch (wpErr) {
+          console.warn('[questions] WP title sync failed:', wpErr.message);
+        }
+      });
+    }
+
+    // Audit log (rabbi edits are logged just like admin edits)
+    logAction(
+      req.rabbi.id,
+      ACTIONS.QUESTION_EDITED,
+      'question',
+      id,
+      { title: existing[0].title },
+      { title: trimmed },
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || null,
+      req.headers['user-agent'] || null
+    ).catch(() => {});
+
+    return res.json({ ok: true, question: updated[0] });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = router;

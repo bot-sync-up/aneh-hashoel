@@ -19,6 +19,8 @@ import {
   Send,
   Paperclip,
   History,
+  Check,
+  X as XIcon,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import Card from '../components/ui/Card';
@@ -43,6 +45,88 @@ import {
   truncate,
   decodeHTML,
 } from '../lib/utils';
+
+/**
+ * Inline-editable question title. Any authenticated rabbi may edit —
+ * persists via PUT /questions/:id/title which also syncs to WordPress.
+ * Falls back gracefully on error.
+ */
+function TitleWithEdit({ title, questionId, onUpdated }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title || '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setDraft(title || ''); }, [title]);
+
+  const save = async () => {
+    const trimmed = (draft || '').trim();
+    if (!trimmed) { toast.error('כותרת ריקה'); return; }
+    if (trimmed === (title || '').trim()) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await put(`/questions/${questionId}/title`, { title: trimmed });
+      onUpdated?.(trimmed);
+      toast.success('הכותרת עודכנה');
+      setEditing(false);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'שגיאה בשמירת הכותרת');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 max-w-full" dir="rtl">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') { setEditing(false); setDraft(title || ''); }
+          }}
+          autoFocus
+          disabled={saving}
+          className="flex-1 min-w-0 text-lg font-bold font-heebo text-[var(--text-primary)] bg-[var(--bg-surface-raised)] border border-brand-gold rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-gold/50"
+          maxLength={500}
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          title="שמור (Enter)"
+          className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50"
+        >
+          <Check size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => { setEditing(false); setDraft(title || ''); }}
+          disabled={saving}
+          title="בטל (Esc)"
+          className="p-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+        >
+          <XIcon size={16} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="truncate">{truncate(title || 'שאלה', 60)}</span>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="עריכת כותרת"
+        className="flex-shrink-0 p-1 rounded text-[var(--text-muted)] hover:text-brand-navy hover:bg-[var(--bg-muted)] transition-colors"
+      >
+        <Pencil size={13} />
+      </button>
+    </span>
+  );
+}
 
 export default function QuestionDetailPage() {
   const { id } = useParams();
@@ -296,7 +380,19 @@ export default function QuestionDetailPage() {
     <div className="page-enter" dir="rtl">
       {/* Header */}
       <PageHeader
-        title={truncate(title || 'שאלה', 60)}
+        title={
+          <TitleWithEdit
+            title={title}
+            questionId={id}
+            onUpdated={(newTitle) => {
+              // Optimistically update the local question state so the
+              // page re-renders with the new title without a full reload.
+              if (typeof setQuestion === 'function') {
+                setQuestion((prev) => prev ? { ...prev, title: newTitle } : prev);
+              }
+            }}
+          />
+        }
         breadcrumb={
           <nav aria-label="פירורי לחם">
             <ol className="flex items-center gap-1 text-sm font-heebo text-[var(--text-muted)]">

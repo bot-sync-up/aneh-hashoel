@@ -1,5 +1,5 @@
 # ענה את השואל — PROJECT SUMMARY
-> נוצר: מרץ 2026 | סיכום מלא של מה שנבנה, האפיון, והמצב הנוכחי
+> נוצר: מרץ 2026 | עודכן: אפריל 2026 | סיכום מלא של מה שנבנה, האפיון, והמצב הנוכחי
 
 ---
 
@@ -12,8 +12,8 @@
 - שאלות מגיעות מאתר הוורדפרס הקיים (moreshet-maran.com)
 - ממשק ייעודי לרבנים לניהול, תשובה, ושיתוף פעולה
 
-**URL:** https://aneh.syncup.co.il
-**Server:** 64.176.170.219 (VPS, PM2 + Nginx)
+**Production URL:** https://ask.moreshet-maran.com
+**Server:** ראה קובץ זיכרון מקומי (`server_aneh_hashoel.md`) — השרת הישן (64.176.170.219) נמחק
 **Repo:** github.com/bot-sync-up/aneh-hashoel
 
 ---
@@ -87,6 +87,10 @@
 - העדפות per event type
 - Email / WhatsApp / Push (FCM) לפי העדפת הרב
 - Notification router בוחר ערוץ אוטומטית
+- **אכיפה בפועל של `notification_preferences`** — כל מייל עובר בדיקה לפי אירוע+ערוץ לפני שליחה (פרט למייל חירום)
+- **מנגנון הסרה מרשימת תפוצה (§30א חוק הספאם)** — עמודת `is_unsubscribed` בטבלת `leads`, JWT tokens, דף `/unsubscribe` ציבורי, footer עם קישור במיילים שיווקיים
+- **מיילים לשואלים מבחינים בקהל** (`audience='asker'`) — בלי קישור "כניסה למערכת"
+- **Reminder ל-overdue pending questions** — admin-configurable (enabled/hours/remind-every), cron שעתי, כפתור "הפעל עכשיו" לבדיקה
 
 ### פרופיל רב
 - פרטים אישיות + חתימה
@@ -101,30 +105,34 @@
 - גרף פעילות (Recharts)
 - גרף קטגוריות (Pie)
 - פיד פעילות
-- רבנים מחוברים עכשיו (online)
-- לוח מצטיינים (leaderboard)
+- רבנים מחוברים עכשיו (online) — **נקרא מ-Socket.io Map (לא מ-DB)**, נתון תמיד עדכני
+- **לוח מצטיינים כ-widget** (Top 5, highlight לרב הנוכחי)
 
-### פאנל אדמין (14 עמודים)
+### פאנל אדמין (15 עמודים)
 - דשבורד עם KPIs בזמן אמת
-- ניהול רבנים (CRUD + הפעלה/השבתה + שינוי תפקיד)
-- ניהול שאלות (bulk actions, CSV export)
-- ניהול קטגוריות (עץ היררכי + drag-drop)
-- הגדרות מערכת (timeout, ניוזלטר, שעות)
+- ניהול רבנים (CRUD + הפעלה/השבתה + שינוי תפקיד + **איפוס סיסמה לרב אחר**)
+- ניהול שאלות (bulk actions, CSV export, **עריכת כותרת + סנכרון ל-WP**)
+- ניהול קטגוריות (עץ היררכי + drag-drop + **מייל לאדמינים כשרב מציע קטגוריה**)
+- הגדרות מערכת (timeout, שעות, **תזכורת שאלות ממתינות**, **ניוזלטר on/off**)
 - Audit log מלא
 - בריאות מערכת (health check — DB, Redis, WP, GreenAPI)
 - מצב חירום (broadcast לכל הרבנים)
-- ניוזלטר (בחירת שאלות + שליחה + ארכיון)
-- תבניות אימייל
+- ניוזלטר (בחירת שאלות + שליחה + ארכיון + **toggle הפעלה/כיבוי**)
+- תבניות אימייל (**audience-aware preview** — בלי קישור כניסה במיילי שואלים)
 - ניהול support tickets
 - תרומות (Nedarim Plus)
 - ביצועי רבנים (performance table)
+- **לוח מצטיינים (leaderboard) — עמוד מלא + API לא-אדמין לרבנים**
+- **אדמין רואה תשובות פרטיות** (רגיל — מוסתר משאר הרבנים)
 
 ### CRM — לידים
 - רשימת לידים עם פילטרים (hot/urgent/contacted)
 - סינכרון Google Sheets אוטומטי
 - Click tracking — סימון "hot" לפי פעילות
-- ייצוא CSV
+- ייצוא CSV (כולל **עמודת "הוסר/ה מרשימת תפוצה"**)
 - הערות מגע + סימון contacted
+- **Badge "הוסר/ה"** על לידים שעשו opt-out
+- אימייל+טלפון מוצגים מלא למנהל (שירות לקוחות רואה רק טלפון)
 
 ### אינטגרציות חיצוניות
 | מערכת | מה עושה |
@@ -139,15 +147,16 @@
 | Google Sheets | ייצוא לידים |
 | Mailwizz | Email marketing integration |
 
-### Cron Jobs (11 משימות)
-- Daily digest, Weekly newsletter, Weekly report
+### Cron Jobs (12 משימות)
+- Daily digest, Weekly newsletter (עם **toggle** מההגדרות), Weekly report
 - IMAP poller (כל 2 דקות)
 - Rabbi of the week
 - Holiday greetings
 - Warning/Timeout checks על שאלות
 - Google Sheets sync
 - WP sync retry
-- Onboarding drip campaign
+- Onboarding drip campaign (**מכבד `is_unsubscribed`**)
+- **Pending questions reminder** (שעתי; admin-configurable)
 
 ### אבטחה
 - Rate limiting (API / auth / write / thank)
@@ -159,23 +168,25 @@
 
 ---
 
-## מסד הנתונים — 18 Migrations
+## מסד הנתונים — 20 Migrations
 
 | Migration | תוכן |
 |-----------|------|
-| 001 | Schema ראשוני: rabbis, questions, answers, categories, discussions |
-| 002 | Indexes לביצועים |
-| 003 | is_private לתשובות |
-| 004 | CRM leads |
-| 005-007 | שיפורי קטגוריות, WP link, תבניות |
-| 008 | FCM tokens |
-| 009-010 | Notified status, WP term ID, support requests |
-| 011-013 | Support messages, unique constraints, dedup טלפון |
-| 014 | Full-text search indexes |
-| 015 | Newsletter archive |
-| 016 | Donations tracking |
-| 017 | Lead click tracking + Onboarding queue |
-| 018 | draft_content + draft_updated_at בטבלת questions |
+| 001_full_schema | Schema ראשוני: rabbis, questions, answers, categories, discussions (+is_unsubscribed/unsubscribed_at על leads) |
+| 002_leads_unsubscribe | עמודות + אינדקס חלקי על `is_unsubscribed=TRUE` |
+| 003_pending_reminder | עמודת `last_reminder_at` + אינדקס חלקי + ברירת מחדל ב-system_config |
+| (legacy 001) | Indexes לביצועים |
+| (legacy 003) | is_private לתשובות |
+| (legacy 004) | CRM leads |
+| (legacy 005-007) | שיפורי קטגוריות, WP link, תבניות |
+| (legacy 008) | FCM tokens |
+| (legacy 009-010) | Notified status, WP term ID, support requests |
+| (legacy 011-013) | Support messages, unique constraints, dedup טלפון |
+| (legacy 014) | Full-text search indexes |
+| (legacy 015) | Newsletter archive |
+| (legacy 016) | Donations tracking |
+| (legacy 017) | Lead click tracking + Onboarding queue |
+| (legacy 018) | draft_content + draft_updated_at בטבלת questions |
 | Fix | follow_up_questions table + missing columns |
 
 ---
@@ -207,6 +218,12 @@
 | user_thanks notification | ✅ תוקן | כעת יוצר רשומה ב-notifications_log + socket `notification:new` לרב בזמן אמת |
 | ENCRYPTION_KEY | ✅ תוקן | מפתח 32 תווים בדיוק בשרת — WP sync עובד על כל השאלות |
 | WP sync status filter | ✅ תוקן | שונה מ-`status:pending` ל-`status:publish` — שאלות מסתנכרנות כעת |
+| Online rabbis = 0 | ✅ תוקן | משתמש ב-`connectedRabbis` Map מ-Socket.io במקום DB stale |
+| תשובה פרטית לאדמין | ✅ תוקן | Frontend: `!isAdmin` בתנאי ההסתרה; Backend כבר היה תקין |
+| Notification preferences save | ✅ תוקן | המרה מאובייקט לארה"ב לפני PUT |
+| Notification preferences אכיפה | ✅ תוקן | `_isEventEnabled` מופעל ב-`notificationRouter._dispatchEmail` |
+| דף מעבר תרומה ב-WP (תודה → Nedarim Plus) | ❌ חיצוני | דרוש שינוי ידני בוורדפרס — לא בקוד האפליקציה |
+| מקור מייל "היכרות" לא מזוהה | ⚠️ | `onboardingDrip` מתוקן; אם קיים מקור נוסף — צריך דוגמה |
 | Mobile app | ❌ לא בנוי | FCM tokens מוכן, אפליקציה עצמה לא קיימת |
 | Email delivery tracking | ⚠️ | routes קיימות (emailWebhook.js) אבל לא מחובר לממשק |
 
@@ -244,16 +261,34 @@ aneh-hashoel/
 
 ## Deploy
 
-**שרת:** 64.176.170.219 | root | PM2
-**PM2 processes:** `backend` (id:0) + `frontend` (id:5)
-**Project path:** `/opt/aneh-hashoel/`
+**שרת ישן (64.176.170.219) — נמחק.** פרטי השרת החדש נשמרים בקובץ הזיכרון המקומי.
+
+### פריסה לשרת החדש (Docker Compose)
 
 ```bash
-# Update server
-ssh root@64.176.170.219
-cd /opt/aneh-hashoel && git pull origin main
+# על השרת, בתיקיית הפרויקט
+git pull origin main
+
+# אם יש migration חדש:
+docker compose exec -T postgres psql -U postgres -d aneh_hashoel \
+  < backend/src/db/migrations/003_pending_reminder.sql
+
+# בנייה מחדש + הרצה
+docker compose build --no-cache backend frontend
+docker compose up -d
+
+# לוודא שה-cron עלה
+docker compose logs backend | grep "pendingQuestionsReminder"
+```
+
+### פריסה ללא Docker (PM2, אם עדיין בשימוש)
+
+```bash
+git pull origin main
+cd backend && npm install && npm run migrate
 pm2 restart backend
-pm2 restart frontend   # רק אם יש שינויים בפרונט (אחרי npm run build)
+cd ../frontend && npm install && npm run build
+pm2 restart frontend
 ```
 
 **WP Snippet update:**

@@ -364,9 +364,25 @@ function SecurityTab() {
   const validate = () => {
     const e = {};
     if (!form.currentPassword) e.currentPassword = 'נדרשת הסיסמה הנוכחית';
-    if (!form.newPassword) e.newPassword = 'נדרשת סיסמה חדשה';
-    else if (form.newPassword.length < 8) e.newPassword = 'לפחות 8 תווים';
+    if (!form.newPassword) {
+      e.newPassword = 'נדרשת סיסמה חדשה';
+    } else {
+      // Must match backend policy (authService.validatePasswordPolicy):
+      //   >= 8 chars, 1 uppercase, 1 digit, 1 special char
+      if (form.newPassword.length < 8) {
+        e.newPassword = 'לפחות 8 תווים';
+      } else if (!/[A-Z]/.test(form.newPassword)) {
+        e.newPassword = 'חייבת לפחות אות גדולה אחת באנגלית (A-Z)';
+      } else if (!/[0-9]/.test(form.newPassword)) {
+        e.newPassword = 'חייבת לפחות ספרה אחת';
+      } else if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(form.newPassword)) {
+        e.newPassword = 'חייבת לפחות תו מיוחד אחד (!@#$%^&*...)';
+      }
+    }
     if (form.newPassword !== form.confirmPassword) e.confirmPassword = 'הסיסמאות אינן תואמות';
+    if (form.currentPassword && form.currentPassword === form.newPassword) {
+      e.newPassword = 'הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית';
+    }
     return e;
   };
 
@@ -385,7 +401,12 @@ function SecurityTab() {
       setSaveStatus('success');
       setTimeout(() => setSaveStatus(null), 4000);
     } catch (err) {
-      setErrors({ global: err.response?.data?.message || 'שגיאה בשינוי הסיסמה. בדוק את הסיסמה הנוכחית.' });
+      // Backend sends { error: "..." } — fall back to message / generic text
+      const backendMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        'שגיאה בשינוי הסיסמה. נסה/י שוב.';
+      setErrors({ global: backendMsg });
       setSaveStatus('error');
     } finally {
       setSaving(false);
@@ -404,6 +425,18 @@ function SecurityTab() {
           <PwField id="cpw" field="currentPassword" showKey="current" label="סיסמה נוכחית" autoComplete="current-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
           <PwField id="npw" field="newPassword" showKey="newPw" label="סיסמה חדשה" autoComplete="new-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
           <PwField id="cpw2" field="confirmPassword" showKey="confirm" label="אימות סיסמה" autoComplete="new-password" form={form} errors={errors} showPw={showPw} onToggle={toggle} onChange={handleChange} />
+
+          {/* Password policy hint — matches backend validatePasswordPolicy */}
+          <div className="text-xs text-[var(--text-muted)] font-heebo bg-[var(--bg-muted)] rounded-md px-3 py-2 border border-[var(--border-default)]">
+            <p className="font-semibold mb-1 text-[var(--text-secondary)]">דרישות לסיסמה חדשה:</p>
+            <ul className="list-disc pr-5 space-y-0.5">
+              <li>לפחות 8 תווים</li>
+              <li>אות גדולה אחת לפחות באנגלית (A-Z)</li>
+              <li>ספרה אחת לפחות (0-9)</li>
+              <li>תו מיוחד אחד לפחות (!@#$%^&amp;*)</li>
+            </ul>
+          </div>
+
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit" variant="primary" size="md" loading={saving} leftIcon={<Save className="w-4 h-4" />}>
               עדכן סיסמה

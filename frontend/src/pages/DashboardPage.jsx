@@ -31,6 +31,7 @@ import EmergencyBanner from '../components/dashboard/EmergencyBanner';
 // New dashboard sub-components
 import AdminStatCards        from '../components/dashboard/AdminStatCards';
 import RabbiStatCards        from '../components/dashboard/RabbiStatCards';
+import LeaderboardWidget     from '../components/dashboard/LeaderboardWidget';
 // Lazy-loaded chart components (recharts is heavy)
 const ActivityChart  = lazy(() => import('../components/dashboard/ActivityChart'));
 const CategoryChart  = lazy(() => import('../components/dashboard/CategoryChart'));
@@ -779,6 +780,14 @@ export default function DashboardPage() {
           <section aria-labelledby="realtime-heading">
             <h2 id="realtime-heading" className="sr-only">רבנים מחוברים</h2>
             <OnlineRabbis initialRabbis={onlineRabbisList} loading={loading} />
+          </section>
+        )}
+
+        {/* ══ Leaderboard widget (rabbi view only — admin already has a full page) ══ */}
+        {!isAdmin && (
+          <section aria-labelledby="leaderboard-heading">
+            <h2 id="leaderboard-heading" className="sr-only">לוח המצטיינים</h2>
+            <LeaderboardWidget limit={5} />
           </section>
         )}
 

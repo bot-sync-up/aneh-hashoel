@@ -4,7 +4,7 @@ import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
   StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
-  CalendarDays, FileText, Bell,
+  CalendarDays, FileText, Bell, MailX,
 } from 'lucide-react';
 import { get, patch } from '../../lib/api';
 import api from '../../lib/api';
@@ -112,6 +112,15 @@ function LeadRow({ lead, onUpdate }) {
               <span className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-2 py-0.5 font-heebo">
                 <Clock size={10} />
                 טרם טופל
+              </span>
+            )}
+            {lead.is_unsubscribed && (
+              <span
+                title={lead.unsubscribed_at ? `הוסר/ה ב-${formatDate(lead.unsubscribed_at)}` : 'הוסר/ה מרשימת התפוצה'}
+                className="inline-flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full px-2 py-0.5 font-heebo"
+              >
+                <MailX size={10} />
+                הוסר/ה
               </span>
             )}
           </div>

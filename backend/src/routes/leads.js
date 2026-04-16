@@ -61,8 +61,8 @@ router.get('/export', async (req, res, next) => {
     // Build CSV manually — no external dependency needed
     // CS agents get restricted columns (no email, no question content)
     const headers = isCS
-      ? ['שם', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'טופל', 'תאריך יצירה', 'הערות']
-      : ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'דחוף', 'טופל', 'תאריך יצירה', 'שאלה אחרונה', 'הערות'];
+      ? ['שם', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'טופל', 'הוסר מרשימת תפוצה', 'תאריך יצירה', 'הערות']
+      : ['שם', 'אימייל', 'טלפון', 'מספר שאלות', 'קטגוריה אחרונה', 'חם', 'דחוף', 'טופל', 'הוסר מרשימת תפוצה', 'תאריך יצירה', 'שאלה אחרונה', 'הערות'];
 
     function escapeCsvField(val) {
       const str = String(val ?? '');
@@ -80,6 +80,7 @@ router.get('/export', async (req, res, next) => {
           l.last_category_name || '',
           l.is_hot ? 'כן' : 'לא',
           l.contacted ? 'כן' : 'לא',
+          l.is_unsubscribed ? 'כן' : 'לא',
           l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
           l.contact_notes || '',
         ].map(escapeCsvField).join(',')
@@ -92,6 +93,7 @@ router.get('/export', async (req, res, next) => {
           l.is_hot ? 'כן' : 'לא',
           l.has_urgent ? 'כן' : 'לא',
           l.contacted ? 'כן' : 'לא',
+          l.is_unsubscribed ? 'כן' : 'לא',
           l.created_at ? new Date(l.created_at).toLocaleDateString('he-IL') : '',
           l.last_question_at ? new Date(l.last_question_at).toLocaleDateString('he-IL') : '',
           l.contact_notes || '',

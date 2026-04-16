@@ -28,6 +28,7 @@ const { runWeeklyNewsletter }   = require('./jobs/weeklyNewsletter');
 const { runHolidayGreetings }   = require('./jobs/holidayGreetings');
 const { runImapPoller }         = require('./jobs/imapPoller');
 const { runOnboardingDrip }    = require('./jobs/onboardingDrip');
+const { runPendingReminder }   = require('./jobs/pendingReminder');
 const {
   syncPendingQuestions,
   syncAnswersToWP,
@@ -144,6 +145,13 @@ function startCronJobs(io = null) {
     timezone: TIMEZONE,
   });
 
+  // ─── Every hour — remind rabbis about overdue pending questions ───────────
+  // Controlled by admin via system_config.pending_reminder (enabled/hours/remind_every).
+  // Job itself is a no-op when disabled, so safe to schedule unconditionally.
+  cron.schedule('15 * * * *', safeJob('pendingQuestionsReminder', runPendingReminder), {
+    timezone: TIMEZONE,
+  });
+
   // ─── Startup: auto-sync categories from WP if local DB has fewer ─────────
   if (process.env.DISABLE_WP_SYNC !== 'true') {
     setImmediate(async () => {
@@ -220,6 +228,7 @@ function startCronJobs(io = null) {
   console.log('[cron]   syncLeadsToGoogleSheets:    */15 * * * *');
   console.log('[cron]   sendWeeklyNewsletter:       0 10 * * 5');
   console.log('[cron]   sendHolidayGreetings:       0 8 * * *');
+  console.log('[cron]   pendingQuestionsReminder:   15 * * * *');
 }
 
 // ── Exports ──────────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ const EMAIL_FOLDERS = [
     id: 'rabbi',
     title: 'מיילים לרבנים',
     icon: '🎓',
+    audience: 'rabbi',
     templates: [
       {
         id: 'welcome',
@@ -106,6 +107,7 @@ const EMAIL_FOLDERS = [
     id: 'asker',
     title: 'מיילים לשואלים',
     icon: '👤',
+    audience: 'asker',
     templates: [
       {
         id: 'question_received',
@@ -175,6 +177,7 @@ const EMAIL_FOLDERS = [
     id: 'onboarding',
     title: 'מיילים היכרות (אונבורדינג)',
     icon: '🤝',
+    audience: 'asker',
     templates: [
       {
         id: 'onboarding_1',
@@ -273,7 +276,7 @@ function fillSampleData(text, templates) {
     .replace(/\{timeout_hours\}/g, '4');
 }
 
-function TemplateCard({ category, templates, onChange, onSave, saving, savedId }) {
+function TemplateCard({ category, templates, onChange, onSave, saving, savedId, audience }) {
   const [open, setOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -294,11 +297,15 @@ function TemplateCard({ category, templates, onChange, onSave, saving, savedId }
         templates
       );
 
+      // Asker-audience templates should NOT include the rabbi login button in preview
+      const isAsker = audience === 'asker';
       const { html } = await post('/admin/email-preview', {
         title,
         body: bodyContent,
-        buttonLabel: 'כניסה למערכת',
-        buttonUrl: 'https://ask.moreshet-maran.com/login',
+        ...(isAsker
+          ? {} // no login button for asker
+          : { buttonLabel: 'כניסה למערכת', buttonUrl: 'https://ask.moreshet-maran.com/login' }),
+        audience: audience || 'rabbi',
       });
       setPreviewHtml(html);
     } catch (err) {
@@ -577,6 +584,7 @@ export default function EmailSettingsPage() {
               onSave={handleSave}
               saving={saving}
               savedId={savedId}
+              audience={folder.audience || 'rabbi'}
             />
           ))}
         </div>

@@ -102,13 +102,16 @@ async function queueOnboarding(leadId, encryptedEmail, askerName) {
 
 async function runOnboardingDrip() {
   try {
-    // Find emails that are due
+    // Find emails that are due.  We JOIN to leads so we can filter out
+    // recipients who have unsubscribed from marketing (Israeli spam law §30א).
     const { rows } = await db(
-      `SELECT id, email_encrypted, asker_name, step
-       FROM   onboarding_queue
-       WHERE  sent_at IS NULL
-         AND  send_at <= NOW()
-       ORDER BY send_at ASC
+      `SELECT oq.id, oq.email_encrypted, oq.asker_name, oq.step, oq.lead_id,
+              COALESCE(l.is_unsubscribed, FALSE) AS is_unsubscribed
+       FROM   onboarding_queue oq
+       LEFT JOIN leads l ON l.id = oq.lead_id
+       WHERE  oq.sent_at IS NULL
+         AND  oq.send_at <= NOW()
+       ORDER BY oq.send_at ASC
        LIMIT 20`
     );
 
@@ -119,10 +122,22 @@ async function runOnboardingDrip() {
     const { sendEmail } = require('../../services/email');
     const { createEmailHTML } = require('../../templates/emailBase');
     const { decryptField } = require('../../utils/encryption');
+    const { signUnsubscribeToken } = require('../../routes/unsubscribe');
 
     for (const row of rows) {
       const stepContent = STEP_CONTENT[row.step];
       if (!stepContent) continue;
+
+      // Skip (mark done) if the lead has opted out — onboarding is marketing,
+      // not a direct reply, so it's covered by the opt-out requirement.
+      if (row.is_unsubscribed) {
+        await db(
+          `UPDATE onboarding_queue SET sent_at = NOW(), error = 'skipped: unsubscribed' WHERE id = $1`,
+          [row.id]
+        );
+        console.log(TAG, `Skipped step ${row.step} for unsubscribed lead ${row.lead_id}`);
+        continue;
+      }
 
       let email;
       try {
@@ -139,7 +154,18 @@ async function runOnboardingDrip() {
 
       const name = row.asker_name || 'ידיד/ה';
       const body = stepContent.body.replace(/\{\{name\}\}/g, name);
-      const html = createEmailHTML(stepContent.title, body, [], { systemName: 'המרכז למורשת מרן' });
+
+      // Build unsubscribe link for this lead
+      const apiBase = (process.env.APP_URL || '').replace(/\/$/, '');
+      const unsubscribeLink = row.lead_id
+        ? `${apiBase}/unsubscribe?token=${signUnsubscribeToken(row.lead_id)}`
+        : '';
+
+      const html = createEmailHTML(stepContent.title, body, [], {
+        systemName: 'המרכז למורשת מרן',
+        audience: 'asker',
+        unsubscribeLink,
+      });
 
       try {
         await sendEmail(email, stepContent.subject, html);

@@ -18,7 +18,7 @@ import {
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
-import { get, patch, del } from '../../lib/api';
+import { get, patch, del, post } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import AddRabbiModal from '../../components/admin/AddRabbiModal';
 
@@ -48,7 +48,7 @@ function RoleBadge({ role }) {
 }
 
 // ─── Edit Rabbi Modal (with action buttons) ──────────────────────────────
-function EditRabbiModal({ rabbi, onClose, onSave, onToggleActive, onChangeRole, onAuditLog, onDelete, isSelf }) {
+function EditRabbiModal({ rabbi, onClose, onSave, onToggleActive, onChangeRole, onAuditLog, onDelete, onResetPassword, isSelf }) {
   const [form, setForm] = useState({
     name: rabbi.name || '',
     email: rabbi.email || '',
@@ -108,6 +108,11 @@ function EditRabbiModal({ rabbi, onClose, onSave, onToggleActive, onChangeRole, 
           <Button variant="outline" size="sm" onClick={() => { onClose(); onAuditLog(); }}>
             <ScrollText size={13} className="ml-1" /> יומן פעילות
           </Button>
+          {!isSelf && onResetPassword && (
+            <Button variant="outline" size="sm" onClick={() => { onClose(); onResetPassword(); }}>
+              <Shield size={13} className="ml-1" /> אפס סיסמה
+            </Button>
+          )}
           {!isSelf && (
             <Button variant="danger" size="sm" onClick={() => { onClose(); onDelete(); }}>
               <Trash2 size={13} className="ml-1" /> מחק
@@ -456,6 +461,21 @@ export default function RabbisAdminPage() {
     }
   };
 
+  const handleResetPassword = async (rabbi) => {
+    if (!rabbi) return;
+    const ok = window.confirm(
+      `לאפס את הסיסמה של ${rabbi.name}? תישלח אליו/ה סיסמה זמנית חדשה במייל.`
+    );
+    if (!ok) return;
+    try {
+      const result = await post(`/admin/rabbis/${rabbi.id}/reset-password`, {});
+      showToast(result?.message || 'הסיסמה אופסה ונשלח מייל');
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'שגיאה באיפוס הסיסמה';
+      showToast(msg, 'error');
+    }
+  };
+
   const handleEditSave = (updated) => {
     setRabbis(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
     setEditRabbi(null);
@@ -506,6 +526,7 @@ export default function RabbisAdminPage() {
           onChangeRole={() => { setEditRabbi(null); setChangeRoleRabbi(editRabbi); }}
           onAuditLog={() => { setEditRabbi(null); setAuditRabbi(editRabbi); }}
           onDelete={() => { setEditRabbi(null); setDeleteRabbi(editRabbi); }}
+          onResetPassword={() => handleResetPassword(editRabbi)}
           isSelf={currentUser && String(currentUser.id) === String(editRabbi.id)}
         />
       )}

@@ -1037,6 +1037,98 @@ router.put('/email-settings', async (req, res) => {
   }
 });
 
+// =============================================================================
+// PENDING QUESTION REMINDER SETTINGS
+// =============================================================================
+
+/**
+ * GET /admin/pending-reminder-settings
+ * מחזיר את הגדרות תזכורת השאלות הממתינות (enabled, hours, remind_every)
+ */
+router.get('/pending-reminder-settings', async (req, res) => {
+  try {
+    const { rows } = await dbQuery(
+      "SELECT value FROM system_config WHERE key = 'pending_reminder'"
+    );
+    const defaults = { enabled: false, hours: 24, remind_every: 24 };
+    if (rows.length === 0 || !rows[0].value) {
+      return res.json({ ok: true, settings: defaults });
+    }
+    const v = typeof rows[0].value === 'string'
+      ? JSON.parse(rows[0].value)
+      : rows[0].value;
+    return res.json({ ok: true, settings: { ...defaults, ...v } });
+  } catch (err) {
+    console.error('[admin] GET /pending-reminder-settings error:', err.message);
+    return res.status(500).json({ error: 'שגיאת שרת בטעינת ההגדרות' });
+  }
+});
+
+/**
+ * PUT /admin/pending-reminder-settings
+ * Body: { enabled: boolean, hours: number, remind_every: number }
+ */
+router.put('/pending-reminder-settings', async (req, res) => {
+  try {
+    const { enabled, hours, remind_every } = req.body ?? {};
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled חייב להיות boolean' });
+    }
+    const h = parseInt(hours, 10);
+    const r = parseInt(remind_every, 10);
+    if (!Number.isFinite(h) || h < 1 || h > 720) {
+      return res.status(400).json({ error: 'hours חייב להיות מספר בין 1 ל-720' });
+    }
+    if (!Number.isFinite(r) || r < 1 || r > 720) {
+      return res.status(400).json({ error: 'remind_every חייב להיות מספר בין 1 ל-720' });
+    }
+
+    const value = { enabled, hours: h, remind_every: r };
+
+    await dbQuery(
+      `INSERT INTO system_config (key, value, updated_at)
+       VALUES ('pending_reminder', $1::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify(value)]
+    );
+
+    // Audit log (non-blocking)
+    setImmediate(() => {
+      logAction(
+        req.rabbi.id,
+        ACTIONS.ADMIN_CONFIG_CHANGED,
+        'system_config',
+        'pending_reminder',
+        null,
+        value,
+        getIp(req)
+      ).catch(() => {});
+    });
+
+    return res.json({ ok: true, settings: value });
+  } catch (err) {
+    console.error('[admin] PUT /pending-reminder-settings error:', err.message);
+    return res.status(500).json({ error: 'שגיאת שרת בשמירת ההגדרות' });
+  }
+});
+
+/**
+ * POST /admin/pending-reminder-settings/run-now
+ * Trigger the reminder job immediately (admin test button).
+ */
+router.post('/pending-reminder-settings/run-now', async (req, res) => {
+  try {
+    const { runPendingReminder } = require('../cron/jobs/pendingReminder');
+    const result = await runPendingReminder();
+    return res.json({ ok: true, result });
+  } catch (err) {
+    console.error('[admin] POST /pending-reminder-settings/run-now error:', err.message);
+    return res.status(500).json({ error: err.message || 'שגיאה בהפעלת התזכורת' });
+  }
+});
+
 /**
  * POST /admin/email-preview
  * Renders a full email preview using createEmailHTML().
@@ -1046,7 +1138,7 @@ router.put('/email-settings', async (req, res) => {
 router.post('/email-preview', async (req, res) => {
   try {
     const { createEmailHTML } = require('../templates/emailBase');
-    const { title, body, buttonLabel, buttonUrl } = req.body;
+    const { title, body, buttonLabel, buttonUrl, audience } = req.body;
 
     if (!title || !body) {
       return res.status(400).json({ error: 'נדרשים title ו-body' });
@@ -1057,7 +1149,11 @@ router.post('/email-preview', async (req, res) => {
       buttons.push({ label: buttonLabel, url: buttonUrl });
     }
 
-    const html = createEmailHTML(title, body, buttons);
+    // audience='asker' removes the "כניסה למערכת" link from the footer
+    const options = {};
+    if (audience === 'asker') options.audience = 'asker';
+
+    const html = createEmailHTML(title, body, buttons, options);
     return res.json({ ok: true, html });
   } catch (err) {
     console.error('[admin] POST /email-preview error:', err.message);
@@ -1187,6 +1283,52 @@ router.get('/newsletter/status', async (req, res) => {
   } catch (err) {
     console.error('[admin] GET /newsletter/status error:', err.message);
     return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
+/**
+ * GET /admin/newsletter/enabled
+ * Returns whether the weekly newsletter auto-send is enabled.
+ */
+router.get('/newsletter/enabled', async (req, res) => {
+  try {
+    const v = await systemSettings.getSetting('newsletter_enabled');
+    // null/undefined defaults to true (legacy behavior)
+    return res.json({ ok: true, enabled: v === false ? false : true });
+  } catch (err) {
+    console.error('[admin] GET /newsletter/enabled error:', err.message);
+    return res.status(500).json({ error: 'שגיאת שרת' });
+  }
+});
+
+/**
+ * PUT /admin/newsletter/enabled
+ * Body: { enabled: boolean }
+ */
+router.put('/newsletter/enabled', async (req, res) => {
+  try {
+    const { enabled } = req.body ?? {};
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled חייב להיות boolean' });
+    }
+    await systemSettings.setSetting('newsletter_enabled', enabled, req.rabbi.id, getIp(req));
+
+    setImmediate(() => {
+      logAction(
+        req.rabbi.id,
+        ACTIONS.ADMIN_CONFIG_CHANGED,
+        'system_config',
+        'newsletter_enabled',
+        null,
+        { enabled },
+        getIp(req)
+      ).catch(() => {});
+    });
+
+    return res.json({ ok: true, enabled });
+  } catch (err) {
+    console.error('[admin] PUT /newsletter/enabled error:', err.message);
+    return res.status(500).json({ error: 'שגיאת שרת' });
   }
 });
 

@@ -272,7 +272,11 @@ export default function QuestionDetailPage() {
 
   // assigned_rabbi may be an object {id,name} or the API may return assigned_rabbi_id + rabbi_name flat
   const assignedRabbiId = assigned_rabbi?.id ?? question?.assigned_rabbi_id;
-  const assignedRabbiName = assigned_rabbi?.name ?? assigned_rabbi?.display_name ?? question?.rabbi_name;
+  const rawRabbiName = assigned_rabbi?.name ?? assigned_rabbi?.display_name ?? question?.rabbi_name;
+  // Strip leading "הרב " / "הרה\"ג " prefix so we don't render "תשובת הרב הרב נחום"
+  const assignedRabbiName = rawRabbiName
+    ? String(rawRabbiName).replace(/^\s*(?:הרב|הרה"ג|הרה״ג|הגאון הרב)\s+/u, '').trim()
+    : rawRabbiName;
   const isMe = rabbi && assignedRabbiId && String(assignedRabbiId) === String(rabbi?.id);
   const isPending = status === 'pending';
   const isInProcess = status === 'in_process';
@@ -721,8 +725,8 @@ export default function QuestionDetailPage() {
               </div>
             </div>
           }>
-            {/* Answer content — hide from other rabbis when private */}
-            {answer_is_private && !isMyAnswer ? (
+            {/* Answer content — hide from other rabbis when private (admins always see it) */}
+            {answer_is_private && !isMyAnswer && !isAdmin ? (
               <p className="text-sm text-[var(--text-muted)] font-heebo italic py-4 text-center">
                 תשובה זו פרטית — גלויה לרב שענה בלבד.
               </p>

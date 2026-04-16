@@ -187,14 +187,23 @@ async function getDashboardStats() {
   const periodRow     = periodResult.rows[0];
   const discussionRow = discussionsResult.rows[0];
 
-  // Online rabbis: rabbis with a socket session activity in the last 5 minutes.
-  // We approximate this via device_sessions last_seen since we do not have a
-  // dedicated online-state table.
-  const { rows: onlineRows } = await query(`
-    SELECT COUNT(DISTINCT rabbi_id)::int AS online_count
-    FROM   device_sessions
-    WHERE  last_seen >= NOW() - INTERVAL '5 minutes'
-  `);
+  // Online rabbis: count is derived from the live socket.io `connectedRabbis`
+  // Map (one entry per rabbi currently holding at least one open socket).
+  // Falls back to device_sessions.last_seen only when the socket module can't
+  // be loaded (e.g. during isolated unit tests).
+  let onlineCount = 0;
+  try {
+    const { connectedRabbis } = require('../socket/helpers');
+    onlineCount = connectedRabbis?.size || 0;
+  } catch (e) {
+    const { rows: fallback } = await query(`
+      SELECT COUNT(DISTINCT rabbi_id)::int AS online_count
+      FROM   device_sessions
+      WHERE  last_seen >= NOW() - INTERVAL '5 minutes'
+    `);
+    onlineCount = fallback[0].online_count;
+  }
+  const onlineRows = [{ online_count: onlineCount }];
 
   const totalQuestions  = parseInt(statusRow.total,      10);
   const pending         = parseInt(statusRow.pending,    10);
@@ -791,7 +800,15 @@ async function getOverviewStats() {
     hidden:          q.hidden,
     totalRabbis:     r.total_rabbis,
     activeRabbis:    r.active_rabbis,
-    onlineRabbis:    onlineAgg.rows[0].online_rabbis,
+    // Prefer live socket map over stale device_sessions.last_seen
+    onlineRabbis:    (() => {
+      try {
+        const { connectedRabbis } = require('../socket/helpers');
+        return connectedRabbis?.size || onlineAgg.rows[0].online_rabbis || 0;
+      } catch {
+        return onlineAgg.rows[0].online_rabbis || 0;
+      }
+    })(),
     avgResponseTime: parseFloat(q.avg_response_hours),
     totalThanks:     thanksAgg.rows[0].total_thanks,
     thisWeekAnswers: weekAgg.rows[0].this_week_answers,

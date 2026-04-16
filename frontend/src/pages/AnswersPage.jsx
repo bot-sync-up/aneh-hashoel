@@ -31,7 +31,7 @@ import {
 const PAGE_SIZE = 20;
 const EDIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
-function AnswerCard({ question, currentRabbiId }) {
+function AnswerCard({ question, currentRabbiId, isAdmin }) {
   const navigate = useNavigate();
   const {
     id,
@@ -65,7 +65,10 @@ function AnswerCard({ question, currentRabbiId }) {
 
   const resolvedRabbiId = assigned_rabbi?.id ?? assigned_rabbi_id;
   const isMe = currentRabbiId && resolvedRabbiId && String(resolvedRabbiId) === String(currentRabbiId);
-  const rabbiName = assigned_rabbi?.display_name ?? assigned_rabbi?.name ?? rabbi_name;
+  const rawRabbiName = assigned_rabbi?.display_name ?? assigned_rabbi?.name ?? rabbi_name;
+  const rabbiName = rawRabbiName
+    ? String(rawRabbiName).replace(/^\s*(?:הרב|הרה"ג|הרה״ג|הגאון הרב)\s+/u, '').trim()
+    : rawRabbiName;
 
   const canEdit = isMe && (() => {
     if (!displayDate) return false;
@@ -109,8 +112,8 @@ function AnswerCard({ question, currentRabbiId }) {
         </p>
       )}
 
-      {/* Answer snippet */}
-      {answer_is_private && !isMyAnswer ? (
+      {/* Answer snippet — admins always see private content */}
+      {answer_is_private && !isMyAnswer && !isAdmin ? (
         <p className="text-sm text-[var(--text-muted)] font-heebo italic mb-1">
           תשובה פרטית — גלויה לרב שענה בלבד.
         </p>
@@ -159,7 +162,7 @@ function AnswerCard({ question, currentRabbiId }) {
 }
 
 export default function AnswersPage() {
-  const { rabbi } = useAuth();
+  const { rabbi, isAdmin } = useAuth();
   const { on } = useSocket();
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -316,6 +319,7 @@ export default function AnswersPage() {
                 key={question.id}
                 question={question}
                 currentRabbiId={rabbi?.id}
+                isAdmin={isAdmin}
               />
             ))}
           </div>

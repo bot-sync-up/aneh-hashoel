@@ -21,6 +21,33 @@
 
 const { query: dbQuery } = require('../db/pool');
 const { decryptField }   = require('../utils/encryption');
+const { findLeadByEmail } = require('./leadsService');
+const { signUnsubscribeToken } = require('../routes/unsubscribe');
+
+// ─── Unsubscribe link helper ───────────────────────────────────────────────────
+
+/**
+ * בונה קישור הסרה חתום לשואל על סמך כתובת המייל שלו (plaintext).
+ * מחזיר מחרוזת ריקה אם אין ליד מתאים או אם APP_URL לא מוגדר.
+ * משמש גם במיילים טרנזקציונליים (תשובה/אישור), כחלק מדרישות שקיפות
+ * והגדלת אמון המשתמש — גם אם החוק לא מחייב ניתוק במיילים אלו.
+ *
+ * @param {string} plainEmail
+ * @returns {Promise<string>}
+ */
+async function _buildUnsubscribeLink(plainEmail) {
+  try {
+    if (!plainEmail) return '';
+    const lead = await findLeadByEmail(plainEmail);
+    if (!lead) return '';
+    const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+    if (!appUrl) return '';
+    return `${appUrl}/unsubscribe?token=${signUnsubscribeToken(lead.id)}`;
+  } catch (err) {
+    console.warn('[askerNotification] _buildUnsubscribeLink failed:', err.message);
+    return '';
+  }
+}
 
 // ─── Encryption helpers ────────────────────────────────────────────────────────
 
@@ -222,7 +249,14 @@ async function notifyAskerNewAnswer(questionId) {
   `;
 
   const buttons = answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [];
-  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons, { systemName: 'שאל את הרב' });
+  // מייל "תשובה" — טרנזקציונלי: נשלח גם אם is_unsubscribed. קישור הסרה
+  // מצורף לשקיפות ולאפשר ניהול עצמי של רשימת התפוצה.
+  const unsubscribeLink = email ? await _buildUnsubscribeLink(email) : '';
+  const html = createEmailHTML('התשובה לשאלתך מוכנה!', bodyContent, buttons, {
+    systemName: 'שאל את הרב',
+    audience: 'asker',
+    unsubscribeLink,
+  });
 
   // Send email
   if (email) {
@@ -292,10 +326,11 @@ async function notifyAskerFollowUp(questionId) {
 
   const answerUrl = buildAnswerUrl(data);
 
-  // Send email
+  // Send email — מייל המשך הוא טרנזקציונלי (תגובה ישירה לשאלת המשך)
   if (email) {
     try {
       const { createEmailHTML } = require('../templates/emailBase');
+      const unsubscribeLink = await _buildUnsubscribeLink(email);
       const followUpHtml = createEmailHTML(
         'תשובת המשך לשאלתך',
         `<p style="margin:0 0 12px; font-size:15px;">הרב ${data.rabbi_name} השיב לשאלת ההמשך שלך:</p>
@@ -306,7 +341,7 @@ async function notifyAskerFollowUp(questionId) {
           ${data.follow_up_answer || ''}
         </div>`,
         answerUrl ? [{ label: 'צפה בתשובה', url: answerUrl }] : [],
-        { systemName: 'שאל את הרב' }
+        { systemName: 'שאל את הרב', audience: 'asker', unsubscribeLink }
       );
       await sendEmail(
         email,
@@ -380,6 +415,7 @@ async function notifyAskerPrivateAnswer(questionId) {
   if (email) {
     try {
       const { createEmailHTML } = require('../templates/emailBase');
+      const unsubscribeLink = await _buildUnsubscribeLink(email);
       const bodyContent = `
         <p style="text-align:right; font-size:18px; font-weight:bold; margin:0 0 8px;">${greeting}</p>
         <p style="text-align:right;">הרב <strong>${data.rabbi_name}</strong> ענה על שאלתך בתשובה אישית:</p>
@@ -393,7 +429,11 @@ async function notifyAskerPrivateAnswer(questionId) {
         <p style="color:#666; font-size:12px;">תשובה זו נשלחה אליך באופן אישי ואינה מפורסמת באתר.</p>
         <p>בברכה,<br><strong>הרב ${data.rabbi_name}</strong></p>
       `;
-      const html = createEmailHTML('תשובה אישית לשאלתך', bodyContent, [], { systemName: 'שאל את הרב' });
+      const html = createEmailHTML('תשובה אישית לשאלתך', bodyContent, [], {
+        systemName: 'שאל את הרב',
+        audience: 'asker',
+        unsubscribeLink,
+      });
       await sendEmail(
         email,
         `תשובה לשאלתך — שאל את הרב`,
@@ -431,6 +471,8 @@ async function notifyAskerQuestionReceived(question) {
 
   const systemName = 'שאל את הרב';
   const subject = `קיבלנו את שאלתך — ${systemName}`;
+  // אישור קבלת שאלה — טרנזקציונלי: נשלח גם אם is_unsubscribed.
+  const unsubscribeLink = await _buildUnsubscribeLink(email);
   const bodyContent = `
     <p style="margin: 0 0 12px; font-size: 15px;">שלום ${question.asker_name || 'שואל/ת יקר/ה'},</p>
     <p style="margin: 0 0 16px; font-size: 15px;">
@@ -444,7 +486,11 @@ async function notifyAskerQuestionReceived(question) {
       נשלח לך מייל נוסף כאשר תתקבל תשובה מהרב.
     </p>
   `;
-  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], { systemName });
+  const html = createEmailHTML('שאלתך התקבלה בהצלחה', bodyContent, [], {
+    systemName,
+    audience: 'asker',
+    unsubscribeLink,
+  });
 
   await sendEmail(email, subject, html, { fromName: systemName });
 }

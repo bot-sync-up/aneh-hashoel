@@ -527,6 +527,27 @@ async function updateLead(id, updates) {
   return rows[0] || null;
 }
 
+// ─── findLeadByEmail ──────────────────────────────────────────────────────────
+
+/**
+ * מחפש ליד לפי כתובת אימייל (plaintext). משתמש ב-email_hash לאיתור,
+ * ומחזיר את מזהה הליד ומצב ההסרה מרשימת התפוצה. משמש את שולחי המיילים
+ * השיווקיים כדי לבדוק opt-out ולצרף קישור הסרה חתום.
+ *
+ * @param {string} plainEmail
+ * @returns {Promise<{ id: string, is_unsubscribed: boolean } | null>}
+ */
+async function findLeadByEmail(plainEmail) {
+  const hash = _emailHash(plainEmail);
+  if (!hash) return null;
+
+  const { rows } = await query(
+    `SELECT id, is_unsubscribed FROM leads WHERE email_hash = $1 LIMIT 1`,
+    [hash]
+  );
+  return rows[0] || null;
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { upsertLead, getLeads, getLeadById, updateLead, syncLeadsFromQuestions };
+module.exports = { upsertLead, getLeads, getLeadById, updateLead, syncLeadsFromQuestions, findLeadByEmail };

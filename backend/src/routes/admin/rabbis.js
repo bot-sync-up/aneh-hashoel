@@ -691,6 +691,93 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
+// ─── POST /:id/reset-password ─────────────────────────────────────────────────
+
+/**
+ * Reset a rabbi's password (admin only).
+ *
+ * Generates a fresh temporary password, updates the hash, forces a password
+ * change on next login (via must_change_password flag if present), and emails
+ * the new credentials to the rabbi.
+ *
+ * Returns the temp password ONLY to the calling admin (NOT stored in plain text).
+ */
+router.post('/:id/reset-password', async (req, res, next) => {
+  try {
+    const targetId = req.params.id;
+
+    const { rows: existing } = await query(
+      `SELECT id, name, email, status FROM rabbis WHERE id = $1`,
+      [targetId]
+    );
+    if (!existing[0]) {
+      return res.status(404).json({ error: 'רב לא נמצא' });
+    }
+    if (existing[0].status === 'deleted') {
+      return res.status(400).json({ error: 'חשבון זה נמחק ולא ניתן לאפס סיסמה' });
+    }
+
+    const crypto = require('crypto');
+    const bcrypt = require('bcryptjs');
+
+    // Readable temp password — 12 hex chars
+    const tempPassword = crypto.randomBytes(6).toString('hex');
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    // Set password + clear any 2fa reset tokens; if `must_change_password`
+    // column exists use it, otherwise ignore silently.
+    try {
+      await query(
+        `UPDATE rabbis
+         SET    password_hash = $1,
+                must_change_password = TRUE,
+                updated_at = NOW()
+         WHERE  id = $2`,
+        [passwordHash, targetId]
+      );
+    } catch (e) {
+      // Fallback: schema may lack must_change_password
+      await query(
+        `UPDATE rabbis
+         SET    password_hash = $1,
+                updated_at = NOW()
+         WHERE  id = $2`,
+        [passwordHash, targetId]
+      );
+    }
+
+    // Email new temp credentials (fire-and-forget so the response is fast)
+    setImmediate(async () => {
+      try {
+        await _sendSetupEmail(existing[0].email, existing[0].name, tempPassword);
+      } catch (err) {
+        console.error('[admin/rabbis] reset-password email failed:', err.message);
+      }
+    });
+
+    // Audit
+    setImmediate(() => {
+      createAuditEntry(
+        req.rabbi.id,
+        ACTIONS.AUTH_PASSWORD_RESET,
+        'rabbi',
+        targetId,
+        null,
+        { reset_by_admin: req.rabbi.id },
+        _clientIp(req)
+      ).catch(() => {});
+    });
+
+    return res.json({
+      ok: true,
+      message: `סיסמה אופסה והמייל נשלח ל-${existing[0].email}`,
+      tempPassword, // returned to admin so they can share if needed
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 // ─── PUT /:id/role ────────────────────────────────────────────────────────────
 
 /**

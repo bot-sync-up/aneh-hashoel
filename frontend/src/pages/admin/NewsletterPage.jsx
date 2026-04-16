@@ -7,9 +7,10 @@ import {
   Clock,
   ThumbsUp,
   Eye,
+  Power,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import { get, post } from '../../lib/api';
+import { get, post, put } from '../../lib/api';
 
 export default function NewsletterPage() {
   const [candidates, setCandidates] = useState([]);
@@ -21,13 +22,16 @@ export default function NewsletterPage() {
   const [saved, setSaved] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [enabled, setEnabled] = useState(true);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [candidatesRes, statusRes] = await Promise.all([
+      const [candidatesRes, statusRes, enabledRes] = await Promise.all([
         get('/admin/newsletter/candidates'),
         get('/admin/newsletter/status'),
+        get('/admin/newsletter/enabled').catch(() => ({ enabled: true })),
       ]);
 
       setCandidates(candidatesRes.candidates || []);
@@ -35,6 +39,7 @@ export default function NewsletterPage() {
         lastSent: statusRes.lastSent,
         selectedQuestions: statusRes.selectedQuestions || [],
       });
+      setEnabled(enabledRes?.enabled !== false);
 
       // Pre-select already-selected questions
       if (statusRes.selectedQuestions?.length > 0) {
@@ -46,6 +51,20 @@ export default function NewsletterPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleToggleEnabled = async () => {
+    setTogglingEnabled(true);
+    setError('');
+    try {
+      const next = !enabled;
+      await put('/admin/newsletter/enabled', { enabled: next });
+      setEnabled(next);
+    } catch (err) {
+      setError(err?.response?.data?.error || 'שגיאה בעדכון ההפעלה');
+    } finally {
+      setTogglingEnabled(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -149,6 +168,34 @@ export default function NewsletterPage() {
           <Send size={16} /> הניוזלטר נשלח בהצלחה!
         </div>
       )}
+
+      {/* On/Off toggle */}
+      <div className={`rounded-xl border ${enabled ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60'} px-5 py-4 flex items-center justify-between`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${enabled ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <Power size={16} className={enabled ? 'text-emerald-700' : 'text-amber-700'} />
+          </div>
+          <div>
+            <p className="text-sm font-bold font-heebo text-[var(--text-primary)]">
+              {enabled ? 'הניוזלטר השבועי פעיל' : 'הניוזלטר השבועי כבוי'}
+            </p>
+            <p className="text-xs font-heebo text-[var(--text-muted)] mt-0.5">
+              {enabled
+                ? 'יישלח אוטומטית בכל יום שישי ב-10:00'
+                : 'לא יישלח ניוזלטר אוטומטי — ניתן עדיין לשלוח ידנית'}
+            </p>
+          </div>
+        </div>
+        <Button
+          variant={enabled ? 'outline' : 'primary'}
+          size="sm"
+          loading={togglingEnabled}
+          onClick={handleToggleEnabled}
+          leftIcon={<Power size={14} />}
+        >
+          {enabled ? 'כבה' : 'הפעל'}
+        </Button>
+      </div>
 
       {/* Status card */}
       <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">

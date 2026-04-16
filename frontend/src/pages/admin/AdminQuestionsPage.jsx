@@ -18,14 +18,17 @@ import {
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
-import { get, patch, del } from '../../lib/api';
+import { get, patch, put, del } from '../../lib/api';
 import api from '../../lib/api';
 import { decodeHTML } from '../../lib/utils';
 
 // ─── Question Preview Modal ───────────────────────────────────────────────
-function QuestionPreviewModal({ question, onClose }) {
+function QuestionPreviewModal({ question, onClose, onTitleUpdated }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editTitle, setEditTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(decodeHTML(question.title) || '');
+  const [savingTitle, setSavingTitle] = useState(false);
 
   useEffect(() => {
     get(`/questions/${question.id}`)
@@ -42,17 +45,66 @@ function QuestionPreviewModal({ question, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)]">
-          <div>
-            <h3 className="text-base font-bold text-[var(--text-primary)] font-heebo">
-              {decodeHTML(question.title)}
-            </h3>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border-default)] bg-[var(--bg-surface-raised)] gap-3">
+          <div className="flex-1 min-w-0">
+            {editTitle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={titleValue}
+                  onChange={(e) => setTitleValue(e.target.value)}
+                  className="flex-1 h-9 px-3 rounded-lg border border-[var(--border-default)] bg-white text-sm font-heebo"
+                  dir="rtl"
+                  autoFocus
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={savingTitle}
+                  onClick={async () => {
+                    if (!titleValue.trim()) return;
+                    setSavingTitle(true);
+                    try {
+                      await put(`/admin/questions/${question.id}/title`, { title: titleValue.trim() });
+                      setEditTitle(false);
+                      onTitleUpdated?.(question.id, titleValue.trim());
+                    } catch (err) {
+                      alert(err?.response?.data?.error || 'שגיאה בעדכון');
+                    } finally {
+                      setSavingTitle(false);
+                    }
+                  }}
+                >
+                  שמור
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setEditTitle(false); setTitleValue(decodeHTML(question.title) || ''); }}
+                >
+                  בטל
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-[var(--text-primary)] font-heebo flex-1">
+                  {decodeHTML(question.title)}
+                </h3>
+                <button
+                  className="p-1 rounded hover:bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  onClick={() => setEditTitle(true)}
+                  title="ערוך כותרת"
+                >
+                  ✏️
+                </button>
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <Badge status={question.status} withDot />
               {question.category && <span className="text-xs text-[var(--text-muted)] font-heebo">{question.category}</span>}
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)] transition-colors">
+          <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-muted)] transition-colors flex-shrink-0">
             <X size={18} />
           </button>
         </div>
@@ -489,7 +541,15 @@ export default function AdminQuestionsPage() {
     <div className="space-y-5" dir="rtl">
       {/* Modals */}
       {previewQuestion && (
-        <QuestionPreviewModal question={previewQuestion} onClose={() => setPreviewQuestion(null)} />
+        <QuestionPreviewModal
+          question={previewQuestion}
+          onClose={() => setPreviewQuestion(null)}
+          onTitleUpdated={(qid, newTitle) => {
+            setQuestions((prev) => prev.map((q) => q.id === qid ? { ...q, title: newTitle } : q));
+            setPreviewQuestion((prev) => prev ? { ...prev, title: newTitle } : prev);
+            showToast('הכותרת עודכנה');
+          }}
+        />
       )}
       {statusModal && (
         <StatusModal question={statusModal} onClose={() => setStatusModal(null)} onSave={handleStatusSave} />

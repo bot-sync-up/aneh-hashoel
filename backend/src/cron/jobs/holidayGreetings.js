@@ -69,11 +69,14 @@ async function _getLeadsWithPhones() {
   const yearAgo = new Date();
   yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 
+  // שליחת ברכות חג היא מסר שיווקי — מסננים לידים שהסירו עצמם מרשימת התפוצה
+  // (is_unsubscribed = TRUE), כמתחייב מתיקון 40 לחוק התקשורת.
   const { rows } = await query(
     `SELECT asker_phone_encrypted
      FROM   leads
      WHERE  asker_phone_encrypted IS NOT NULL
-       AND  last_question_at >= $1`,
+       AND  last_question_at >= $1
+       AND  is_unsubscribed = FALSE`,
     [yearAgo.toISOString()]
   );
 

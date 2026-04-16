@@ -43,6 +43,7 @@ const ACTIONS = Object.freeze({
   QUESTION_UNHIDDEN:      'question.unhidden',
   QUESTION_REASSIGNED:    'question.reassigned',
   QUESTION_DELETED:       'question.deleted',
+  QUESTION_EDITED:        'question.edited',
 
   // Answer lifecycle
   ANSWER_EDITED:          'answer.edited',

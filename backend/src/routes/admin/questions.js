@@ -251,6 +251,66 @@ router.put('/:id/status', async (req, res) => {
   }
 });
 
+// ─── PUT /:id/title ──────────────────────────────────────────────────────────
+
+/**
+ * PUT /admin/questions/:id/title
+ * Update the question title. Also syncs title to WordPress (fire-and-forget).
+ * Body: { title: string }
+ */
+router.put('/:id/title', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'כותרת נדרשת' });
+    }
+    const trimmed = title.trim().slice(0, 500);
+
+    const { rows: existing } = await dbQuery(
+      'SELECT id, title, wp_post_id FROM questions WHERE id = $1',
+      [id]
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'שאלה לא נמצאה' });
+    }
+
+    const { rows: updated } = await dbQuery(
+      'UPDATE questions SET title = $1, updated_at = NOW() WHERE id = $2 RETURNING id, title, wp_post_id',
+      [trimmed, id]
+    );
+
+    // Fire-and-forget: sync title to WP post
+    const wpPostId = updated[0]?.wp_post_id;
+    if (wpPostId && process.env.WP_API_URL && process.env.WP_API_KEY) {
+      setImmediate(async () => {
+        try {
+          const axios = require('axios');
+          const cred = Buffer.from(process.env.WP_API_KEY).toString('base64');
+          await axios.post(
+            `${process.env.WP_API_URL}/ask-rabai/${wpPostId}`,
+            { title: trimmed },
+            { headers: { Authorization: `Basic ${cred}`, 'Content-Type': 'application/json' }, timeout: 10000 }
+          );
+        } catch (wpErr) {
+          console.warn('[admin/questions] WP title sync failed:', wpErr.message);
+        }
+      });
+    }
+
+    await logAction(
+      req.rabbi.id, ACTIONS.QUESTION_EDITED, 'question', id,
+      { title: existing[0].title }, { title: trimmed }, getIp(req)
+    );
+
+    return res.json({ ok: true, question: updated[0] });
+  } catch (err) {
+    console.error('[admin/questions] PUT /:id/title error:', err.message);
+    return res.status(err.status || 500).json({ error: err.message || 'שגיאת שרת' });
+  }
+});
+
 // ─── PUT /:id/assign ──────────────────────────────────────────────────────────
 
 /**

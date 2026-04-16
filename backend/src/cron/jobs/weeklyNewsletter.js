@@ -169,6 +169,18 @@ function _formatNewsletterHtml(questions) {
 async function runWeeklyNewsletter() {
   console.info('[weekly-newsletter] בודק שאלות נבחרות ע"י מנהל...');
 
+  // Check admin toggle — ניתן לכבות את הניוזלטר מהגדרות המערכת.
+  try {
+    const enabled = await systemSettings.getSetting('newsletter_enabled');
+    // treat null/undefined as enabled (legacy default)
+    if (enabled === false) {
+      console.info('[weekly-newsletter] הניוזלטר כבוי בהגדרות — דילוג');
+      return;
+    }
+  } catch (err) {
+    console.warn('[weekly-newsletter] לא ניתן לקרוא את newsletter_enabled — ממשיך כברירת מחדל');
+  }
+
   // Check for admin-selected questions first
   let questions = await _getAdminSelectedQuestions();
 

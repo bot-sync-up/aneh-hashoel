@@ -258,20 +258,34 @@ async function fetchHistory({ lastId = 0, maxId = 2000 } = {}) {
     timeout: 30_000,
   });
 
-  // Nedarim returns a plain JSON array on success, or a string on error.
-  if (Array.isArray(resp.data)) return resp.data;
-
-  // Some endpoints return a JSON-encoded string (response.data is string)
-  if (typeof resp.data === 'string') {
+  // Nedarim responses observed in the wild:
+  //  - success with rows:     [ {...}, {...} ]
+  //  - success with no rows:  []
+  //  - error (object form):   { "Result": "Error", "Message": "..." }
+  //  - error (string form):   '{"Result":"Error","Message":"..."}' (unparsed)
+  //
+  // We now EXPLICITLY reject the error object so the cron surfaces the
+  // problem instead of silently returning "0 transactions".
+  let data = resp.data;
+  if (typeof data === 'string') {
     try {
-      const parsed = JSON.parse(resp.data);
-      return Array.isArray(parsed) ? parsed : [];
+      data = JSON.parse(data);
     } catch {
-      throw new Error(`Unexpected Nedarim response: ${resp.data.slice(0, 200)}`);
+      throw new Error(`Unexpected Nedarim response (non-JSON): ${String(resp.data).slice(0, 200)}`);
     }
   }
 
-  return [];
+  if (Array.isArray(data)) return data;
+
+  // Object-form error — surface the Hebrew message back to the caller.
+  if (data && typeof data === 'object' && String(data.Result).toLowerCase() === 'error') {
+    const err = new Error(`Nedarim API error: ${data.Message || 'unknown error'}`);
+    err.nedarimMessage = data.Message;
+    throw err;
+  }
+
+  // Anything else unexpected
+  throw new Error(`Unexpected Nedarim response shape: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
 // ─── Exports ─────────────────────────────────────────────────────────────────

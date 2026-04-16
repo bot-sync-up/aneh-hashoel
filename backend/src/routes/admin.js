@@ -1030,6 +1030,12 @@ router.put('/email-settings', async (req, res) => {
       getIp(req)
     );
 
+    // Invalidate the in-memory template cache so the next send uses
+    // the just-saved values (no 60-second delay for the admin).
+    try {
+      require('../services/emailTemplates')._invalidateCache();
+    } catch (_) { /* module may not exist yet during first boot */ }
+
     return res.json({ ok: true, updated: result });
   } catch (err) {
     console.error('[admin] PUT /email-settings error:', err.message);

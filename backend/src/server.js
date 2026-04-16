@@ -271,6 +271,15 @@ async function start() {
   // Give questionService access to io so _emitSafe works (thankReceived, followUp, etc.)
   require('./services/questionService').setIO(io);
 
+  // Ensure email templates are seeded in DB so admin UI always has full
+  // editable content (non-blocking — logs on failure).
+  try {
+    const { seedDefaultEmailTemplates } = require('./services/emailTemplates');
+    await seedDefaultEmailTemplates();
+  } catch (err) {
+    log.warn({ err }, 'email-templates seed failed — continuing');
+  }
+
   // Start background cron jobs (pass io so polling sync can broadcast socket events)
   startCronJobs(io);
 

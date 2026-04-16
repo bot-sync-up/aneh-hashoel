@@ -142,7 +142,7 @@ router.post('/', async (req, res, next) => {
     }
 
     // Rabbi-suggested category → notify all admins by email (fire-and-forget).
-    // UI already surfaces a badge via GET /categories/pending count.
+    // Uses the admin-editable template 'admin_category_new'.
     if (!isAdmin && rows[0]) {
       setImmediate(async () => {
         try {
@@ -153,34 +153,22 @@ router.post('/', async (req, res, next) => {
           );
           if (admins.length === 0) return;
 
-          const { sendEmail } = require('../services/email');
-          const { createEmailHTML } = require('../templates/emailBase');
+          const { sendTemplated } = require('../services/emailTemplates');
           const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-
           const suggesterName = req.rabbi.name || 'רב';
-          const body = `
-            <p>שלום,</p>
-            <p>הרב <strong>${suggesterName}</strong> הציע קטגוריה חדשה:</p>
-            <div style="background:#f8f8fb;border-right:4px solid #B8973A;padding:14px 18px;margin:14px 0;border-radius:4px;">
-              <p style="margin:0;font-size:15px;"><strong>${trimmedName}</strong></p>
-            </div>
-            <p>הקטגוריה ממתינה לאישור במערכת הניהול.</p>
-          `;
-          const html = createEmailHTML(
-            'הצעת קטגוריה חדשה ממתינה לאישור',
-            body,
-            [{ label: 'לאישור הקטגוריה', url: `${appUrl}/admin/categories` }]
-          );
 
           for (const admin of admins) {
-            try {
-              await sendEmail(
-                admin.email,
-                `קטגוריה חדשה להצעה: ${trimmedName}`,
-                html
-              );
-            } catch (e) {
-              console.warn(`[categories] admin notify failed for ${admin.email}:`, e.message);
+            const result = await sendTemplated('admin_category_new', {
+              to: admin.email,
+              audience: 'rabbi',
+              buttons: [{ label: 'לאישור הקטגוריה', url: `${appUrl}/admin/categories` }],
+              vars: {
+                suggester_name: suggesterName,
+                category_name:  trimmedName,
+              },
+            });
+            if (!result.ok) {
+              console.warn(`[categories] admin notify failed for ${admin.email}:`, result.error);
             }
           }
         } catch (err) {

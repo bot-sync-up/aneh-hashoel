@@ -609,6 +609,32 @@ router.post('/change-password', authenticate, async (req, res, next) => {
       ).catch(() => {});
     });
 
+    // Confirmation email — never contains the password, only a
+    // security notice. Uses the admin-editable template.
+    setImmediate(async () => {
+      try {
+        const { sendTemplated } = require('../services/emailTemplates');
+        const { rows: r2 } = await db(
+          'SELECT name, email FROM rabbis WHERE id = $1',
+          [req.rabbi.id]
+        );
+        if (!r2[0]?.email) return;
+        await sendTemplated('password_changed', {
+          to: r2[0].email,
+          audience: 'rabbi',
+          vars: {
+            name: r2[0].name,
+            email: r2[0].email,
+            ip: _auditIp(req) || '—',
+            time: new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }),
+            device: req.headers?.['user-agent']?.slice(0, 80) || '—',
+          },
+        });
+      } catch (e) {
+        console.error('[auth] password_changed email failed:', e.message);
+      }
+    });
+
     return res.json({ message: 'הסיסמה שונתה בהצלחה' });
   } catch (err) {
     return next(err);

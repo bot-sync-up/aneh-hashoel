@@ -96,7 +96,80 @@ add_action('wp_footer', function() {
         <?php endif; ?>
     </div>
 
-    <!-- Donation popup -->
+    <!-- ── "תודה נשלחה" confirmation popup (opens BEFORE donation popup) ── -->
+    <div id="aneh-thanks-overlay" style="display:none; position:fixed; inset:0;
+         background:rgba(0,0,0,.55); z-index:999999; justify-content:center; align-items:center;
+         direction:rtl; font-family:inherit;">
+        <div style="position:relative; background:#fff; border-radius:14px;
+                    width:92%; max-width:440px; box-shadow:0 12px 40px rgba(0,0,0,.35);
+                    overflow:hidden; animation:anehFadeIn .25s ease-out;">
+
+            <!-- Close (X) -->
+            <button id="aneh-thanks-close"
+                style="position:absolute; top:10px; left:14px; background:none; border:none;
+                       font-size:24px; cursor:pointer; color:#888; line-height:1; padding:4px;"
+                aria-label="סגור">&times;</button>
+
+            <!-- Header with brand gradient -->
+            <div style="background:linear-gradient(135deg, #1B2B5E 0%, #2a3f7a 100%);
+                        padding:28px 20px 22px; text-align:center;">
+                <div style="font-size:44px; margin-bottom:8px; line-height:1;">❤️</div>
+                <h3 style="margin:0; color:#B8973A; font-size:22px; font-weight:700;
+                           font-family:inherit; letter-spacing:.3px;">
+                    תודתך נשלחה לרב!
+                </h3>
+                <p style="margin:6px 0 0; color:#fff; font-size:14px; font-family:inherit; opacity:.9;">
+                    הרב יקבל את הודעת התודה שלך
+                </p>
+            </div>
+
+            <!-- Body — donation request -->
+            <div style="padding:22px 24px 20px; text-align:right;">
+                <p style="margin:0 0 12px; font-size:15px; color:#333; line-height:1.6; font-family:inherit;">
+                    אם עזרנו לך ורצית להחזיר טובה —
+                </p>
+                <p style="margin:0 0 18px; font-size:15px; color:#333; line-height:1.6; font-family:inherit;">
+                    <strong style="color:#1B2B5E;">תרומה קטנה</strong> מאפשרת לנו להמשיך
+                    להעביר תורה ולענות על שאלות של עוד יהודים.
+                </p>
+
+                <!-- Buttons -->
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button id="aneh-thanks-donate"
+                        style="flex:1; min-width:140px; padding:13px 20px; border:none; border-radius:6px;
+                               background:#B8973A; color:#1B2B5E; font-size:15px; font-weight:700;
+                               cursor:pointer; font-family:inherit; transition:background .15s;">
+                        💛 כן, אשמח לתרום
+                    </button>
+                    <button id="aneh-thanks-later"
+                        style="flex:1; min-width:140px; padding:13px 20px; border:1px solid #d0d0d0;
+                               border-radius:6px; background:#fff; color:#555; font-size:14px;
+                               font-weight:600; cursor:pointer; font-family:inherit;">
+                        אולי בהמשך
+                    </button>
+                </div>
+            </div>
+
+            <!-- Small footer link -->
+            <div style="background:#f7f6f1; padding:10px 20px; text-align:center;
+                        border-top:1px solid #ece8dd;">
+                <a href="https://moreshet-maran.com" target="_blank"
+                   style="color:#888; font-size:11px; text-decoration:none; font-family:inherit;">
+                    המרכז למורשת מרן
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple fade-in keyframes -->
+    <style>
+        @keyframes anehFadeIn {
+            from { opacity:0; transform:translateY(-8px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+    </style>
+
+    <!-- Donation popup (Nedarim Plus — opens only after user clicks "כן, אשמח לתרום") -->
     <div id="aneh-donate-overlay" style="display:none; position:fixed; inset:0;
          background:rgba(0,0,0,.55); z-index:999999; justify-content:center; align-items:center;">
         <div style="position:relative; background:#fff; border-radius:10px;
@@ -159,10 +232,11 @@ add_action('wp_footer', function() {
                     btn.style.background = "#16a34a";
                     btn.style.opacity = "1";
                     document.getElementById("aneh-thank-ok").style.display = "block";
+                    // First show the "thanks sent" confirmation popup; user decides whether to donate
                     setTimeout(function(){
-                        var ov = document.getElementById("aneh-donate-overlay");
-                        ov.style.display = "flex";
-                    }, 1200);
+                        var thanksOv = document.getElementById("aneh-thanks-overlay");
+                        if (thanksOv) thanksOv.style.display = "flex";
+                    }, 700);
                 } else {
                     btn.textContent = d.error || "שגיאה";
                     btn.style.opacity = "1";
@@ -177,6 +251,36 @@ add_action('wp_footer', function() {
         var cls = document.getElementById("aneh-donate-close");
         cls && cls.addEventListener("click", function(){ ov.style.display="none"; });
         ov && ov.addEventListener("click", function(e){ if(e.target===ov) ov.style.display="none"; });
+
+        // ── "Thanks sent" overlay: 3 ways to close + one button to open donation ──
+        var thanksOv    = document.getElementById("aneh-thanks-overlay");
+        var thanksClose = document.getElementById("aneh-thanks-close");
+        var thanksLater = document.getElementById("aneh-thanks-later");
+        var thanksDonate= document.getElementById("aneh-thanks-donate");
+
+        function closeThanks() { if (thanksOv) thanksOv.style.display = "none"; }
+
+        thanksClose && thanksClose.addEventListener("click", closeThanks);
+        thanksLater && thanksLater.addEventListener("click", closeThanks);
+        thanksOv    && thanksOv.addEventListener("click", function(e){
+            if (e.target === thanksOv) closeThanks();
+        });
+
+        // "אשמח לתרום" → close thanks popup, open Nedarim popup
+        thanksDonate && thanksDonate.addEventListener("click", function() {
+            closeThanks();
+            setTimeout(function(){
+                if (ov) ov.style.display = "flex";
+            }, 220); // small gap for smoother transition
+        });
+
+        // Hover effect on primary donate button
+        thanksDonate && thanksDonate.addEventListener("mouseenter", function(){
+            thanksDonate.style.background = "#a2832f";
+        });
+        thanksDonate && thanksDonate.addEventListener("mouseleave", function(){
+            thanksDonate.style.background = "#B8973A";
+        });
 
         // ── Follow-up ──
         var fuBtn = document.getElementById("aneh-fu-btn");

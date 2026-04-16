@@ -63,6 +63,16 @@ router.get('/', async (req, res, next) => {
   } catch (err) { return next(err); }
 });
 
+// GET /pending/count — admin: quick count for sidebar badge (no heavy join)
+router.get('/pending/count', requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT COUNT(*)::int AS count FROM categories WHERE status = 'pending'`
+    );
+    return res.json({ count: rows[0]?.count || 0 });
+  } catch (err) { return next(err); }
+});
+
 // GET /pending — admin: list pending suggestions with suggester name
 router.get('/pending', requireAdmin, async (req, res, next) => {
   try {

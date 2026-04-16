@@ -1,86 +1,58 @@
 <?php
 /**
- * WP Snippet: OneSignal Push Notification on Answer Publish
+ * WP Snippet: Fire OneSignal's normal publish flow when an answer is written
  *
- * The OneSignal plugin normally fires pushes on `publish_post` — but our
- * system publishes answers by updating the `ask-answ` meta on an already-
- * published ask-rabai post, which does NOT trigger publish_post. This
- * snippet bridges the gap:
+ * Problem:
+ *   OneSignal fires on the `publish_post` action, which runs when a post
+ *   transitions to 'publish' status. Our system writes answers by
+ *   updating the `ask-answ` meta on an already-published ask-rabai post,
+ *   so publish_post never fires and subscribers stop getting pushes.
  *
- *   updated_post_meta (ask-answ, first non-empty value)
- *     → fetch OneSignal credentials from OneSignalWPSetting option
- *     → POST to https://onesignal.com/api/v1/notifications
+ * Solution:
+ *   When the ask-answ meta is first set to a non-empty value, we manually
+ *   fire the `publish_post` action with the post object. OneSignal's
+ *   handler — and any other plugin that hooks into publish_post — runs
+ *   exactly as it would for a fresh publish, meaning subscribers get
+ *   push notifications (and any email/other channels OneSignal is
+ *   configured for).
  *
- * Fires ONCE per post (guarded by _aneh_push_sent meta flag).
+ *   Fires ONCE per post (guarded by _aneh_push_sent meta flag).
  *
- * Deployed to moreshet-maran.com as a new Code Snippet. No env vars or
- * extra plugin configuration required — uses whatever OneSignal already
- * has in its own settings.
+ *   Requires OneSignal's `allowed_custom_post_types` to include
+ *   `ask-rabai` — already configured via a one-shot option update.
  */
 
-add_action('updated_post_meta', 'aneh_onesignal_on_answer', 10, 4);
-add_action('added_post_meta',   'aneh_onesignal_on_answer', 10, 4);
+add_action('updated_post_meta', 'aneh_fire_publish_on_answer', 10, 4);
+add_action('added_post_meta',   'aneh_fire_publish_on_answer', 10, 4);
 
-function aneh_onesignal_on_answer($meta_id, $post_id, $meta_key, $meta_value) {
-    // Only react to the answer meta being set
+function aneh_fire_publish_on_answer($meta_id, $post_id, $meta_key, $meta_value) {
     if ($meta_key !== 'ask-answ') return;
     if (empty($meta_value) || !trim(wp_strip_all_tags($meta_value))) return;
 
-    // Only for our question post type
     if (get_post_type($post_id) !== 'ask-rabai') return;
 
-    // Fire ONCE per post — prevents duplicates if meta is re-saved later
-    $already = get_post_meta($post_id, '_aneh_push_sent', true);
-    if (!empty($already)) return;
-
-    // Pull OneSignal credentials from the OneSignal WP plugin's own options
-    $settings = get_option('OneSignalWPSetting');
-    if (empty($settings) || !is_array($settings)) return;
-
-    $app_id   = $settings['app_id'] ?? null;
-    $rest_key = $settings['app_rest_api_key'] ?? null;
-    if (empty($app_id) || empty($rest_key)) return;
+    // Fire ONCE per post
+    if (!empty(get_post_meta($post_id, '_aneh_push_sent', true))) return;
 
     $post = get_post($post_id);
-    if (!$post) return;
+    if (!$post || $post->post_status !== 'publish') return;
 
-    $title = wp_strip_all_tags($post->post_title ?: 'תשובה חדשה');
-    if (function_exists('mb_substr') && mb_strlen($title) > 120) {
-        $title = mb_substr($title, 0, 117) . '...';
-    }
-    $url = get_permalink($post_id);
-
-    $body = [
-        'app_id'            => $app_id,
-        'included_segments' => ['Subscribed Users'],
-        'url'               => $url,
-        'headings'          => [
-            'he' => 'תשובה חדשה באתר',
-            'en' => 'New Answer',
-        ],
-        'contents'          => [
-            'he' => $title,
-            'en' => $title,
-        ],
-    ];
-
-    // Send the notification. wp_remote_post handles timeouts + SSL.
-    $response = wp_remote_post('https://onesignal.com/api/v1/notifications', [
-        'timeout' => 10,
-        'blocking' => false, // fire-and-forget so answer-save stays snappy
-        'headers' => [
-            'Authorization' => 'Basic ' . $rest_key,
-            'Content-Type'  => 'application/json; charset=utf-8',
-        ],
-        'body'    => wp_json_encode($body),
-    ]);
-
-    // Mark sent — even if wp_remote_post returned WP_Error we still mark it
-    // so we don't spam the user with retries. Debug via OneSignal dashboard.
+    // Mark FIRST so reentrant calls inside the hook don't loop
     update_post_meta($post_id, '_aneh_push_sent', time());
 
-    // Optional debug log (only if WP_DEBUG_LOG is on)
+    // Fire the same hooks that WordPress fires on a fresh publish:
+    //   1. publish_post          — generic publish action
+    //   2. publish_{post_type}   — type-specific variant
+    //   3. transition_post_status — OneSignal v3 listens here too
+    //
+    // This triggers OneSignal's notification flow AND any other plugin
+    // hooked on publish_post (e.g. email newsletters). Because we only
+    // fire ONCE per post (meta guard above), subscribers never get spam.
+    do_action('publish_post', $post_id, $post);
+    do_action("publish_{$post->post_type}", $post_id, $post);
+    do_action('transition_post_status', 'publish', 'publish', $post);
+
     if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-        error_log('[aneh_onesignal] fired for post ' . $post_id . ' - ' . $title);
+        error_log('[aneh_onesignal] fired publish hooks for ask-rabai #' . $post_id);
     }
 }

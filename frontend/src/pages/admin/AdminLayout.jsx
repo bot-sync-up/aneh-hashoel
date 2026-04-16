@@ -1,6 +1,8 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { FullPageSpinner } from '../../components/ui/Spinner';
+import { get } from '../../lib/api';
+import { useSocket } from '../../contexts/SocketContext';
 
 const RabbisAdminPage      = React.lazy(() => import('./RabbisAdminPage'));
 const AdminQuestionsPage   = React.lazy(() => import('./AdminQuestionsPage'));
@@ -55,6 +57,30 @@ const TABS = [
 export default function AdminLayout() {
   const location = useLocation();
 
+  // Pending category suggestions count → red badge on the "קטגוריות" tab
+  const [pendingCategoryCount, setPendingCategoryCount] = useState(0);
+  const socket = useSocket();
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      get('/categories/pending/count')
+        .then((d) => { if (!cancelled) setPendingCategoryCount(d?.count || 0); })
+        .catch(() => { /* non-fatal — badge stays hidden */ });
+    };
+    refresh();
+    // Refresh every minute in case another admin approves/rejects
+    const t = setInterval(refresh, 60_000);
+    // Real-time: refresh when we receive any category event via socket (optional)
+    const off = socket?.on?.('category:new', refresh);
+    return () => { cancelled = true; clearInterval(t); off?.(); };
+  }, [socket]);
+
+  // Build the tabs list with the badge count attached to 'categories'
+  const tabsWithBadges = TABS.map((tab) =>
+    tab.to === 'categories' ? { ...tab, badge: pendingCategoryCount } : tab
+  );
+
   return (
     <div className="min-h-screen bg-[var(--bg-page)]" dir="rtl">
       {/* Admin header bar */}
@@ -83,13 +109,13 @@ export default function AdminLayout() {
             className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide"
             aria-label="ניווט לוח ניהול"
           >
-            {TABS.map(({ to, label, icon: Icon }) => (
+            {tabsWithBadges.map(({ to, label, icon: Icon, badge }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-2 px-4 py-3 text-sm font-medium font-heebo whitespace-nowrap',
+                    'relative flex items-center gap-2 px-4 py-3 text-sm font-medium font-heebo whitespace-nowrap',
                     'border-b-2 transition-all duration-150 flex-shrink-0',
                     isActive
                       ? 'border-[#B8973A] text-[#B8973A]'
@@ -98,6 +124,14 @@ export default function AdminLayout() {
                 }
               >
                 <Icon size={16} strokeWidth={1.8} />
+                {badge > 0 && (
+                  <span
+                    title={`${badge} הצעות ממתינות לאישור`}
+                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-red-500 text-white leading-none"
+                  >
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
                 {label}
               </NavLink>
             ))}

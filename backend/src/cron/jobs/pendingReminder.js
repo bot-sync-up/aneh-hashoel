@@ -77,62 +77,104 @@ async function runPendingReminder() {
 
   log.info({ count: questions.length }, 'pendingReminder: overdue questions found');
 
-  // Load active rabbis
+  // Load active rabbis — LEFT JOIN לבדיקת העדפות התראות לאירוע pending_reminder
   const { rows: rabbis } = await query(
-    `SELECT id, name, email FROM rabbis WHERE is_active = TRUE AND email IS NOT NULL AND email <> ''`
+    `SELECT r.id, r.name, r.email,
+            COALESCE(np.enabled, TRUE) AS email_enabled
+     FROM   rabbis r
+     LEFT JOIN notification_preferences np
+            ON np.rabbi_id = r.id
+           AND np.event_type = 'pending_reminder'
+           AND np.channel IN ('email', 'all', 'both')
+     WHERE  r.is_active = TRUE
+       AND  r.email IS NOT NULL
+       AND  r.email <> ''`
   );
 
-  if (rabbis.length === 0) {
-    log.info('pendingReminder: no active rabbis');
-    return { success: true, sent: 0 };
+  const eligibleRabbis = rabbis.filter((r) => r.email_enabled !== false);
+  if (eligibleRabbis.length === 0) {
+    log.info('pendingReminder: no rabbis with pending_reminder enabled');
+    return { success: true, sent: 0, questionCount: questions.length };
   }
 
-  // Build single digest email with all overdue questions
+  // Load editable template from system_config.email_templates
+  let subjectTpl, bodyTpl, systemName;
+  try {
+    const { rows: cfgRows } = await query(
+      "SELECT value FROM system_config WHERE key = 'email_templates'"
+    );
+    const tpls = cfgRows[0]?.value
+      ? (typeof cfgRows[0].value === 'string' ? JSON.parse(cfgRows[0].value) : cfgRows[0].value)
+      : {};
+    subjectTpl = tpls.rabbi_pending_reminder_subject
+      || 'תזכורת — שאלות ממתינות לתפיסה — {system_name}';
+    bodyTpl = tpls.rabbi_pending_reminder_body
+      || '<p>שלום רב,</p><p>יש שאלות שממתינות לתפיסה מעל <strong>{hours} שעות</strong>. נא להיכנס למערכת ולענות.</p><ul style="padding-right:20px;">{questions_list}</ul>';
+    systemName = tpls.rabbi_system_name || 'ענה את השואל';
+  } catch (err) {
+    log.warn({ err }, 'pendingReminder: failed to load template — using default');
+    subjectTpl = 'תזכורת — שאלות ממתינות לתפיסה — {system_name}';
+    bodyTpl = '<p>שלום רב,</p><p>יש שאלות שממתינות לתפיסה מעל <strong>{hours} שעות</strong>. נא להיכנס למערכת ולענות.</p><ul style="padding-right:20px;">{questions_list}</ul>';
+    systemName = 'ענה את השואל';
+  }
+
+  // Build digest
   const { sendEmail } = require('../../services/email');
   const { createEmailHTML } = require('../../templates/emailBase');
   const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
 
-  const rows = questions.map((q) => {
+  const questionsListHtml = questions.map((q) => {
     const ageHours = Math.floor((Date.now() - new Date(q.created_at).getTime()) / (1000 * 60 * 60));
     const qNumber = q.question_number || q.wp_post_id || q.id;
     const cat = q.category_name ? ` — ${q.category_name}` : '';
     return `<li style="margin-bottom:6px;"><a href="${appUrl}/questions/${q.id}" style="color:#1B2B5E;">#${qNumber} ${q.title}</a>${cat} <span style="color:#999;">(${ageHours} שעות)</span></li>`;
   }).join('\n');
 
-  const body = `
-    <p>שלום רב,</p>
-    <p>יש שאלות שממתינות לתפיסה מעל <strong>${hours} שעות</strong>. נא להיכנס למערכת ולענות.</p>
-    <ul style="padding-right:20px;">
-      ${rows}
-    </ul>
-    <p style="margin-top:12px; font-size:13px; color:#888;">
-      תזכורת זו נשלחת אוטומטית לפי הגדרות המערכת.
-    </p>
-  `;
+  // Substitute template variables
+  const fill = (str) => String(str || '')
+    .replace(/\{hours\}/g, String(hours))
+    .replace(/\{questions_list\}/g, questionsListHtml)
+    .replace(/\{system_name\}/g, systemName);
 
+  const subject = fill(subjectTpl);
+  const body = fill(bodyTpl);
   const html = createEmailHTML('שאלות ממתינות — תזכורת', body, [
     { label: 'צפה בתור השאלות', url: `${appUrl}/questions` },
-  ]);
+  ], { systemName });
 
   let sent = 0;
-  for (const rabbi of rabbis) {
+  const errors = [];
+  for (const rabbi of eligibleRabbis) {
     try {
-      await sendEmail(rabbi.email, 'תזכורת — שאלות ממתינות לתפיסה', html);
+      await sendEmail(rabbi.email, subject, html);
       sent++;
     } catch (err) {
+      errors.push({ rabbi: rabbi.email, error: err.message });
       log.error({ err, rabbiEmail: rabbi.email }, 'pendingReminder: email failed');
     }
   }
 
-  // Mark reminder sent
-  const questionIds = questions.map((q) => q.id);
-  await query(
-    `UPDATE questions SET last_reminder_at = NOW() WHERE id = ANY($1::uuid[])`,
-    [questionIds]
-  );
+  // Mark reminder sent on overdue questions
+  if (sent > 0) {
+    const questionIds = questions.map((q) => q.id);
+    await query(
+      `UPDATE questions SET last_reminder_at = NOW() WHERE id = ANY($1::uuid[])`,
+      [questionIds]
+    );
+  }
 
-  log.info({ sent, questionCount: questions.length }, 'pendingReminder: done');
-  return { success: true, sent, questionCount: questions.length };
+  log.info(
+    { sent, questionCount: questions.length, eligible: eligibleRabbis.length, skipped: rabbis.length - eligibleRabbis.length },
+    'pendingReminder: done'
+  );
+  return {
+    success: true,
+    sent,
+    questionCount: questions.length,
+    eligibleRabbis: eligibleRabbis.length,
+    skipped: rabbis.length - eligibleRabbis.length,
+    errors,
+  };
 }
 
 module.exports = { runPendingReminder };

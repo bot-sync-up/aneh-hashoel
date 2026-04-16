@@ -61,6 +61,17 @@ const {
 // Legacy auth service (2FA, loginWithEmail for backwards-compat)
 const legacyAuth = require('../services/auth');
 
+// Audit log — record login/logout/password events against the acting rabbi
+const { logAction, ACTIONS } = require('../middleware/auditLog');
+
+function _auditIp(req) {
+  return (
+    (req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.ip ||
+    null
+  );
+}
+
 // Utilities
 const { verifyActionToken } = require('../utils/actionTokens');
 
@@ -283,6 +294,20 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       [rawRabbi.id]
     );
 
+    // Audit log — rabbi logged in (fire-and-forget)
+    setImmediate(() => {
+      logAction(
+        rawRabbi.id,
+        ACTIONS.AUTH_LOGIN,
+        'rabbi',
+        rawRabbi.id,
+        null,
+        { device: device?.userAgent || null, is_new_device: isNewDevice },
+        _auditIp(req),
+        req.headers?.['user-agent'] || null
+      ).catch(() => {});
+    });
+
     return res.json({
       accessToken,
       refreshToken,  // also returned in body for clients that cannot read cookies
@@ -327,7 +352,24 @@ router.post('/logout', async (req, res, next) => {
 
     if (rawToken) {
       const tokenHash = hashToken(rawToken);
-      await revokeSessionByTokenHash(tokenHash);
+      const revoked = await revokeSessionByTokenHash(tokenHash);
+
+      // Best-effort audit log — revokeSessionByTokenHash may return session info
+      const actorId = revoked?.rabbi_id || revoked?.rabbiId || req.rabbi?.id || null;
+      if (actorId) {
+        setImmediate(() => {
+          logAction(
+            actorId,
+            ACTIONS.AUTH_LOGOUT,
+            'rabbi',
+            actorId,
+            null,
+            null,
+            _auditIp(req),
+            req.headers?.['user-agent'] || null
+          ).catch(() => {});
+        });
+      }
     }
 
     _clearRefreshCookie(res);
@@ -345,6 +387,19 @@ router.post('/logout-all', authenticate, async (req, res, next) => {
     const revoked = await revokeAllSessions(req.rabbi.id);
 
     _clearRefreshCookie(res);
+
+    setImmediate(() => {
+      logAction(
+        req.rabbi.id,
+        ACTIONS.AUTH_LOGOUT,
+        'rabbi',
+        req.rabbi.id,
+        null,
+        { all_sessions: true, revoked },
+        _auditIp(req),
+        req.headers?.['user-agent'] || null
+      ).catch(() => {});
+    });
 
     return res.json({ message: 'כל ההתחברויות בוטלו בהצלחה', revoked });
   } catch (err) {
@@ -539,6 +594,20 @@ router.post('/change-password', authenticate, async (req, res, next) => {
        WHERE  id = $2`,
       [newHash, req.rabbi.id]
     );
+
+    // Audit log — rabbi changed own password (never log the hash/plaintext)
+    setImmediate(() => {
+      logAction(
+        req.rabbi.id,
+        ACTIONS.AUTH_PASSWORD_CHANGED,
+        'rabbi',
+        req.rabbi.id,
+        null,
+        null,
+        _auditIp(req),
+        req.headers?.['user-agent'] || null
+      ).catch(() => {});
+    });
 
     return res.json({ message: 'הסיסמה שונתה בהצלחה' });
   } catch (err) {

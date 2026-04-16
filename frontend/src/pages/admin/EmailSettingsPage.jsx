@@ -92,6 +92,17 @@ const EMAIL_FOLDERS = [
         variables: ['{name}', '{title}', '{id}', '{follow_up_content}', '{system_name}'],
       },
       {
+        id: 'pending_reminder',
+        title: 'תזכורת שאלות ממתינות',
+        icon: '⏰',
+        description: 'Digest לרבנים על שאלות שלא נענו מעל X שעות (cron)',
+        fields: [
+          { key: 'rabbi_pending_reminder_subject', label: 'נושא', type: 'input' },
+          { key: 'rabbi_pending_reminder_body', label: 'תוכן (HTML)', type: 'html' },
+        ],
+        variables: ['{hours}', '{questions_list}', '{system_name}'],
+      },
+      {
         id: 'answer_confirm',
         title: 'אישור קליטת תשובה',
         icon: '📝',
@@ -241,6 +252,8 @@ const DEFAULT_TEMPLATES = {
   asker_follow_up_body: '<p>שלום {name},</p><p>נרשמה שאלת המשך לשאלתך <strong>"{title}"</strong>.</p><p>הרב יענה בהקדם.</p>',
   rabbi_follow_up_subject: '[ID:{id}] שאלת המשך: {title} — {system_name}',
   rabbi_follow_up_body: '<p>שלום רב,</p><p>השואל הוסיף שאלת המשך לשאלה שטיפלת בה:</p><div style="background:#f8f8fb;border-right:4px solid #B8973A;padding:16px 20px;margin:16px 0;border-radius:4px;"><p style="margin:0 0 8px;font-weight:bold;font-size:15px;color:#1B2B5E;">{title}</p><p style="margin:0;color:#333;font-size:14px;line-height:1.7;">{follow_up_content}</p></div><p style="margin:12px 0;font-size:13px;color:#888;">ניתן להשיב ישירות למייל זה.</p>',
+  rabbi_pending_reminder_subject: 'תזכורת — שאלות ממתינות לתפיסה — {system_name}',
+  rabbi_pending_reminder_body: '<p>שלום רב,</p><p>יש שאלות שממתינות לתפיסה מעל <strong>{hours} שעות</strong>. נא להיכנס למערכת ולענות.</p><ul style="padding-right:20px;">{questions_list}</ul><p style="margin-top:12px;font-size:13px;color:#888;">תזכורת זו נשלחת אוטומטית לפי הגדרות המערכת.</p>',
   password_reset_subject: 'איפוס סיסמה — {system_name}',
   password_reset_body: '<p>שלום {name},</p><p>התקבלה בקשה לאיפוס הסיסמה שלך.</p><p>לחץ על הכפתור למטה לאיפוס:</p>',
   new_device_subject: 'כניסה ממכשיר חדש — {system_name}',

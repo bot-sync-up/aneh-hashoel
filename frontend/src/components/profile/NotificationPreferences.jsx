@@ -12,6 +12,7 @@ const EVENT_ROWS = [
   { key: 'answer_published',  label: 'תשובה פורסמה',         defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'user_thanks',       label: 'תודה מגולש',           defaultEmail: false, defaultWhatsapp: false, defaultPush: false, alwaysOn: true, alwaysOnNote: 'התראות תודה נשלחות תמיד ולא ניתנות לביטול' },
   { key: 'lock_reminder',     label: 'תזכורת נעילה',         defaultEmail: true,  defaultWhatsapp: true,  defaultPush: false },
+  { key: 'pending_reminder',  label: 'תזכורת שאלות ממתינות', defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'followup_question', label: 'שאלת המשך',            defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'weekly_report',     label: 'דוח שבועי',            defaultEmail: true,  defaultWhatsapp: false, defaultPush: false },
   { key: 'daily_summary',     label: 'סיכום יומי',           defaultEmail: false, defaultWhatsapp: false, defaultPush: false },

@@ -676,33 +676,12 @@ router.get('/leaderboard', async (req, res, next) => {
 
     const leaderboard = await getLeaderboard(limit);
 
-    const result = leaderboard.map((entry) => {
-      const isSelf = String(entry.rabbi_id) === myRabbiId;
-
-      if (isAdmin || isSelf) {
-        return entry; // full data
-      }
-
-      // Anonymize for non-admin
-      return {
-        rank:               entry.rank,
-        answers_count:      entry.answers_count,
-        avg_response_hours: entry.avg_response_hours,
-        thanks_count:       entry.thanks_count,
-        views_count:        entry.views_count,
-        is_me:              false,
-      };
-    });
-
-    // Mark self for non-admin so the UI can highlight the rabbi's own row
-    if (!isAdmin) {
-      for (const entry of result) {
-        const original = leaderboard[result.indexOf(entry)];
-        if (String(original.rabbi_id) === myRabbiId) {
-          entry.is_me = true;
-        }
-      }
-    }
+    // Everyone (rabbi + admin) sees full names — consistent with "רב השבוע"
+    // that is already visible publicly to all rabbis.
+    const result = leaderboard.map((entry) => ({
+      ...entry,
+      is_me: String(entry.rabbi_id) === myRabbiId,
+    }));
 
     return res.json({ leaderboard: result });
   } catch (err) {

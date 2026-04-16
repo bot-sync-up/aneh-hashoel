@@ -298,6 +298,12 @@ const DEFAULT_TEMPLATES = {
 /** Replace template variables with sample data */
 function fillSampleData(text, templates) {
   if (!text) return text;
+  // Sample HTML list used for the pending-reminder preview (otherwise
+  // admins saw a literal "{questions_list}" inside the preview).
+  const sampleQuestionsList =
+    '<li style="margin-bottom:6px;"><a href="#" style="color:#1B2B5E;">#12345 האם מותר להדליק נר בשבת?</a> — הלכה <span style="color:#999;">(26 שעות)</span></li>' +
+    '<li style="margin-bottom:6px;"><a href="#" style="color:#1B2B5E;">#12346 חיוב טבילת כלים חדשים</a> — כשרות <span style="color:#999;">(30 שעות)</span></li>';
+
   return text
     .replace(/\{name\}/g, 'הרב ישראל כהן')
     .replace(/\{title\}/g, 'האם מותר להדליק נר בשבת?')
@@ -312,7 +318,20 @@ function fillSampleData(text, templates) {
     .replace(/\{thank_count\}/g, '8')
     .replace(/\{category\}/g, 'הלכה')
     .replace(/\{content\}/g, 'תוכן השאלה המלא כאן...')
-    .replace(/\{timeout_hours\}/g, '4');
+    .replace(/\{timeout_hours\}/g, '4')
+    // Pending reminder variables
+    .replace(/\{hours\}/g, '24')
+    .replace(/\{questions_list\}/g, sampleQuestionsList)
+    // Follow-up variables
+    .replace(/\{follow_up_content\}/g, 'הרב, שאלה קצרה להבהרה של התשובה הקודמת...')
+    // Password reset / change
+    .replace(/\{reset_url\}/g, 'https://ask.moreshet-maran.com/reset-password/sample-token')
+    .replace(/\{ip\}/g, '84.95.12.45')
+    .replace(/\{time\}/g, '17/04/2026 18:42')
+    .replace(/\{device\}/g, 'Chrome on Windows')
+    // Admin category new
+    .replace(/\{suggester_name\}/g, 'הרב ישראל כהן')
+    .replace(/\{category_name\}/g, 'שבת — הלכות מוקצה');
 }
 
 function TemplateCard({ category, templates, onChange, onSave, saving, savedId, audience }) {

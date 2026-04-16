@@ -91,6 +91,21 @@
 - **מנגנון הסרה מרשימת תפוצה (§30א חוק הספאם)** — עמודת `is_unsubscribed` בטבלת `leads`, JWT tokens, דף `/unsubscribe` ציבורי, footer עם קישור במיילים שיווקיים
 - **מיילים לשואלים מבחינים בקהל** (`audience='asker'`) — בלי קישור "כניסה למערכת"
 - **Reminder ל-overdue pending questions** — admin-configurable (enabled/hours/remind-every), cron שעתי, כפתור "הפעל עכשיו" לבדיקה
+- **מייל "הסיסמה שלך שונתה"** — נשלח אוטומטית אחרי שינוי סיסמה; לא מכיל את הסיסמה; כולל IP + user-agent + timestamp לצורכי אבטחה
+
+### מערכת תבניות מיילים (Centralized Email Templates)
+- **Single source of truth**: `system_config['email_templates']` (JSONB) — עורך הממשק כותב לפה, כל מייל קורא מפה
+- `constants/defaultEmailTemplates.js` — ברירות מחדל; seed אוטומטי ל-DB ב-startup
+- `services/emailTemplates.js` — helper מרכזי: `getTemplate()` / `renderTemplate()` / `sendTemplated()` / `buildUnsubscribeLink()`
+- Cache בזיכרון עם TTL של דקה, invalidated מיד כשה-admin שומר שינויים
+- תבניות זמינות: welcome, rabbi_new_question, rabbi_thank, rabbi_weekly_report, rabbi_already_claimed, rabbi_release_confirmation, rabbi_answer_confirmation, rabbi_follow_up, **rabbi_pending_reminder**, asker_question_received, asker_answer_ready, asker_follow_up, asker_private_answer, onboarding_1/2/3, password_reset, **password_changed**, new_device, **admin_category_new**
+
+### תרומות — שילוב מלא עם Nedarim Plus
+- **Webhook (PUSH)** — `/webhook/nedarim` מקבל POST אמיתי מנדרים (PascalCase fields: `TransactionId`, `Amount`, `Currency` 1=ILS/2=USD וכו'); אותנטיקציה דרך `NEDARIM_WEBHOOK_SECRET`
+- **GetHistoryJson (PULL)** — cron שעתי שמושך גיבוי של כל העסקאות (נדרים **לא מנסים שוב** על webhook שנכשל!); עוקב אחרי `nedarim_sync_last_id`
+- **`services/nedarimService.js`**: `mapNedarimPayload()` + `parseComments()` + `fetchHistory()` + `upsertDonation()` (idempotent על TransactionId)
+- **correlation**: ה-WP snippet מטמיע `Comments=q:<post_id>` באיפרם → webhook מחלץ ומשייך תרומה לשאלה/רב
+- **Auto-attribution ללידים**: כל תרומה שמגיעה עם email/phone של לead קיים — מקושרת אוטומטית (לפי SHA-256 hash)
 
 ### פרופיל רב
 - פרטים אישיות + חתימה
@@ -133,6 +148,8 @@
 - הערות מגע + סימון contacted
 - **Badge "הוסר/ה"** על לידים שעשו opt-out
 - אימייל+טלפון מוצגים מלא למנהל (שירות לקוחות רואה רק טלפון)
+- **תג תרומות** (❤️ 3 · ₪450) מוצג ישיר בשורה ברשימה
+- **כרטסת ליד מלאה** (`/admin/leads/:id` וגם `/leads/:id` ל-CS): header עם badges (hot/contacted/unsubscribed), 4 KPIs (שאלות/תרומות/סה"כ ₪/ציון עניין), טבלת תרומות (תאריך/סכום/סוג/כרטיס/בעקבות איזה שאלה/אישור), רשימת שאלות עם ניווט לדף השאלה, הערות עם שמירה
 
 ### אינטגרציות חיצוניות
 | מערכת | מה עושה |
@@ -147,7 +164,7 @@
 | Google Sheets | ייצוא לידים |
 | Mailwizz | Email marketing integration |
 
-### Cron Jobs (12 משימות)
+### Cron Jobs (13 משימות)
 - Daily digest, Weekly newsletter (עם **toggle** מההגדרות), Weekly report
 - IMAP poller (כל 2 דקות)
 - Rabbi of the week
@@ -155,8 +172,9 @@
 - Warning/Timeout checks על שאלות
 - Google Sheets sync
 - WP sync retry
-- Onboarding drip campaign (**מכבד `is_unsubscribed`**)
+- Onboarding drip campaign (**מכבד `is_unsubscribed`** + טוען מ-templates)
 - **Pending questions reminder** (שעתי; admin-configurable)
+- **Nedarim history sync** (שעתי; גיבוי ל-webhook — נדרים לא מנסים שוב!)
 
 ### אבטחה
 - Rate limiting (API / auth / write / thank)
@@ -168,13 +186,15 @@
 
 ---
 
-## מסד הנתונים — 20 Migrations
+## מסד הנתונים — 22 Migrations
 
 | Migration | תוכן |
 |-----------|------|
 | 001_full_schema | Schema ראשוני: rabbis, questions, answers, categories, discussions (+is_unsubscribed/unsubscribed_at על leads) |
 | 002_leads_unsubscribe | עמודות + אינדקס חלקי על `is_unsubscribed=TRUE` |
 | 003_pending_reminder | עמודת `last_reminder_at` + אינדקס חלקי + ברירת מחדל ב-system_config |
+| **004_donations_nedarim** | transaction_id (UNIQUE), transaction_type, confirmation, tashloumim, first_tashloum, keva_id, last_num, source, raw_payload בטבלת donations. Seed של nedarim_sync_enabled + nedarim_sync_last_id |
+| **005_donations_to_leads** | donations.lead_id FK → leads(id) + backfill תרומות ישנות לפי email/phone hash |
 | (legacy 001) | Indexes לביצועים |
 | (legacy 003) | is_private לתשובות |
 | (legacy 004) | CRM leads |
@@ -215,6 +235,7 @@
 | DiscussionDetailPage | ✅ תוקן | redirect אוטומטי ל-`/discussions?d=:id` |
 | WP snippet — מיקום | ✅ תוקן | שונה מ-`the_content` (לא עובד עם Elementor) ל-`wp_footer` |
 | WP thank/follow-up API | ✅ תוקן | תמיכה ב-wp_post_id (לא רק UUID) |
+| WP snippet — פופאפ תודה | ✅ תוקן | "תודתך נשלחה" עם כפתור לתרומה לפני פתיחת Nedarim |
 | user_thanks notification | ✅ תוקן | כעת יוצר רשומה ב-notifications_log + socket `notification:new` לרב בזמן אמת |
 | ENCRYPTION_KEY | ✅ תוקן | מפתח 32 תווים בדיוק בשרת — WP sync עובד על כל השאלות |
 | WP sync status filter | ✅ תוקן | שונה מ-`status:pending` ל-`status:publish` — שאלות מסתנכרנות כעת |
@@ -222,10 +243,19 @@
 | תשובה פרטית לאדמין | ✅ תוקן | Frontend: `!isAdmin` בתנאי ההסתרה; Backend כבר היה תקין |
 | Notification preferences save | ✅ תוקן | המרה מאובייקט לארה"ב לפני PUT |
 | Notification preferences אכיפה | ✅ תוקן | `_isEventEnabled` מופעל ב-`notificationRouter._dispatchEmail` |
-| דף מעבר תרומה ב-WP (תודה → Nedarim Plus) | ❌ חיצוני | דרוש שינוי ידני בוורדפרס — לא בקוד האפליקציה |
-| מקור מייל "היכרות" לא מזוהה | ⚠️ | `onboardingDrip` מתוקן; אם קיים מקור נוסף — צריך דוגמה |
+| "כניסה אחרונה" ריק | ✅ תוקן | `updateLastLogin()` עכשיו מעדכן את העמודה הנכונה `last_login_at` |
+| "תשובות החודש" תמיד 0 | ✅ תוקן | COUNT ישיר על answers table עם `date_trunc('month')` — זמן אמת |
+| יומן פעילות ריק | ✅ תוקן | login/logout/password_changed כולם נרשמים ב-audit_log |
+| שינוי סיסמה — הודעה גנרית | ✅ תוקן | הפרונט קורא `data.error` מהbackend + client-side validation מלא + תיבת הנחיות |
+| Nedarim webhook לא עובד | ✅ תוקן | שכתוב מלא של donationsWebhook.js לקבל את הפורמט האמיתי (PascalCase) |
+| Source of donations data | ✅ תוקן | Webhook (push, real-time) + GetHistoryJson (pull, שעתי, backup) |
+| קישור תרומות ללידים | ✅ תוקן | auto-attribute לפי email/phone hash; גלוי בכרטסת הליד |
+| Email templates hardcoded | ✅ תוקן (רוב) | onboarding + categories + password_changed + pending_reminder = מתבניות; askerNotification + welcome = עדיין inline (סבב הבא) |
+| דף מעבר תרומה ב-WP (תודה → Nedarim Plus) | ✅ תוקן | פופאפ "תודתך נשלחה" ב-WP snippet (Deployed to snippet ID 25) |
+| מקור מייל "היכרות" | ✅ תוקן | `onboardingDrip` טוען מ-templates; אם תערוך בממשק זה יתפוס |
 | Mobile app | ❌ לא בנוי | FCM tokens מוכן, אפליקציה עצמה לא קיימת |
 | Email delivery tracking | ⚠️ | routes קיימות (emailWebhook.js) אבל לא מחובר לממשק |
+| askerNotification refactor | ⚠️ ברשימה | עובד כרגע inline; סבב הבא יעביר ל-`sendTemplated()` כדי שעריכה בממשק תשפיע |
 
 ---
 

@@ -394,6 +394,8 @@ CREATE TABLE IF NOT EXISTS leads (
   last_click_at         TIMESTAMPTZ,
   click_count           INTEGER     NOT NULL DEFAULT 0,
   has_thanked           BOOLEAN     DEFAULT FALSE,
+  is_unsubscribed       BOOLEAN     NOT NULL DEFAULT FALSE,
+  unsubscribed_at       TIMESTAMPTZ,
   first_question_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_question_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

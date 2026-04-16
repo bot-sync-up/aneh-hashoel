@@ -157,6 +157,8 @@ app.use('/api/support',      require('./routes/support'));
 app.use('/api/action',        actionLinksRoute);
 app.use('/api/leads',         leadsRoutes);
 app.use('/api/track',         require('./routes/track'));
+app.use('/unsubscribe',       require('./routes/unsubscribe'));
+app.use('/api/unsubscribe',   require('./routes/unsubscribe'));
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 

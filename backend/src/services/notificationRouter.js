@@ -126,6 +126,40 @@ function _parsePreferences(pref) {
   return { email: true, whatsapp: false, push: false };
 }
 
+// ─── Per-event preference check ─────────────────────────────────────────────
+
+/**
+ * Check if a specific event+channel is enabled for a rabbi based on the
+ * notification_preferences table. Returns true if enabled (default: true
+ * when no explicit preference exists).
+ *
+ * @param {string} rabbiId
+ * @param {string} eventType  — e.g. 'question_broadcast', 'thank_you'
+ * @param {string} channel    — 'email' | 'whatsapp' | 'push'
+ * @returns {Promise<boolean>}
+ */
+async function _isEventEnabled(rabbiId, eventType, channel) {
+  if (!rabbiId || !eventType || !channel) return true;
+  try {
+    const { rows } = await query(
+      `SELECT channel, enabled FROM notification_preferences
+       WHERE rabbi_id = $1 AND event_type = $2`,
+      [rabbiId, eventType]
+    );
+    if (rows.length === 0) return true; // default: enabled
+    const rec = rows[0];
+    if (rec.enabled === false) return false;
+    // channel stored might be 'email', 'whatsapp', 'push', 'both', 'all'
+    const c = (rec.channel || '').toLowerCase();
+    if (!c || c === 'all') return true;
+    if (c === 'both') return channel === 'email' || channel === 'whatsapp';
+    return c === channel;
+  } catch (err) {
+    log.warn({ err, rabbiId, eventType, channel }, '_isEventEnabled: error — defaulting to enabled');
+    return true;
+  }
+}
+
 // ─── Rabbi loader ──────────────────────────────────────────────────────────────
 
 /**
@@ -189,6 +223,15 @@ async function _dispatchEmail(rabbi, type, data) {
   if (!svc) {
     log.warn("Email service not available");
     return;
+  }
+
+  // Respect per-event notification preferences (except emergency)
+  if (type !== 'emergency') {
+    const enabled = await _isEventEnabled(rabbi.id, type, 'email');
+    if (!enabled) {
+      log.info({ rabbiId: rabbi.id, type }, '_dispatchEmail: disabled by rabbi preference — skipping');
+      return;
+    }
   }
 
   try {

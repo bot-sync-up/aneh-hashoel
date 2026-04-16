@@ -116,7 +116,22 @@ export default function NotificationPreferences({ pushConfigured = false }) {
     setSaving(true);
     setSaveStatus(null);
     try {
-      await api.put('/rabbis/profile/notifications', { preferences: prefs });
+      // Flatten {event: {email, whatsapp, push}} → [{event_type, channel, enabled}]
+      const flatPrefs = [];
+      for (const [event_type, channels] of Object.entries(prefs)) {
+        if (!channels || typeof channels !== 'object') continue;
+        for (const ch of ['email', 'whatsapp', 'push']) {
+          if (typeof channels[ch] === 'boolean') {
+            flatPrefs.push({ event_type, channel: ch, enabled: channels[ch] });
+          }
+        }
+      }
+      if (flatPrefs.length === 0) {
+        setSaveStatus('error');
+        setSaving(false);
+        return;
+      }
+      await api.put('/rabbis/profile/notifications', { preferences: flatPrefs });
       setSaveStatus('success');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch {

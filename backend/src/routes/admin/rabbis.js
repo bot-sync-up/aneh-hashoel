@@ -162,10 +162,6 @@ router.get('/', async (req, res, next) => {
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-    const weekStart   = _currentWeekStart();
-
-    params.push(weekStart);
-    const weekParam = idx++;
 
     params.push(limit);
     const limitParam = idx++;
@@ -173,6 +169,11 @@ router.get('/', async (req, res, next) => {
     params.push(offset);
     const offsetParam = idx++;
 
+    // Instead of relying on rabbi_stats (updated weekly by cron — lags reality)
+    // we compute the counts directly from the answers table for real-time accuracy.
+    // answers_this_month  = answers this calendar month
+    // answers_count_total = answers ever
+    // thanks_this_month   = SUM(questions.thank_count) for questions this rabbi answered this month
     const { rows } = await query(
       `SELECT
          r.id,
@@ -189,16 +190,18 @@ router.get('/', async (req, res, next) => {
          r.color_label,
          r.last_login_at,
          r.created_at,
-         COALESCE(rs.answers_count, 0)  AS answers_count,
-         rs.avg_response_minutes,
-         rs.avg_response_time_hours,
-         COALESCE(rs.thanks_count, 0)   AS thanks_count,
-         COALESCE(rs.views_count, 0)    AS views_count,
+         (SELECT COUNT(*)::int FROM answers a
+          WHERE a.rabbi_id = r.id
+            AND a.created_at >= date_trunc('month', NOW()))                 AS answers_count,
+         (SELECT COUNT(*)::int FROM answers a WHERE a.rabbi_id = r.id)      AS answers_count_total,
+         (SELECT COALESCE(SUM(q.thank_count), 0)::int
+            FROM answers a
+            JOIN questions q ON q.id = a.question_id
+           WHERE a.rabbi_id = r.id
+             AND a.created_at >= date_trunc('month', NOW()))                AS thanks_count,
          (SELECT COUNT(*)::int FROM questions q
-          WHERE q.assigned_rabbi_id = r.id AND q.status = 'in_process') AS assigned_questions
+          WHERE q.assigned_rabbi_id = r.id AND q.status = 'in_process')     AS assigned_questions
        FROM rabbis r
-       LEFT JOIN rabbi_stats rs
-              ON rs.rabbi_id = r.id AND rs.week_start = $${weekParam}
        ${whereClause}
        ORDER BY r.name ASC
        LIMIT  $${limitParam}

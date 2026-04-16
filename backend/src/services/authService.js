@@ -666,8 +666,14 @@ async function getSessionById(sessionId, rabbiId) {
  */
 async function updateLastLogin(rabbiId) {
   try {
+    // Stamp the real last_login_at column so admin views can show
+    // "last login" correctly. Previously only updated_at was touched which
+    // left the rabbis list with an empty "כניסה אחרונה" column forever.
     await db(
-      `UPDATE rabbis SET updated_at = NOW() WHERE id = $1`,
+      `UPDATE rabbis
+       SET    last_login_at = NOW(),
+              updated_at    = NOW()
+       WHERE  id = $1`,
       [rabbiId]
     );
   } catch (err) {

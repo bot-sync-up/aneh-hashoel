@@ -34,6 +34,25 @@ router.use(authenticate, requireAdmin);
  * with " AND " (or is empty) so it can be concatenated after an
  * existing WHERE clause.
  */
+/**
+ * The admin CRM "Donations" tab only shows donations that came through
+ * OUR flow — i.e. via the Nedarim donation link embedded in the WP
+ * "תודה לרב" popup. Every such donation has a `q:<post_id>` marker
+ * inside Nedarim's `Comments` field (we inject it ourselves via the
+ * iframe URL: `...?S=NJxJ&Comments=q:<post_id>`).
+ *
+ * Historical donations from other campaigns ("טלטרגט", "מוקד", "פורום"
+ * etc.) do NOT have this marker and are excluded from this view.
+ *
+ * This filter runs against the `notes` column (which stores a cleaned
+ * version of the Nedarim Comments field). See parseComments() in
+ * services/nedarimService.js — it strips the q:/r: markers before
+ * saving but the original raw_payload.Comments is preserved too.
+ */
+const OUR_SYSTEM_FILTER = `
+  (raw_payload->>'Comments' ~ 'q:[0-9a-f]{6,}' OR notes ~ 'q:[0-9a-f]{6,}')
+`;
+
 function buildDateFilter(req, startParamIdx = 1) {
   const period = (req.query.period || 'month').toLowerCase();
   const from = req.query.from;
@@ -113,7 +132,8 @@ router.get('/stats', async (req, res) => {
          COUNT(*)::int                           AS count_all_time,
          COALESCE(ROUND(AVG(d.amount), 2), 0)::numeric AS avg_all_time
        FROM donations d
-       WHERE d.status = 'completed'`,
+       WHERE d.status = 'completed'
+         AND ${OUR_SYSTEM_FILTER}`,
       params
     );
 
@@ -166,6 +186,7 @@ router.get('/recent', async (req, res) => {
       LEFT JOIN leads     l ON l.id = d.lead_id
       LEFT JOIN questions q ON q.id = d.question_id
       LEFT JOIN rabbis    u ON u.id = d.rabbi_id
+      WHERE ${OUR_SYSTEM_FILTER}
       ORDER BY d.transaction_time DESC NULLS LAST
       LIMIT 10
     `);
@@ -205,7 +226,7 @@ router.get('/', async (req, res) => {
       idx++;
     }
 
-    const where = `WHERE 1=1 ${dateWhere} ${searchClause}`;
+    const where = `WHERE ${OUR_SYSTEM_FILTER} ${dateWhere} ${searchClause}`;
 
     const countPromise = dbQuery(
       `SELECT COUNT(*)::int AS total FROM donations d ${where}`,
@@ -271,7 +292,7 @@ router.get('/export.csv', async (req, res) => {
       idx++;
     }
 
-    const where = `WHERE 1=1 ${dateWhere} ${searchClause}`;
+    const where = `WHERE ${OUR_SYSTEM_FILTER} ${dateWhere} ${searchClause}`;
 
     const { rows } = await dbQuery(
       `SELECT

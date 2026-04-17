@@ -236,12 +236,12 @@ export default function DonationsPage() {
     <div className="space-y-6">
       {/* Header with period tabs + export */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">
-            תרומות
+            תרומות — פופאפ "תודה לרב"
           </h2>
           <span className="text-xs text-[var(--text-muted)] font-heebo">
-            · מציג {PERIOD_LABEL_MAP[period]}
+            · {PERIOD_LABEL_MAP[period]} · רק תרומות שהגיעו דרך המערכת
           </span>
         </div>
         <div className="flex items-center gap-2">

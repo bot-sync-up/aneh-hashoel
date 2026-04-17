@@ -75,8 +75,14 @@ async function upsertLead(question) {
   const emailHash = _emailHash(plainEmail);
   const phoneHash = _phoneHash(plainPhone);
 
-  // If no email AND no phone AND no name, skip — we can't identify this lead
-  if (!emailHash && !phoneHash && !asker_name) return;
+  // Require AT LEAST one contact channel (email or phone) to create a lead.
+  // A "lead" is by definition someone we can reach out to — name-only rows
+  // pile up as useless phantoms that confuse the CS team (issue reported
+  // 2026-04-17: 49 name-only leads from old questions before the WP form
+  // started requiring these fields).
+  if (!emailHash && !phoneHash) {
+    return;
+  }
 
   // Fallback hash from name when neither email nor phone is available
   const nameHash = _nameHash(asker_name);

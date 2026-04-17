@@ -4,9 +4,9 @@ import { clsx } from 'clsx';
 import {
   ArrowRight, Phone, Mail, MailX, Flame, CalendarDays,
   MessageSquare, Heart, StickyNote, CheckCircle2, Clock,
-  AlertTriangle, Loader2, DollarSign, TrendingUp,
+  AlertTriangle, Loader2, DollarSign, TrendingUp, Trash2,
 } from 'lucide-react';
-import { get, patch } from '../../lib/api';
+import { get, patch, del } from '../../lib/api';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -64,6 +64,7 @@ export default function LeadDetailPage() {
   const [notes, setNotes] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +97,25 @@ export default function LeadDetailPage() {
       const { lead: updated } = await patch(`/leads/${lead.id}`, { contact_notes: notes });
       setLead((prev) => ({ ...prev, ...updated }));
     } finally { setSavingNote(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!lead) return;
+    const name = lead.asker_name || 'ללא שם';
+    const ok = window.confirm(
+      `למחוק את הליד "${name}" לצמיתות?\n\n` +
+      `פעולה זו לא ניתנת לשחזור.\n` +
+      `השאלות של הליד יישארו במערכת, רק רשומת הליד תימחק.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await del(`/leads/${lead.id}`);
+      navigate(window.location.pathname.startsWith('/admin') ? '/admin/leads' : '/leads');
+    } catch (err) {
+      alert(err?.response?.data?.error || 'שגיאה במחיקת הליד');
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -376,6 +396,15 @@ export default function LeadDetailPage() {
               leftIcon={<CheckCircle2 size={14} />}
             >
               {lead.contacted ? 'סמן כלא טופל' : 'סמן כטופל'}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={deleting}
+              onClick={handleDelete}
+              leftIcon={<Trash2 size={14} />}
+            >
+              מחק ליד
             </Button>
             {lead.email && (
               <a

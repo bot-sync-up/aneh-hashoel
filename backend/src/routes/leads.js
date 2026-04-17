@@ -12,6 +12,8 @@
 
 const express = require('express');
 const { authenticate } = require('../middleware/auth');
+const { query: dbQuery } = require('../db/pool');
+const { logAction, ACTIONS } = require('../middleware/auditLog');
 const { getLeads, getLeadById, updateLead, syncLeadsFromQuestions } = require('../services/leadsService');
 
 const router = express.Router();
@@ -160,6 +162,56 @@ router.patch('/:id', async (req, res, next) => {
     }
 
     return res.json({ message: 'הליד עודכן בהצלחה', lead: updated });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ─── DELETE /:id ──────────────────────────────────────────────────────────────
+// Customer service + admin can permanently delete a lead. Questions authored
+// by the same asker are NOT affected (they stay in the questions table).
+// Related rows cascade per FK: onboarding_queue (DELETE), donations.lead_id
+// (SET NULL) — so donation history is preserved, just unlinked.
+
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch the row first so we can include details in the audit log
+    const { rows: existing } = await dbQuery(
+      `SELECT id, asker_name, is_hot, interaction_score, contacted, question_count,
+              asker_email_encrypted IS NOT NULL AS has_email,
+              asker_phone_encrypted IS NOT NULL AS has_phone
+         FROM leads
+        WHERE id = $1`,
+      [id]
+    );
+    if (!existing[0]) {
+      return res.status(404).json({ error: 'ליד לא נמצא' });
+    }
+
+    await dbQuery('DELETE FROM leads WHERE id = $1', [id]);
+
+    // Audit — record WHO deleted WHAT so accidental deletions are recoverable
+    // from the old_value snapshot.
+    setImmediate(() => {
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || null;
+      logAction(
+        req.rabbi.id,
+        'lead.deleted',
+        'lead',
+        id,
+        existing[0],
+        null,
+        ip,
+        req.headers['user-agent'] || null
+      ).catch(() => {});
+    });
+
+    return res.json({
+      ok: true,
+      message: `הליד "${existing[0].asker_name || 'ללא שם'}" נמחק בהצלחה`,
+    });
   } catch (err) {
     return next(err);
   }

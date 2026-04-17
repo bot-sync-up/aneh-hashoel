@@ -5,9 +5,9 @@ import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
   StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
-  CalendarDays, FileText, Bell, MailX, Heart, ArrowLeft,
+  CalendarDays, FileText, Bell, MailX, Heart, ArrowLeft, Trash2,
 } from 'lucide-react';
-import { get, patch } from '../../lib/api';
+import { get, patch, del } from '../../lib/api';
 import api from '../../lib/api';
 import { formatDate } from '../../lib/utils';
 import Spinner, { BlockSpinner } from '../../components/ui/Spinner';
@@ -41,13 +41,30 @@ const STATUS_MAP = {
   hidden:     { label: 'מוסתר',    color: 'text-gray-500 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-800/40 dark:border-gray-600' },
 };
 
-function LeadRow({ lead, onUpdate }) {
+function LeadRow({ lead, onUpdate, onDelete }) {
   const navigate = useNavigate();
   const [notesOpen,     setNotesOpen]     = useState(false);
   const [notes,         setNotes]         = useState(lead.contact_notes || '');
   const [savingNote,    setSavingNote]    = useState(false);
   const [toggling,      setToggling]      = useState(false);
+  const [deleting,      setDeleting]      = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
+
+  const handleDelete = async () => {
+    const ok = window.confirm(
+      `למחוק את הליד "${lead.asker_name || 'ללא שם'}" לצמיתות?\n\n` +
+      `פעולה זו לא ניתנת לשחזור. השאלות של הליד יישארו במערכת, רק רשומת הליד תימחק.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await del(`/leads/${lead.id}`);
+      onDelete?.(lead.id);
+    } catch (err) {
+      alert(err?.response?.data?.error || 'שגיאה במחיקת הליד');
+      setDeleting(false);
+    }
+  };
 
   const handleToggleContacted = async () => {
     setToggling(true);
@@ -303,6 +320,17 @@ function LeadRow({ lead, onUpdate }) {
             חייג
           </a>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          loading={deleting}
+          onClick={handleDelete}
+          leftIcon={<Trash2 size={13} />}
+          className="!text-red-600 hover:!bg-red-50 dark:hover:!bg-red-900/20 ml-auto"
+          title="מחק ליד לצמיתות"
+        >
+          מחק
+        </Button>
       </div>
     </div>
   );
@@ -394,6 +422,11 @@ export default function LeadsPage() {
 
   const handleUpdate = useCallback((updated) => {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
+  }, []);
+
+  const handleDelete = useCallback((deletedId) => {
+    setLeads((prev) => prev.filter((l) => l.id !== deletedId));
+    setTotal((t) => Math.max(0, (t || 0) - 1));
   }, []);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -517,7 +550,7 @@ export default function LeadsPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {leads.map((lead) => (
-              <LeadRow key={lead.id} lead={lead} onUpdate={handleUpdate} />
+              <LeadRow key={lead.id} lead={lead} onUpdate={handleUpdate} onDelete={handleDelete} />
             ))}
           </div>
         )}

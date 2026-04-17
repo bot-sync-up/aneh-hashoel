@@ -113,7 +113,7 @@ export default function ChangePasswordPage() {
 
       setSuccess(true);
       toast.success('הסיסמה הוגדרה בהצלחה!');
-      setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+      setTimeout(() => navigate('/', { replace: true }), 2000);
     } catch (err) {
       const message =
         err.response?.data?.message || 'שגיאה בהגדרת הסיסמה. אנא נסה שוב.';

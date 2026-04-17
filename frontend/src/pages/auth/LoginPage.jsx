@@ -136,7 +136,7 @@ export default function LoginPage() {
           navigate('/setup-password', { replace: true });
           return;
         }
-        navigate('/dashboard', { replace: true });
+        navigate('/', { replace: true });
         return;
       }
 

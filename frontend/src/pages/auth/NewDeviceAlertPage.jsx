@@ -165,7 +165,7 @@ export default function NewDeviceAlertPage() {
         await api.post('/auth/device-alert/confirm', { alertId });
       }
       toast.success('הכניסה אושרה');
-      navigate('/dashboard', { replace: true });
+      navigate('/', { replace: true });
     } catch {
       toast.error('שגיאה באישור הכניסה. אנא נסה שוב.');
     } finally {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
@@ -379,6 +380,7 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState(lead.contact_notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [notesJustSaved, setNotesJustSaved] = useState(false);
 
   useEffect(() => {
     setNotesDraft(lead.contact_notes || '');
@@ -429,9 +431,17 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
     try {
       const result = await patch(`/leads/${lead.id}`, { contact_notes: notesDraft });
       onUpdate(result.lead || result);
-      setNotesOpen(false);
+      // 3 כפל-ודא שהמשתמש יודע שההערה נשמרה:
+      // 1) toast גלובלי ירוק
+      // 2) הודעת inline "נשמר ✓" שנעלמת אחרי 2 שניות
+      // 3) איקון ההערה נצבע כתום (כי hasNotes=true עכשיו)
+      toast.success('ההערה נשמרה', { duration: 2500 });
+      setNotesJustSaved(true);
+      setTimeout(() => setNotesJustSaved(false), 2000);
+      // לא סוגרים מיד — נותנים 1.5 שניות למשתמש לראות את ההודעה
+      setTimeout(() => setNotesOpen(false), 1500);
     } catch (err) {
-      alert(err?.response?.data?.error || 'שגיאה בשמירת ההערה');
+      toast.error(err?.response?.data?.error || 'שגיאה בשמירת ההערה');
     } finally {
       setSavingNotes(false);
     }
@@ -617,8 +627,17 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
                 Ctrl+Enter לשמירה · Esc לביטול
               </span>
               <div className="flex items-center gap-2">
+                {notesJustSaved && (
+                  <span
+                    role="status"
+                    className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 font-heebo animate-fade-in"
+                  >
+                    <CheckCircle2 size={13} />
+                    נשמר!
+                  </span>
+                )}
                 <Button variant="ghost" size="sm" onClick={cancelNotes}>
-                  ביטול
+                  {notesJustSaved ? 'סגור' : 'ביטול'}
                 </Button>
                 <Button
                   variant="primary"
@@ -626,6 +645,7 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
                   loading={savingNotes}
                   onClick={saveNotes}
                   leftIcon={<CheckCircle2 size={13} />}
+                  disabled={savingNotes || notesJustSaved}
                 >
                   שמור הערה
                 </Button>

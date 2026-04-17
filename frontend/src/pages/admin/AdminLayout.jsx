@@ -50,7 +50,7 @@ const TABS = [
   { to: 'email-templates', label: 'תבניות אימייל', icon: Mail },
   { to: 'newsletter',      label: 'ניוזלטר',       icon: Newspaper },
   { to: 'newsletter-archive', label: 'ארכיון ניוזלטרים', icon: Archive },
-  { to: 'donations',       label: 'תרומות',         icon: Heart },
+  // 'תרומות' removed from top nav — now accessible as a tab inside /admin/leads
   { to: 'emergency',       label: 'שידור חירום',   icon: AlertTriangle },
 ];
 

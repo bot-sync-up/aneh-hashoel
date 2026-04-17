@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Flame, Phone, Mail, MessageSquare,
   CheckCircle2, Clock, Search, RefreshCw, ChevronRight, ChevronLeft,
   StickyNote, X, Download, AlertTriangle, ChevronDown, ChevronUp,
-  CalendarDays, FileText, Bell, MailX, Heart, ArrowLeft, Trash2,
+  CalendarDays, FileText, Bell, MailX, Heart, ArrowLeft, Trash2, Eye,
 } from 'lucide-react';
 import { get, patch, del } from '../../lib/api';
 import api from '../../lib/api';
@@ -14,6 +14,9 @@ import Spinner, { BlockSpinner } from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useSocket } from '../../contexts/SocketContext';
+
+// Donations tab content — lazy-loaded so the initial leads view stays fast
+const DonationsPanel = React.lazy(() => import('./DonationsPage'));
 
 const PAGE_SIZE = 20;
 
@@ -368,6 +371,173 @@ function ClickAlertToast({ alert, onClose }) {
   );
 }
 
+// ── Compact table row — the new "normal" view ───────────────────────────────
+function LeadTableRow({ lead, onUpdate, onDelete }) {
+  const navigate = useNavigate();
+  const [toggling, setToggling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const go = () => {
+    const base = window.location.pathname.startsWith('/admin') ? '/admin/leads' : '/leads';
+    navigate(`${base}/${lead.id}`);
+  };
+
+  const handleToggleContacted = async (e) => {
+    e.stopPropagation();
+    setToggling(true);
+    try {
+      const result = await patch(`/leads/${lead.id}`, { contacted: !lead.contacted });
+      onUpdate(result.lead || result);
+    } catch { /* ignore */ }
+    finally { setToggling(false); }
+  };
+
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    const ok = window.confirm(
+      `למחוק את הליד "${lead.asker_name || 'ללא שם'}" לצמיתות?\n\n` +
+      `פעולה זו לא ניתנת לשחזור. השאלות של הליד יישארו במערכת.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await del(`/leads/${lead.id}`);
+      onDelete?.(lead.id);
+    } catch (err) {
+      alert(err?.response?.data?.error || 'שגיאה במחיקת הליד');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <tr
+      onClick={go}
+      className={clsx(
+        'border-b border-[var(--border-default)] transition-colors cursor-pointer',
+        'hover:bg-[var(--bg-muted)]',
+        lead.is_hot && 'bg-orange-50/40 dark:bg-orange-900/10'
+      )}
+    >
+      {/* Name + flags */}
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {lead.is_hot && (
+            <Flame size={13} className="text-orange-500 flex-shrink-0" fill="currentColor" />
+          )}
+          <span className="font-medium font-heebo text-[var(--text-primary)] truncate">
+            {lead.asker_name || 'שואל אנונימי'}
+          </span>
+          {lead.is_unsubscribed && (
+            <MailX size={12} className="text-gray-400 flex-shrink-0" title="הוסר/ה מרשימת תפוצה" />
+          )}
+        </div>
+      </td>
+
+      {/* Email */}
+      <td className="px-3 py-3 text-xs text-[var(--text-secondary)]">
+        {lead.email ? (
+          <a
+            href={`mailto:${lead.email}`}
+            onClick={(e) => e.stopPropagation()}
+            dir="ltr"
+            style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+            className="inline-flex items-center gap-1 hover:text-brand-navy hover:underline truncate max-w-[180px]"
+          >
+            <Mail size={11} className="flex-shrink-0" />
+            <span className="truncate">{lead.email}</span>
+          </a>
+        ) : (
+          <span className="text-[var(--text-muted)]">—</span>
+        )}
+      </td>
+
+      {/* Phone */}
+      <td className="px-3 py-3 text-xs text-[var(--text-secondary)]">
+        {lead.phone ? (
+          <a
+            href={`tel:${lead.phone}`}
+            onClick={(e) => e.stopPropagation()}
+            dir="ltr"
+            className="inline-flex items-center gap-1 hover:text-brand-navy hover:underline"
+          >
+            <Phone size={11} />
+            {lead.phone}
+          </a>
+        ) : (
+          <span className="text-[var(--text-muted)]">—</span>
+        )}
+      </td>
+
+      {/* Questions count */}
+      <td className="px-3 py-3 text-center text-xs tabular-nums">
+        <span className="inline-flex items-center gap-1 text-[var(--text-secondary)]">
+          <MessageSquare size={11} />
+          {lead.question_count || 0}
+        </span>
+      </td>
+
+      {/* Donations */}
+      <td className="px-3 py-3 text-center text-xs tabular-nums">
+        {Number(lead.donations_count) > 0 ? (
+          <span className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 font-semibold" title={`${lead.donations_count} תרומות`}>
+            <Heart size={11} fill="currentColor" />
+            ₪{Math.round(Number(lead.donations_total_ils) || 0).toLocaleString('he-IL')}
+          </span>
+        ) : (
+          <span className="text-[var(--text-muted)]">—</span>
+        )}
+      </td>
+
+      {/* Status */}
+      <td className="px-3 py-3">
+        {lead.contacted ? (
+          <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 font-heebo">
+            <CheckCircle2 size={10} /> טופל
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 font-heebo">
+            <Clock size={10} /> ממתין
+          </span>
+        )}
+      </td>
+
+      {/* Last question */}
+      <td className="px-3 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">
+        {lead.last_question_at ? formatDate(lead.last_question_at) : '—'}
+      </td>
+
+      {/* Actions */}
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-1 justify-end">
+          <button
+            onClick={handleToggleContacted}
+            disabled={toggling}
+            title={lead.contacted ? 'סמן כלא טופל' : 'סמן כטופל'}
+            className="p-1.5 rounded hover:bg-[var(--bg-surface-raised)] text-emerald-600 disabled:opacity-50"
+          >
+            <CheckCircle2 size={14} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); go(); }}
+            title="פתח כרטסת"
+            className="p-1.5 rounded hover:bg-[var(--bg-surface-raised)] text-brand-navy"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="מחק ליד"
+            className="p-1.5 rounded hover:bg-red-50 text-red-600 disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
@@ -380,6 +550,7 @@ export default function LeadsPage() {
   const [search,  setSearch]  = useState('');
   const [searchQ, setSearchQ] = useState(''); // debounced
   const [clickAlerts, setClickAlerts] = useState([]);
+  const [activeTab, setActiveTab] = useState('leads'); // 'leads' | 'donations'
   const { on } = useSocket();
 
   // Listen for real-time lead click events from CS socket room
@@ -449,12 +620,12 @@ export default function LeadsPage() {
 
       {/* Header */}
       <div className="bg-[var(--bg-surface)] border-b border-[var(--border-default)] shadow-[var(--shadow-soft)]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-xl font-bold text-[var(--text-primary)] font-heebo flex items-center gap-2">
                 <Users size={22} className="text-brand-navy" />
-                ניהול לידים
+                ניהול CRM
               </h1>
               <p className="text-sm text-[var(--text-muted)] font-heebo mt-0.5">
                 {total} לידים סה״כ
@@ -463,37 +634,74 @@ export default function LeadsPage() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Download size={14} />}
-                onClick={async () => {
-                  try {
-                    const response = await api.get('/leads/export', { responseType: 'blob' });
-                    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `leads-${new Date().toISOString().split('T')[0]}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.parentNode.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                  } catch (err) {
-                    alert(err?.response?.data?.error || 'שגיאה בייצוא הלידים. נסה שוב.');
-                  }
-                }}
+            {activeTab === 'leads' && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Download size={14} />}
+                  onClick={async () => {
+                    try {
+                      const response = await api.get('/leads/export', { responseType: 'blob' });
+                      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `leads-${new Date().toISOString().split('T')[0]}.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.parentNode.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      alert(err?.response?.data?.error || 'שגיאה בייצוא הלידים. נסה שוב.');
+                    }
+                  }}
+                >
+                  ייצוא CSV
+                </Button>
+                <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={14} />} onClick={fetchLeads}>
+                  רענן
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Tab bar — switch between leads and donations */}
+          <div className="flex items-center gap-1 mt-4 border-b border-[var(--border-default)] -mb-5">
+            {[
+              { key: 'leads',     label: 'לידים',     icon: Users },
+              { key: 'donations', label: 'תרומות',    icon: Heart },
+            ].map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={clsx(
+                  'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium font-heebo',
+                  'border-b-2 transition-all duration-150',
+                  activeTab === key
+                    ? 'border-[#B8973A] text-[#B8973A]'
+                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                )}
               >
-                ייצוא CSV
-              </Button>
-              <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={14} />} onClick={fetchLeads}>
-                רענן
-              </Button>
-            </div>
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* DONATIONS TAB */}
+      {activeTab === 'donations' && (
+        <Suspense fallback={<BlockSpinner label="טוען תרומות..." />}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            <DonationsPanel />
+          </div>
+        </Suspense>
+      )}
+
+      {/* LEADS TAB */}
+      {activeTab === 'leads' && (
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
         {/* Filters + search */}
@@ -535,7 +743,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content — as a real table for easier scanning */}
         {loading ? (
           <BlockSpinner label="טוען לידים..." />
         ) : error ? (
@@ -548,10 +756,33 @@ export default function LeadsPage() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {leads.map((lead) => (
-              <LeadRow key={lead.id} lead={lead} onUpdate={handleUpdate} onDelete={handleDelete} />
-            ))}
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] overflow-hidden shadow-[var(--shadow-soft)]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm font-heebo">
+                <thead className="bg-[var(--bg-muted)] text-[var(--text-muted)]">
+                  <tr>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold">שם</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold">מייל</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold">טלפון</th>
+                    <th className="px-3 py-2.5 text-center text-xs font-semibold w-16">שאלות</th>
+                    <th className="px-3 py-2.5 text-center text-xs font-semibold w-24">תרומות</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold w-24">סטטוס</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold whitespace-nowrap">שאלה אחרונה</th>
+                    <th className="px-3 py-2.5 text-end text-xs font-semibold w-28">פעולות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((lead) => (
+                    <LeadTableRow
+                      key={lead.id}
+                      lead={lead}
+                      onUpdate={handleUpdate}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -582,6 +813,7 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

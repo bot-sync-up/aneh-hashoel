@@ -658,10 +658,20 @@ async function sendThankNotificationEmail(rabbiEmail, question) {
  * @param {object} stats.global
  */
 async function sendWeeklyReport(rabbiEmail, stats) {
-  const dashboardUrl = `${appUrl()}/dashboard`;
+  // Use the app root — there is no /dashboard route (we send the user to
+  // their home page, which IS the dashboard for rabbis).
+  const dashboardUrl = `${appUrl()}/`;
+
+  // Clean the rabbi name: strip any leading "הרב"/"הרה\"ג" prefix so we
+  // don't render "שלום הרב הרב נחום". Fall back to a generic greeting.
+  const rawName  = stats.rabbiName || '';
+  const cleanName = rawName
+    .replace(/^\s*(?:הרב|הרה"ג|הרה״ג|הגאון הרב)\s+/u, '')
+    .trim();
+  const greeting = cleanName ? `שלום הרב ${cleanName},` : 'שלום רב,';
 
   const bodyContent = `
-    <p style="margin: 0 0 12px; font-size: 15px;">שלום רב,</p>
+    <p style="margin: 0 0 12px; font-size: 15px;">${greeting}</p>
     <p style="margin: 0 0 16px; font-size: 15px;">
       להלן סיכום הפעילות שלך בשבוע ${stats.weekStart} — ${stats.weekEnd}:
     </p>

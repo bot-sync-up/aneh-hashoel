@@ -376,6 +376,15 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
   const navigate = useNavigate();
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState(lead.contact_notes || '');
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    setNotesDraft(lead.contact_notes || '');
+  }, [lead.contact_notes]);
+
+  const hasNotes = !!(lead.contact_notes && lead.contact_notes.trim());
 
   const go = () => {
     const base = window.location.pathname.startsWith('/admin') ? '/admin/leads' : '/leads';
@@ -409,7 +418,33 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
     }
   };
 
+  const toggleNotes = (e) => {
+    e.stopPropagation();
+    setNotesOpen((v) => !v);
+  };
+
+  const saveNotes = async (e) => {
+    e.stopPropagation();
+    setSavingNotes(true);
+    try {
+      const result = await patch(`/leads/${lead.id}`, { contact_notes: notesDraft });
+      onUpdate(result.lead || result);
+      setNotesOpen(false);
+    } catch (err) {
+      alert(err?.response?.data?.error || 'שגיאה בשמירת ההערה');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const cancelNotes = (e) => {
+    e.stopPropagation();
+    setNotesDraft(lead.contact_notes || '');
+    setNotesOpen(false);
+  };
+
   return (
+    <>
     <tr
       onClick={go}
       className={clsx(
@@ -510,6 +545,19 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
       <td className="px-3 py-3">
         <div className="flex items-center gap-1 justify-end">
           <button
+            onClick={toggleNotes}
+            title={hasNotes ? 'ערוך הערות' : 'הוסף הערות'}
+            className={clsx(
+              'relative p-1.5 rounded hover:bg-[var(--bg-surface-raised)]',
+              hasNotes ? 'text-amber-600' : 'text-[var(--text-muted)]'
+            )}
+          >
+            <StickyNote size={14} />
+            {hasNotes && (
+              <span className="absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full bg-amber-500 border border-[var(--bg-surface)]" />
+            )}
+          </button>
+          <button
             onClick={handleToggleContacted}
             disabled={toggling}
             title={lead.contacted ? 'סמן כלא טופל' : 'סמן כטופל'}
@@ -535,6 +583,59 @@ function LeadTableRow({ lead, onUpdate, onDelete }) {
         </div>
       </td>
     </tr>
+
+    {/* Expanded notes editor — only visible when this row is toggled open */}
+    {notesOpen && (
+      <tr className="bg-[var(--bg-surface-raised)] border-b border-[var(--border-default)]">
+        <td colSpan={8} className="px-4 py-3">
+          <div className="flex flex-col gap-2" dir="rtl" onClick={(e) => e.stopPropagation()}>
+            <label className="text-xs font-semibold text-[var(--text-secondary)] font-heebo flex items-center gap-1.5">
+              <StickyNote size={12} className="text-amber-600" />
+              הערות שירות לקוחות — {lead.asker_name || 'ליד ללא שם'}
+            </label>
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') cancelNotes(e);
+                // Ctrl/Cmd+Enter to save
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveNotes(e);
+              }}
+              placeholder="הוסף/י הערה על הליד — מועד לחזור, הקשר לשיחה קודמת, וכו'"
+              dir="rtl"
+              rows={3}
+              autoFocus
+              className={clsx(
+                'w-full px-3 py-2 text-sm font-heebo resize-y',
+                'bg-[var(--bg-surface)] text-[var(--text-primary)]',
+                'border border-[var(--border-default)] rounded-md',
+                'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent'
+              )}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--text-muted)] font-heebo">
+                Ctrl+Enter לשמירה · Esc לביטול
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={cancelNotes}>
+                  ביטול
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={savingNotes}
+                  onClick={saveNotes}
+                  leftIcon={<CheckCircle2 size={13} />}
+                >
+                  שמור הערה
+                </Button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 

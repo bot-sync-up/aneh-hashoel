@@ -59,6 +59,71 @@ function mapTransactionType(v) {
   return s.slice(0, 30);
 }
 
+// ─── Nedarim date parser ─────────────────────────────────────────────────────
+
+/**
+ * Parse a Nedarim TransactionTime string into an ISO-8601 UTC instant.
+ * Nedarim uses Israeli format "DD/MM/YYYY HH:MM:SS" in Asia/Jerusalem time.
+ * Also tolerates ISO strings (in case Nedarim changes format later).
+ *
+ * @param {string} raw
+ * @returns {string|null} ISO-8601 UTC string, or null if unparseable
+ */
+function _parseNedarimDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+
+  // Israeli format: DD/MM/YYYY HH:MM:SS (seconds optional)
+  const il = s.match(/^(\d{2})\/(\d{2})\/(\d{4})[\sT](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (il) {
+    const [, dd, mm, yyyy, hh, mi, ss] = il;
+    // Build a UTC instant that represents the given wall-clock in Jerusalem.
+    // Israel is UTC+2 or UTC+3 (DST). Cheap exact conversion:
+    //   start with UTC at the wall-clock, then subtract the TZ offset.
+    // But JS doesn't expose Asia/Jerusalem offset directly — we use Intl.
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      });
+      const wallStr = `${yyyy}-${mm}-${dd}T${hh.padStart(2,'0')}:${mi}:${ss || '00'}Z`;
+      const guess = new Date(wallStr); // interpret wall-clock as UTC first
+      // Find the offset that would make `fmt.format(guess + offset)` match our wall-clock.
+      // Easier: just loop over ±3h offsets to find one whose formatted Jerusalem output
+      // equals what we parsed. Cheap, correct across DST boundaries.
+      for (const offsetHours of [2, 3]) {
+        const candidate = new Date(guess.getTime() - offsetHours * 3600_000);
+        const parts = Object.fromEntries(
+          fmt.formatToParts(candidate).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value])
+        );
+        if (
+          parts.year   === yyyy  &&
+          parts.month  === mm    &&
+          parts.day    === dd    &&
+          parts.hour   === hh.padStart(2, '0') &&
+          parts.minute === mi    &&
+          parts.second === (ss || '00')
+        ) {
+          return candidate.toISOString();
+        }
+      }
+      // Fallback: assume UTC+2 (non-DST)
+      return new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh - 2, +mi, +(ss || 0))).toISOString();
+    } catch {
+      // Fallback if Intl misbehaves
+      return new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh - 2, +mi, +(ss || 0))).toISOString();
+    }
+  }
+
+  // ISO-ish fallback (e.g. "2025-09-15T09:23:51")
+  const iso = new Date(s);
+  if (!isNaN(iso.getTime())) return iso.toISOString();
+
+  return null;
+}
+
 // ─── Comments parser (correlates donation → question/rabbi) ──────────────────
 
 /**
@@ -111,13 +176,15 @@ function mapNedarimPayload(raw) {
   const { questionId, rabbiId, cleanComment } =
     parseComments(raw.Comments ?? raw.comments ?? raw.reference);
 
-  // Nedarim timestamps come in ISO-ish format. Parse to Date; if invalid,
-  // store null and let the DB default to current time.
+  // Nedarim TransactionTime format is Israeli DD/MM/YYYY HH:MM:SS
+  // (confirmed 2026-04-17 via raw_payload inspection on 4167 rows).
+  // The time is in Asia/Jerusalem — convert to an absolute UTC ISO string
+  // so the TIMESTAMPTZ column stores the correct instant. `new Date(...)`
+  // alone doesn't parse this format and returns Invalid Date.
   let txTime = null;
   const rawTxTime = raw.TransactionTime ?? raw.transaction_time ?? null;
   if (rawTxTime) {
-    const d = new Date(rawTxTime);
-    if (!isNaN(d.getTime())) txTime = d.toISOString();
+    txTime = _parseNedarimDate(rawTxTime);
   }
 
   return {

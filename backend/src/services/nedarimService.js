@@ -111,8 +111,18 @@ function mapNedarimPayload(raw) {
   const { questionId, rabbiId, cleanComment } =
     parseComments(raw.Comments ?? raw.comments ?? raw.reference);
 
+  // Nedarim timestamps come in ISO-ish format. Parse to Date; if invalid,
+  // store null and let the DB default to current time.
+  let txTime = null;
+  const rawTxTime = raw.TransactionTime ?? raw.transaction_time ?? null;
+  if (rawTxTime) {
+    const d = new Date(rawTxTime);
+    if (!isNaN(d.getTime())) txTime = d.toISOString();
+  }
+
   return {
     transaction_id:   String(raw.TransactionId ?? raw.transaction_id ?? '').slice(0, 100) || null,
+    transaction_time: txTime,
     question_id:      questionId,
     rabbi_id:         rabbiId,
     amount,
@@ -188,7 +198,7 @@ async function upsertDonation(mapped, source = 'webhook') {
 
   const result = await query(
     `INSERT INTO donations (
-       transaction_id, question_id, rabbi_id, lead_id,
+       transaction_id, transaction_time, question_id, rabbi_id, lead_id,
        amount, currency,
        donor_name, donor_email, donor_phone,
        last_num, confirmation,
@@ -196,7 +206,7 @@ async function upsertDonation(mapped, source = 'webhook') {
        nedarim_reference, payment_method, notes,
        source, raw_payload
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb
      )
      ON CONFLICT (transaction_id)
        WHERE transaction_id IS NOT NULL
@@ -204,6 +214,7 @@ async function upsertDonation(mapped, source = 'webhook') {
      RETURNING id, amount, currency, transaction_id, lead_id`,
     [
       mapped.transaction_id,
+      mapped.transaction_time,
       mapped.question_id,
       mapped.rabbi_id,
       leadId,

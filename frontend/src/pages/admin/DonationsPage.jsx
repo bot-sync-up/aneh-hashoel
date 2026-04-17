@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
   Heart, TrendingUp, DollarSign, Calendar,
-  ChevronRight, ChevronLeft, RefreshCw, User, ExternalLink,
+  ChevronRight, ChevronLeft, RefreshCw, User, ExternalLink, Download,
 } from 'lucide-react';
 import { get } from '../../lib/api';
+import api from '../../lib/api';
 import { formatDateTime } from '../../lib/utils';
 import { BlockSpinner } from '../../components/ui/Spinner';
+import Button from '../../components/ui/Button';
 
 const PAGE_SIZE = 50;
 
@@ -61,7 +63,10 @@ function DonationRow({ donation }) {
             {amountStr}
           </span>
           <span className="text-xs text-[var(--text-muted)] font-heebo">
-            {donation.created_at ? formatDateTime(donation.created_at) : ''}
+            {/* Real transaction date from Nedarim — NOT when we synced it */}
+            {donation.transaction_time
+              ? formatDateTime(donation.transaction_time)
+              : (donation.created_at ? formatDateTime(donation.created_at) : '')}
           </span>
         </div>
 
@@ -128,6 +133,22 @@ function DonationRow({ donation }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
+const PERIODS = [
+  { value: 'today',  label: 'היום' },
+  { value: 'week',   label: 'השבוע' },
+  { value: 'month',  label: 'החודש' },
+  { value: 'year',   label: 'השנה' },
+  { value: 'all',    label: 'כל הזמן' },
+];
+
+const PERIOD_LABEL_MAP = {
+  today: 'היום',
+  week:  'השבוע',
+  month: 'החודש',
+  year:  'השנה',
+  all:   'כל הזמן',
+};
+
 export default function DonationsPage() {
   const [stats,    setStats]    = useState(null);
   const [recent,   setRecent]   = useState([]);
@@ -136,12 +157,14 @@ export default function DonationsPage() {
   const [total,    setTotal]    = useState(0);
   const [loading,  setLoading]  = useState(true);
   const [showAll,  setShowAll]  = useState(false);
+  const [period,   setPeriod]   = useState('month'); // default: this month
+  const [exporting, setExporting] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, recentRes] = await Promise.all([
-        get('/admin/donations/stats'),
+        get('/admin/donations/stats', { period }),
         get('/admin/donations/recent'),
       ]);
       setStats(statsRes.data);
@@ -151,26 +174,52 @@ export default function DonationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
-  const fetchAll = async (p = 1) => {
+  const fetchAll = useCallback(async (p = 1) => {
     try {
-      const res = await get('/admin/donations', { page: p, limit: PAGE_SIZE });
+      const res = await get('/admin/donations', { page: p, limit: PAGE_SIZE, period });
       setAllDonations(res.data);
       setTotal(res.pagination.total);
       setPage(p);
     } catch (err) {
       console.error('Failed to load donations list:', err);
     }
-  };
+  }, [period]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     if (showAll) fetchAll(page);
-  }, [showAll]);
+  }, [showAll, page, fetchAll]);
+
+  // Reset to page 1 when period changes
+  useEffect(() => { setPage(1); }, [period]);
+
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const response = await api.get('/admin/donations/export.csv', {
+        params: { period },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `donations-${period}-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.error || 'שגיאה בייצוא. נסה שוב.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -185,48 +234,83 @@ export default function DonationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">
-          תרומות
-        </h2>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition font-heebo"
-        >
-          <RefreshCw size={14} />
-          רענון
-        </button>
+      {/* Header with period tabs + export */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">
+            תרומות
+          </h2>
+          <span className="text-xs text-[var(--text-muted)] font-heebo">
+            · מציג {PERIOD_LABEL_MAP[period]}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Period selector */}
+          <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={clsx(
+                  'px-3 py-1.5 rounded-md text-xs font-heebo transition-colors',
+                  period === p.value
+                    ? 'bg-[#1B2B5E] text-white font-semibold'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={exporting}
+            onClick={handleExportCSV}
+            leftIcon={<Download size={14} />}
+          >
+            ייצוא לאקסל
+          </Button>
+          <button
+            onClick={fetchData}
+            title="רענן נתונים"
+            className="flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition font-heebo p-1.5 rounded"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — now dynamic based on selected period */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Heart}
-            label="סה״כ החודש"
-            value={fmtAmount(stats.totalThisMonth)}
-            sub={`${stats.countThisMonth} תרומות`}
+            label={`סה"כ ${PERIOD_LABEL_MAP[period]}`}
+            value={fmtAmount(stats.periodTotal)}
+            sub={`${stats.periodCount} תרומות`}
             color="#B8973A"
           />
           <StatCard
+            icon={Calendar}
+            label="מספר תרומות"
+            value={String(stats.periodCount || 0)}
+            sub={`ממוצע ${fmtAmount(stats.periodAvg)}`}
+            color="#7c3aed"
+          />
+          <StatCard
             icon={TrendingUp}
-            label="סה״כ כללי"
+            label='סה"כ כללי'
             value={fmtAmount(stats.totalAllTime)}
             sub={`${stats.countAllTime} תרומות`}
             color="#1B2B5E"
           />
           <StatCard
             icon={DollarSign}
-            label="ממוצע לתרומה"
+            label="ממוצע כללי לתרומה"
             value={fmtAmount(stats.averageDonation)}
+            sub={`לכל ${stats.countAllTime} התרומות`}
             color="#16a34a"
-          />
-          <StatCard
-            icon={Calendar}
-            label="תרומות החודש"
-            value={String(stats.countThisMonth)}
-            color="#7c3aed"
           />
         </div>
       )}

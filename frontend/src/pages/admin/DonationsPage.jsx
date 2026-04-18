@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import {
   Heart, TrendingUp, DollarSign, Calendar,
   ChevronRight, ChevronLeft, RefreshCw, User, ExternalLink, Download,
+  Search, X as XIcon, Filter,
 } from 'lucide-react';
 import { get } from '../../lib/api';
 import api from '../../lib/api';
@@ -118,14 +119,8 @@ function DonationRow({ donation }) {
               : 'חד-פעמי'}
           </span>
         )}
-        {donation.source && (
-          <span
-            className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-            title={donation.source === 'api_sync' ? 'הגיעה דרך סנכרון API (לא webhook)' : donation.source === 'webhook' ? 'הגיעה דרך webhook בזמן אמת' : donation.source}
-          >
-            {donation.source === 'api_sync' ? 'sync' : donation.source === 'webhook' ? 'live' : donation.source}
-          </span>
-        )}
+        {/* The 'sync/live' source label is intentionally hidden — it's an
+            implementation detail users don't care about. */}
       </div>
     </div>
   );
@@ -160,6 +155,17 @@ export default function DonationsPage({ scope: scopeProp = 'system' } = {}) {
   const [period,   setPeriod]   = useState('month'); // default: this month
   const [exporting, setExporting] = useState(false);
 
+  // Search + filters (wired to backend)
+  const [search,       setSearch]       = useState('');
+  const [searchQ,      setSearchQ]      = useState(''); // debounced query
+  const [txTypeFilter, setTxTypeFilter] = useState('all'); // all|regular|installments|standing_order
+
+  // Debounce search input (avoid spamming backend on every keystroke)
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQ(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
   // scope: 'system' (popup-only) or 'all' (everything from Nedarim)
   const scope = scopeProp;
 
@@ -167,28 +173,46 @@ export default function DonationsPage({ scope: scopeProp = 'system' } = {}) {
     setLoading(true);
     try {
       const [statsRes, recentRes] = await Promise.all([
-        get('/admin/donations/stats', { period, scope }),
-        get('/admin/donations/recent', { scope }),
+        get('/admin/donations/stats', { period, scope, search: searchQ || undefined }),
+        get('/admin/donations/recent', {
+          scope,
+          search: searchQ || undefined,
+          transaction_type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
+        }),
       ]);
       setStats(statsRes.data);
-      setRecent(recentRes.data);
+      // Client-side filter by transaction_type on /recent response since
+      // the endpoint doesn't natively support it yet. Cheap — only 10 rows.
+      const rec = txTypeFilter !== 'all'
+        ? (recentRes.data || []).filter((d) => d.transaction_type === txTypeFilter)
+        : recentRes.data;
+      setRecent(rec);
     } catch (err) {
       console.error('Failed to load donations:', err);
     } finally {
       setLoading(false);
     }
-  }, [period, scope]);
+  }, [period, scope, searchQ, txTypeFilter]);
 
   const fetchAll = useCallback(async (p = 1) => {
     try {
-      const res = await get('/admin/donations', { page: p, limit: PAGE_SIZE, period, scope });
-      setAllDonations(res.data);
+      const params = { page: p, limit: PAGE_SIZE, period, scope };
+      if (searchQ)                 params.search = searchQ;
+      if (txTypeFilter !== 'all')  params.transaction_type = txTypeFilter;
+      const res = await get('/admin/donations', params);
+      let data = res.data;
+      // Same client-side tx_type filter on the list since backend may not
+      // natively support it (still valid even if it does)
+      if (txTypeFilter !== 'all') {
+        data = (data || []).filter((d) => d.transaction_type === txTypeFilter);
+      }
+      setAllDonations(data);
       setTotal(res.pagination.total);
       setPage(p);
     } catch (err) {
       console.error('Failed to load donations list:', err);
     }
-  }, [period, scope]);
+  }, [period, scope, searchQ, txTypeFilter]);
 
   useEffect(() => {
     fetchData();
@@ -198,14 +222,19 @@ export default function DonationsPage({ scope: scopeProp = 'system' } = {}) {
     if (showAll) fetchAll(page);
   }, [showAll, page, fetchAll]);
 
-  // Reset to page 1 when period changes
-  useEffect(() => { setPage(1); }, [period]);
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1); }, [period, searchQ, txTypeFilter]);
 
   const handleExportCSV = async () => {
     setExporting(true);
     try {
       const response = await api.get('/admin/donations/export.csv', {
-        params: { period, scope },
+        params: {
+          period,
+          scope,
+          search: searchQ || undefined,
+          transaction_type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
+        },
         responseType: 'blob',
       });
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
@@ -284,6 +313,67 @@ export default function DonationsPage({ scope: scopeProp = 'system' } = {}) {
             <RefreshCw size={14} />
           </button>
         </div>
+      </div>
+
+      {/* Search + transaction-type filter row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Search input */}
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search size={14} className="absolute top-1/2 -translate-y-1/2 end-3 text-[var(--text-muted)] pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="חיפוש לפי שם תורם או מייל..."
+            dir="rtl"
+            className={clsx(
+              'w-full pe-9 ps-3 py-2 text-sm font-heebo',
+              'bg-[var(--bg-surface)] text-[var(--text-primary)]',
+              'border border-[var(--border-default)] rounded-lg',
+              'focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-transparent'
+            )}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute top-1/2 -translate-y-1/2 start-2 p-1 rounded hover:bg-[var(--bg-muted)]"
+              title="נקה חיפוש"
+            >
+              <XIcon size={12} className="text-[var(--text-muted)]" />
+            </button>
+          )}
+        </div>
+
+        {/* Transaction type filter pills */}
+        <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg p-1">
+          <Filter size={12} className="text-[var(--text-muted)] mx-1" />
+          {[
+            { value: 'all',             label: 'הכל' },
+            { value: 'regular',         label: 'חד-פעמי' },
+            { value: 'installments',    label: 'תשלומים' },
+            { value: 'standing_order',  label: 'הוראת קבע' },
+          ].map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setTxTypeFilter(t.value)}
+              className={clsx(
+                'px-2.5 py-1 rounded-md text-xs font-heebo transition-colors',
+                txTypeFilter === t.value
+                  ? 'bg-[#B8973A] text-white font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Match summary */}
+        {searchQ && (
+          <span className="text-xs text-[var(--text-muted)] font-heebo ms-auto">
+            חיפוש: <strong>{searchQ}</strong>
+          </span>
+        )}
       </div>
 
       {/* KPI Cards — now dynamic based on selected period */}

@@ -671,7 +671,7 @@ export default function LeadsPage() {
   const [search,  setSearch]  = useState('');
   const [searchQ, setSearchQ] = useState(''); // debounced
   const [clickAlerts, setClickAlerts] = useState([]);
-  const [activeTab, setActiveTab] = useState('leads'); // 'leads' | 'donations'
+  const [activeTab, setActiveTab] = useState('leads'); // 'leads' | 'donations' | 'donations-all'
   const { on } = useSocket();
 
   // Listen for real-time lead click events from CS socket room
@@ -790,8 +790,9 @@ export default function LeadsPage() {
           {/* Tab bar — switch between leads and donations */}
           <div className="flex items-center gap-1 mt-4 border-b border-[var(--border-default)] -mb-5">
             {[
-              { key: 'leads',     label: 'לידים',     icon: Users },
-              { key: 'donations', label: 'תרומות',    icon: Heart },
+              { key: 'leads',          label: 'לידים',         icon: Users },
+              { key: 'donations',      label: 'תרומות דרך המערכת', icon: Heart },
+              { key: 'donations-all',  label: 'כל התרומות',    icon: Heart },
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -812,11 +813,20 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* DONATIONS TAB */}
+      {/* DONATIONS TAB — only donations via our thank-rabbi popup */}
       {activeTab === 'donations' && (
         <Suspense fallback={<BlockSpinner label="טוען תרומות..." />}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-            <DonationsPanel />
+            <DonationsPanel scope="system" />
+          </div>
+        </Suspense>
+      )}
+
+      {/* ALL DONATIONS TAB — everything synced from Nedarim */}
+      {activeTab === 'donations-all' && (
+        <Suspense fallback={<BlockSpinner label="טוען תרומות..." />}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            <DonationsPanel scope="all" />
           </div>
         </Suspense>
       )}

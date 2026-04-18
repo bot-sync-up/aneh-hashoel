@@ -149,7 +149,7 @@ const PERIOD_LABEL_MAP = {
   all:   'כל הזמן',
 };
 
-export default function DonationsPage() {
+export default function DonationsPage({ scope: scopeProp = 'system' } = {}) {
   const [stats,    setStats]    = useState(null);
   const [recent,   setRecent]   = useState([]);
   const [allDonations, setAllDonations] = useState([]);
@@ -160,12 +160,15 @@ export default function DonationsPage() {
   const [period,   setPeriod]   = useState('month'); // default: this month
   const [exporting, setExporting] = useState(false);
 
+  // scope: 'system' (popup-only) or 'all' (everything from Nedarim)
+  const scope = scopeProp;
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, recentRes] = await Promise.all([
-        get('/admin/donations/stats', { period }),
-        get('/admin/donations/recent'),
+        get('/admin/donations/stats', { period, scope }),
+        get('/admin/donations/recent', { scope }),
       ]);
       setStats(statsRes.data);
       setRecent(recentRes.data);
@@ -174,18 +177,18 @@ export default function DonationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, scope]);
 
   const fetchAll = useCallback(async (p = 1) => {
     try {
-      const res = await get('/admin/donations', { page: p, limit: PAGE_SIZE, period });
+      const res = await get('/admin/donations', { page: p, limit: PAGE_SIZE, period, scope });
       setAllDonations(res.data);
       setTotal(res.pagination.total);
       setPage(p);
     } catch (err) {
       console.error('Failed to load donations list:', err);
     }
-  }, [period]);
+  }, [period, scope]);
 
   useEffect(() => {
     fetchData();
@@ -202,7 +205,7 @@ export default function DonationsPage() {
     setExporting(true);
     try {
       const response = await api.get('/admin/donations/export.csv', {
-        params: { period },
+        params: { period, scope },
         responseType: 'blob',
       });
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
@@ -238,10 +241,12 @@ export default function DonationsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold text-[var(--text-primary)] font-heebo">
-            תרומות — פופאפ "תודה לרב"
+            {scope === 'all' ? 'כל התרומות' : 'תרומות — פופאפ "תודה לרב"'}
           </h2>
           <span className="text-xs text-[var(--text-muted)] font-heebo">
-            · {PERIOD_LABEL_MAP[period]} · רק תרומות שהגיעו דרך המערכת
+            · {PERIOD_LABEL_MAP[period]}
+            {scope === 'system' && ' · רק תרומות שהגיעו דרך המערכת'}
+            {scope === 'all' && ' · כל התרומות מנדרים'}
           </span>
         </div>
         <div className="flex items-center gap-2">

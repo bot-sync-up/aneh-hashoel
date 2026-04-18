@@ -53,6 +53,19 @@ const OUR_SYSTEM_FILTER = `
   (raw_payload->>'Comments' ~ 'q:[0-9a-f]{6,}' OR notes ~ 'q:[0-9a-f]{6,}')
 `;
 
+/**
+ * Scope selector: 'system' (default) shows only donations made through
+ * our thank-rabbi popup; 'all' shows every donation synced from Nedarim.
+ *
+ * Returns a SQL fragment (already starts with "WHERE" or "AND") and the
+ * effective scope value.
+ */
+function scopeClause(req, prefix = 'WHERE') {
+  const scope = (req.query.scope || 'system').toLowerCase();
+  if (scope === 'all') return { clause: '', scope: 'all' };
+  return { clause: `${prefix} ${OUR_SYSTEM_FILTER}`, scope: 'system' };
+}
+
 function buildDateFilter(req, startParamIdx = 1) {
   const period = (req.query.period || 'month').toLowerCase();
   const from = req.query.from;
@@ -133,7 +146,7 @@ router.get('/stats', async (req, res) => {
          COALESCE(ROUND(AVG(d.amount), 2), 0)::numeric AS avg_all_time
        FROM donations d
        WHERE d.status = 'completed'
-         AND ${OUR_SYSTEM_FILTER}`,
+         ${scopeClause(req, 'AND').clause}`,
       params
     );
 
@@ -170,6 +183,7 @@ router.get('/stats', async (req, res) => {
 
 router.get('/recent', async (req, res) => {
   try {
+    const { clause } = scopeClause(req, 'WHERE');
     const result = await dbQuery(`
       SELECT
         d.id, d.amount, d.currency, d.donor_name, d.donor_email,
@@ -181,12 +195,14 @@ router.get('/recent', async (req, res) => {
         d.lead_id,
         l.asker_name AS lead_name,
         q.title      AS question_title,
-        u.name       AS rabbi_name
+        u.name       AS rabbi_name,
+        d.notes,
+        raw_payload->>'Groupe' AS nedarim_groupe
       FROM donations d
       LEFT JOIN leads     l ON l.id = d.lead_id
       LEFT JOIN questions q ON q.id = d.question_id
       LEFT JOIN rabbis    u ON u.id = d.rabbi_id
-      WHERE ${OUR_SYSTEM_FILTER}
+      ${clause}
       ORDER BY d.transaction_time DESC NULLS LAST
       LIMIT 10
     `);
@@ -226,7 +242,10 @@ router.get('/', async (req, res) => {
       idx++;
     }
 
-    const where = `WHERE ${OUR_SYSTEM_FILTER} ${dateWhere} ${searchClause}`;
+    const { clause: scopeWhere } = scopeClause(req, 'WHERE');
+    // scopeWhere is either empty (scope=all) or 'WHERE <OUR_SYSTEM_FILTER>'
+    const baseWhere = scopeWhere || 'WHERE 1=1';
+    const where = `${baseWhere} ${dateWhere} ${searchClause}`;
 
     const countPromise = dbQuery(
       `SELECT COUNT(*)::int AS total FROM donations d ${where}`,
@@ -292,7 +311,10 @@ router.get('/export.csv', async (req, res) => {
       idx++;
     }
 
-    const where = `WHERE ${OUR_SYSTEM_FILTER} ${dateWhere} ${searchClause}`;
+    const { clause: scopeWhere } = scopeClause(req, 'WHERE');
+    // scopeWhere is either empty (scope=all) or 'WHERE <OUR_SYSTEM_FILTER>'
+    const baseWhere = scopeWhere || 'WHERE 1=1';
+    const where = `${baseWhere} ${dateWhere} ${searchClause}`;
 
     const { rows } = await dbQuery(
       `SELECT

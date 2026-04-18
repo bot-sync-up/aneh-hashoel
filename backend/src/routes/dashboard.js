@@ -104,18 +104,37 @@ router.get("/my-questions", async (req, res) => {
 router.get("/activity", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
+    // Critical: use the REAL event time for each status, NOT q.updated_at.
+    // updated_at bumps every time view_count++ (or any other column updates),
+    // so the old query showed every question as 'הרב ענה הרגע' the moment
+    // anyone opened its page. We now pick the right column per status:
+    //   answered    → answered_at
+    //   in_process  → lock_timestamp (the claim moment)
+    //   else        → created_at
     const { rows } = await db(
-      `SELECT q.id, q.title, q.status, q.updated_at AS timestamp,
+      `SELECT q.id, q.title, q.status,
+              COALESCE(
+                CASE WHEN q.status = 'answered'   THEN q.answered_at    END,
+                CASE WHEN q.status = 'in_process' THEN q.lock_timestamp END,
+                q.created_at
+              ) AS timestamp,
               r.name AS rabbi_name,
               CASE
-                WHEN q.status = 'answered' THEN 'answer_published'
+                WHEN q.status = 'answered'   THEN 'answer_published'
                 WHEN q.status = 'in_process' THEN 'new_question_in_category'
-                WHEN q.status = 'pending' THEN 'question_released'
+                WHEN q.status = 'pending'    THEN 'question_released'
                 ELSE 'new_question_in_category'
               END AS type
        FROM   questions q
        LEFT JOIN rabbis r ON r.id = q.assigned_rabbi_id
-       ORDER BY q.updated_at DESC
+       WHERE (q.status = 'answered'   AND q.answered_at    IS NOT NULL)
+          OR (q.status = 'in_process' AND q.lock_timestamp IS NOT NULL)
+          OR  q.status = 'pending'
+       ORDER BY COALESCE(
+         CASE WHEN q.status = 'answered'   THEN q.answered_at    END,
+         CASE WHEN q.status = 'in_process' THEN q.lock_timestamp END,
+         q.created_at
+       ) DESC
        LIMIT $1`,
       [limit]
     );

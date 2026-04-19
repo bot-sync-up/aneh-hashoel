@@ -682,23 +682,42 @@ async function createRabbi(data) {
 // ─── getNotificationPreferences ───────────────────────────────────────────────
 
 /**
- * Return a rabbi's notification preferences as a map keyed by event_type.
+ * Return a rabbi's notification preferences as a nested map:
+ *   { event_type: { email: bool, whatsapp: bool, push: bool } }
+ *
+ * Each row in notification_preferences is a single (event, channel) toggle.
+ * Legacy rows with channel='both' or 'all' (pre-migration 008) are expanded
+ * on read so callers don't have to care about historical values.
  *
  * @param {string|number} rabbiId
- * @returns {Promise<Record<string, { channel: string, enabled: boolean }>>}
+ * @returns {Promise<Record<string, { email: boolean, whatsapp: boolean, push: boolean }>>}
  */
 async function getNotificationPreferences(rabbiId) {
   const { rows } = await query(
     `SELECT event_type, channel, enabled
      FROM   notification_preferences
      WHERE  rabbi_id = $1
-     ORDER  BY event_type`,
+     ORDER  BY event_type, channel`,
     [rabbiId]
   );
 
   const map = {};
   for (const row of rows) {
-    map[row.event_type] = { channel: row.channel, enabled: row.enabled };
+    if (!map[row.event_type]) map[row.event_type] = {};
+    const ch = (row.channel || '').toLowerCase();
+    const en = Boolean(row.enabled);
+
+    if (ch === 'both') {
+      // Legacy: fill email + whatsapp unless already set explicitly
+      if (map[row.event_type].email    === undefined) map[row.event_type].email    = en;
+      if (map[row.event_type].whatsapp === undefined) map[row.event_type].whatsapp = en;
+    } else if (ch === 'all') {
+      if (map[row.event_type].email    === undefined) map[row.event_type].email    = en;
+      if (map[row.event_type].whatsapp === undefined) map[row.event_type].whatsapp = en;
+      if (map[row.event_type].push     === undefined) map[row.event_type].push     = en;
+    } else if (ch === 'email' || ch === 'whatsapp' || ch === 'push') {
+      map[row.event_type][ch] = en;
+    }
   }
   return map;
 }
@@ -707,6 +726,8 @@ async function getNotificationPreferences(rabbiId) {
 
 /**
  * Upsert an array of notification preferences for a rabbi.
+ * Each (event_type, channel) pair is a discrete toggle — the ON CONFLICT
+ * clause targets the composite PK so toggling push doesn't clobber email.
  *
  * @param {string|number} rabbiId
  * @param {Array<{ event_type: string, channel: string, enabled: boolean }>} preferences
@@ -718,15 +739,23 @@ async function updateNotificationPreferences(rabbiId, preferences) {
   await withTransaction(async (client) => {
     for (const pref of preferences) {
       const { event_type, channel, enabled } = pref;
-      await client.query(
-        `INSERT INTO notification_preferences (rabbi_id, event_type, channel, enabled)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (rabbi_id, event_type)
-         DO UPDATE SET
-           channel = EXCLUDED.channel,
-           enabled = EXCLUDED.enabled`,
-        [rabbiId, event_type, channel, Boolean(enabled)]
-      );
+
+      // Expand legacy 'both'/'all' into explicit per-channel rows so the
+      // new composite PK works uniformly.
+      const channels =
+        channel === 'both' ? ['email', 'whatsapp']
+        : channel === 'all' ? ['email', 'whatsapp', 'push']
+        : [channel];
+
+      for (const ch of channels) {
+        await client.query(
+          `INSERT INTO notification_preferences (rabbi_id, event_type, channel, enabled)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (rabbi_id, event_type, channel)
+           DO UPDATE SET enabled = EXCLUDED.enabled`,
+          [rabbiId, event_type, ch, Boolean(enabled)]
+        );
+      }
     }
   });
 }

@@ -77,15 +77,22 @@ async function runPendingReminder() {
 
   log.info({ count: questions.length }, 'pendingReminder: overdue questions found');
 
-  // Load active rabbis — LEFT JOIN לבדיקת העדפות התראות לאירוע pending_reminder
+  // Load active rabbis — LEFT JOIN לבדיקת העדפות התראות לאירוע pending_reminder.
+  // Post-migration-008 the table has one row per (event, channel) pair, so we
+  // match the email row directly. Legacy 'both'/'all' rows are still honored
+  // for rabbis whose preferences predate the migration.
   const { rows: rabbis } = await query(
     `SELECT r.id, r.name, r.email,
             COALESCE(np.enabled, TRUE) AS email_enabled
      FROM   rabbis r
-     LEFT JOIN notification_preferences np
-            ON np.rabbi_id = r.id
-           AND np.event_type = 'pending_reminder'
-           AND np.channel IN ('email', 'all', 'both')
+     LEFT JOIN LATERAL (
+       SELECT enabled FROM notification_preferences
+       WHERE  rabbi_id   = r.id
+         AND  event_type = 'pending_reminder'
+         AND  channel IN ('email', 'both', 'all')
+       ORDER BY CASE channel WHEN 'email' THEN 0 WHEN 'both' THEN 1 ELSE 2 END
+       LIMIT 1
+     ) np ON TRUE
      WHERE  r.is_active = TRUE
        AND  r.email IS NOT NULL
        AND  r.email <> ''`

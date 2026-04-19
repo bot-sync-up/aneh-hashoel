@@ -117,13 +117,24 @@ export default function NotificationPreferences({ pushConfigured = false }) {
     setSaving(true);
     setSaveStatus(null);
     try {
+      // Build a quick lookup of alwaysOn events so we never persist their
+      // toggles as disabled (the UI won't let the user change them anyway).
+      const alwaysOnSet = new Set(
+        EVENT_ROWS.filter((r) => r.alwaysOn).map((r) => r.key)
+      );
+
       // Flatten {event: {email, whatsapp, push}} → [{event_type, channel, enabled}]
       const flatPrefs = [];
       for (const [event_type, channels] of Object.entries(prefs)) {
         if (!channels || typeof channels !== 'object') continue;
+        const lockOn = alwaysOnSet.has(event_type);
         for (const ch of ['email', 'whatsapp', 'push']) {
           if (typeof channels[ch] === 'boolean') {
-            flatPrefs.push({ event_type, channel: ch, enabled: channels[ch] });
+            flatPrefs.push({
+              event_type,
+              channel: ch,
+              enabled: lockOn ? true : channels[ch],
+            });
           }
         }
       }

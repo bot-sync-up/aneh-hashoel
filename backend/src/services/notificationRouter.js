@@ -138,22 +138,55 @@ function _parsePreferences(pref) {
  * @param {string} channel    — 'email' | 'whatsapp' | 'push'
  * @returns {Promise<boolean>}
  */
+// Dispatcher-side event type → UI/preference event_type.
+// The frontend's notification-preferences UI uses short, user-facing keys.
+// The dispatcher uses internal operational types. This map bridges them so
+// a rabbi's toggle actually gates the matching dispatch call.
+const DISPATCH_TO_PREF_EVENT = {
+  question_broadcast:  'new_question',
+  question_released:   'new_question',
+  urgent_question:     'new_question',
+  claim_confirmation:  'claim_approved',
+  thank_you:           'user_thanks',
+  timeout_warning:     'lock_reminder',
+  follow_up:           'followup_question',
+  new_device:          'new_device_login',
+  daily_digest:        'daily_summary',
+  // identity passthroughs (same name on both sides)
+  answer_published:    'answer_published',
+  weekly_report:       'weekly_report',
+  pending_reminder:    'pending_reminder',
+};
+
 async function _isEventEnabled(rabbiId, eventType, channel) {
   if (!rabbiId || !eventType || !channel) return true;
   try {
+    const prefKey = DISPATCH_TO_PREF_EVENT[eventType] || eventType;
+    // Post-migration-008 storage: one row per (event, channel) pair. Prefer
+    // the exact match; if absent, accept legacy 'both'/'all' rows that cover
+    // this channel.
     const { rows } = await query(
       `SELECT channel, enabled FROM notification_preferences
        WHERE rabbi_id = $1 AND event_type = $2`,
-      [rabbiId, eventType]
+      [rabbiId, prefKey]
     );
-    if (rows.length === 0) return true; // default: enabled
-    const rec = rows[0];
-    if (rec.enabled === false) return false;
-    // channel stored might be 'email', 'whatsapp', 'push', 'both', 'all'
-    const c = (rec.channel || '').toLowerCase();
-    if (!c || c === 'all') return true;
-    if (c === 'both') return channel === 'email' || channel === 'whatsapp';
-    return c === channel;
+    if (rows.length === 0) return true; // default: enabled when no record
+
+    const exact = rows.find((r) => (r.channel || '').toLowerCase() === channel);
+    if (exact) return Boolean(exact.enabled);
+
+    // No exact row — consult any legacy aggregate row
+    const legacy = rows.find((r) => {
+      const c = (r.channel || '').toLowerCase();
+      if (c === 'all') return true;
+      if (c === 'both') return channel === 'email' || channel === 'whatsapp';
+      return false;
+    });
+    if (legacy) return Boolean(legacy.enabled);
+
+    // Rows exist for OTHER channels but not this one → the rabbi has explicit
+    // preferences configured and chose to skip this channel → disabled.
+    return false;
   } catch (err) {
     log.warn({ err, rabbiId, eventType, channel }, '_isEventEnabled: error — defaulting to enabled');
     return true;
@@ -339,6 +372,15 @@ async function _dispatchWhatsApp(rabbi, type, data) {
   if (!phone) {
     log.debug({ rabbiId: rabbi.id }, "No WhatsApp number for rabbi");
     return;
+  }
+
+  // Respect per-event notification preferences (except emergency)
+  if (type !== 'emergency') {
+    const enabled = await _isEventEnabled(rabbi.id, type, 'whatsapp');
+    if (!enabled) {
+      log.info({ rabbiId: rabbi.id, type }, '_dispatchWhatsApp: disabled by rabbi preference — skipping');
+      return;
+    }
   }
 
   try {

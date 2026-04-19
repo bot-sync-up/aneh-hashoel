@@ -341,7 +341,7 @@ async function submitAnswer(questionId, rabbiId, content, publishNow = true, isP
  * @param {string} newContent
  * @returns {Promise<object>} – Updated answer row
  */
-async function editAnswer(questionId, rabbiId, newContent) {
+async function editAnswer(questionId, rabbiId, newContent, options = {}) {
   const { rows: answerRows } = await dbQuery(
     `SELECT id FROM answers WHERE question_id = $1 LIMIT 1`,
     [questionId]
@@ -353,7 +353,8 @@ async function editAnswer(questionId, rabbiId, newContent) {
     throw err;
   }
 
-  const answer = await getAnswersService().editAnswer(answerRows[0].id, rabbiId, newContent);
+  // Pass isAdmin through so admins can edit any rabbi's answer.
+  const answer = await getAnswersService().editAnswer(answerRows[0].id, rabbiId, newContent, options);
 
   // Trigger WP sync after edit — fire-and-forget
   getWPSyncService().syncAnswersToWP().catch((err) => {

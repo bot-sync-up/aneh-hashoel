@@ -218,7 +218,7 @@ async function submitAnswer(questionId, rabbiId, content, isPrivate = false) {
  * @param {string} newContent  Raw HTML from the editor
  * @returns {Promise<object>}  Updated answer row
  */
-async function editAnswer(answerId, rabbiId, newContent) {
+async function editAnswer(answerId, rabbiId, newContent, options = {}) {
   if (!answerId || !rabbiId || !newContent) {
     const e = new Error('חסרים שדות חובה: תשובה, רב, ותוכן');
     e.status = 400;
@@ -241,7 +241,9 @@ async function editAnswer(answerId, rabbiId, newContent) {
 
   const existingAnswer = answerRows[0];
 
-  if (String(existingAnswer.rabbi_id) !== String(rabbiId)) {
+  // Admins bypass the ownership check — they can edit any rabbi's answer.
+  // The rabbi_id column keeps the ORIGINAL author so attribution is preserved.
+  if (!options.isAdmin && String(existingAnswer.rabbi_id) !== String(rabbiId)) {
     const e = new Error('אין הרשאה לערוך תשובה זו');
     e.status = 403;
     throw e;

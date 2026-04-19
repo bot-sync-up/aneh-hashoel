@@ -60,6 +60,10 @@ const FOLLOWUP_PATTERN = /\[FOLLOWUP:\s*(\d+)\s*:\s*(\d+)\]/i;
 const REPLY_BOUNDARY_PATTERNS = [
   // Gmail/Apple "On <date> ... wrote:"
   /^On .{0,200}wrote:\s*$/i,
+  // Gmail Hebrew "בתאריך <date>, <time>, מאת <sender> <email>:" — with or
+  // without trailing colon, optional Unicode RTL marks at line start
+  /^\s*[\u200e\u200f]*בתאריך\s/,
+  /^\s*[\u200e\u200f]*ב\s*\d{1,2}\/\d{1,2}\/\d{2,4}/,
   // Standard plain-text quoting: line begins with >
   /^>/,
   // Outlook "-----Original Message-----"

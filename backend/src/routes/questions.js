@@ -654,7 +654,12 @@ router.put(
         });
       }
 
-      const answer = await questionService.editAnswer(req.params.id, req.rabbi.id, content);
+      const answer = await questionService.editAnswer(
+        req.params.id,
+        req.rabbi.id,
+        content,
+        { isAdmin: req.rabbi.role === 'admin' }
+      );
 
       logAction(
         req.rabbi.id,

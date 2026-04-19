@@ -75,12 +75,23 @@ async function upsertLead(question) {
   const emailHash = _emailHash(plainEmail);
   const phoneHash = _phoneHash(plainPhone);
 
-  // Require AT LEAST one contact channel (email or phone) to create a lead.
-  // A "lead" is by definition someone we can reach out to — name-only rows
+  // Require AT LEAST one contact channel we can actually store AND reach out
+  // to. A "lead" is by definition someone we can contact — name-only rows
   // pile up as useless phantoms that confuse the CS team (issue reported
   // 2026-04-17: 49 name-only leads from old questions before the WP form
   // started requiring these fields).
-  if (!emailHash && !phoneHash) {
+  //
+  // IMPORTANT: we need BOTH a hash (to dedup/lookup) AND an encrypted value
+  // (to actually contact the person later). If a caller has plaintext email
+  // but no encrypted blob — e.g. the webhook had the raw email in its
+  // payload but the question row's encrypted column was never populated —
+  // storing a lead row is pointless: the CS team would see a name with no
+  // email/phone and couldn't act on it. Skip those instead of creating
+  // phantom leads.
+  const hasStorableEmail = Boolean(emailHash && asker_email_encrypted);
+  const hasStorablePhone = Boolean(phoneHash && asker_phone_encrypted);
+
+  if (!hasStorableEmail && !hasStorablePhone) {
     return;
   }
 

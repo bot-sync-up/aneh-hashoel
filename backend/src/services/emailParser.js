@@ -57,57 +57,168 @@ const FOLLOWUP_PATTERN = /\[FOLLOWUP:\s*(\d+)\s*:\s*(\d+)\]/i;
  *
  * Order matters: more-specific patterns first.
  */
+// Reply-history boundaries: markers that reliably indicate the START of a
+// quoted chain (previous message, forwarded message, reply headers). These
+// are deterministic — signature heuristics are handled separately in
+// detectAndStripSignature() below.
 const REPLY_BOUNDARY_PATTERNS = [
   // Gmail/Apple "On <date> ... wrote:"
   /^On .{0,200}wrote:\s*$/i,
-  // Gmail Hebrew "בתאריך <date>, <time>, מאת <sender> <email>:" — with or
-  // without trailing colon, optional Unicode RTL marks at line start
+  // Gmail Hebrew "בתאריך <date>, <time>, מאת <sender> <email>:"
   /^\s*[\u200e\u200f]*בתאריך\s/,
   /^\s*[\u200e\u200f]*ב\s*\d{1,2}\/\d{1,2}\/\d{2,4}/,
-  // Standard plain-text quoting: line begins with >
+  // Plain-text quoting: line begins with >
   /^>/,
-  // Outlook "-----Original Message-----"
+  // Outlook "-----Original Message-----" / Hebrew equivalents
   /^-{3,}\s*original message\s*-{3,}/i,
-  // Hebrew "--- הודעה מקורית ---" / "--- המקור ---"
   /^-{3,}\s*הודע[הה]\s*מקורית?\s*-{3,}/i,
-  // Outlook Hebrew "פרטי ההודעה:"
   /^פרטי ההודעה:/,
-  // Hebrew mobile signature "נשלח מ-iPhone" / "נשלח מהאייפון"
-  /^נשלח מ/,
-  // English mobile signature "Sent from my iPhone"
-  /^Sent from /i,
-  // RFC 3676 sig delimiter: standalone "-- "
-  /^--\s*$/,
   // Email header lines in forwarded blocks
-  /^From:\s/i,
-  /^To:\s/i,
-  /^Subject:\s/i,
-  /^Date:\s/i,
-  /^נושא:\s/,
-  /^מאת:\s/,
-  /^אל:\s/,
-  /^תאריך:\s/,
-  // Outlook underline rule
+  /^From:\s/i,  /^To:\s/i,  /^Subject:\s/i,  /^Date:\s/i,
+  /^נושא:\s/,   /^מאת:\s/,  /^אל:\s/,         /^תאריך:\s/,
+  // Outlook underline rule (forwarded-message separator)
   /^_{8,}/,
-  // Common divider lines
-  /^[-=*]{3,}\s*$/,
-  // Hebrew sign-offs. Match when the line STARTS with the phrase — the rabbi's
-  // name typically follows ("בכבוד רב ראובן זכאים", "בברכה, הרב יוסף" etc.),
-  // so we can't require end-of-line here. The boundary after the phrase is a
-  // whitespace, punctuation, or EOL to avoid false positives mid-sentence.
-  /^בכבוד רב(?:\s|[,.]|$)/,
-  /^בכבוד\s+רב\s+ו/,            // "בכבוד רב ובברכה" style
-  /^בברכה(?:\s|[,.]|$)/,
-  /^בהוקרה(?:\s|[,.]|$)/,
-  /^בהערכה(?:\s|[,.]|$)/,
-  /^בידידות(?:\s|[,.]|$)/,
-  /^כבוד הרב(?:\s|[,.]|$)/,
-  /^בכל\s+הכבוד/,
-  /^ידידך(?:\s|[,.]|$)/,
-  /^אוהבך(?:\s|[,.]|$)/,
-  // "Get Outlook for iOS" / similar app footers
-  /^Get (Outlook|Mail) for /i,
 ];
+
+// ─── Signature detection — heuristic, language-agnostic ───────────────────────
+//
+// A signature is identified by its SHAPE, not by matching specific Hebrew
+// phrases. We split the message into paragraphs (blank-line separated) and
+// walk from the end, scoring each paragraph on signature-like traits. High
+// score = cut. This correctly handles:
+//   • "בכבוד רב ראובן זכאים" (+closer phrase +short)
+//   • "ראובן זכאים\n050-1234567" (+phone +short +name-shaped)
+//   • "-- \nRabbi's contact info" (+delimiter)
+//   • Custom HTML signatures from Gmail (no `--` separator)
+// Without false-positives on real content: scientific citations, hilkhot
+// references, long prose paragraphs all score too low to be cut.
+
+// Common closing openers — matched anywhere (start of paragraph or after
+// sentence-ending punctuation). NOT exhaustive by design; a paragraph
+// doesn't NEED a closer phrase to be flagged — phone/email/name shape
+// contribute too.
+const CLOSER_PHRASE_RE = /(?:^|[.!?]\s+|[\n])(בכבוד\s*רב|בברכה|בהוקרה|בהערכה|בידידות|ידידך|אוהבך|בכל\s*הכבוד|כבוד\s*הרב|תודה\s*רבה\s*מראש|בשורות\s*טובות|ויה"ר|ברכת התורה)(?=\s|[,.]|$)/;
+
+// RFC 3676 "-- " delimiter + Outlook-style separators
+const SIG_DELIMITER_RE = /^(?:-{2,}|_{3,}|={3,}|\*{3,})\s*$/;
+
+// Mobile client auto-signatures — these ARE deterministic enough to include
+const MOBILE_SIG_RE = /^(נשלח מ|Sent from (my )?|Get (Outlook|Mail) for)/i;
+
+// Phone patterns — Israeli formats + generic international
+const PHONE_RE = /(?:\+?972[-\s]?|\b0)[2-9](?:[-\s]?\d){6,8}\b/;
+
+const URL_RE   = /\bhttps?:\/\/\S+/i;
+const EMAIL_RE = /\b[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/i;
+
+/**
+ * Score a paragraph's signature-like traits. Returns a number.
+ * Threshold for "this is a signature" is determined by caller (8+).
+ */
+function _signatureScore(para) {
+  const trimmed = para.trim();
+  if (!trimmed) return 100; // blank lines are part of the signature block
+
+  // Clearly not a signature — long prose paragraphs
+  if (trimmed.length > 350) return 0;
+
+  const lines = trimmed.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  let score = 0;
+
+  // Strong signals
+  if (lines.some((l) => SIG_DELIMITER_RE.test(l)))             score += 20;
+  if (lines.some((l) => MOBILE_SIG_RE.test(l)))                score += 20;
+  if (CLOSER_PHRASE_RE.test(trimmed))                          score += 12;
+  if (PHONE_RE.test(trimmed))                                   score += 8;
+  if (URL_RE.test(trimmed))                                     score += 6;
+  if (EMAIL_RE.test(trimmed))                                   score += 6;
+
+  // Shape signals
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  const hasEndingPunct = /[?!.:]/.test(trimmed);
+  const allShortLines = lines.every((l) => l.length < 60);
+
+  // Short paragraph with all short lines → block of signature info
+  if (allShortLines && lines.length <= 6 && trimmed.length < 200) score += 3;
+
+  // Name-shape: 1-4 tokens, no sentence-ending punctuation, single line.
+  // Ending punctuation (., !, ?, :) → this is a complete sentence, not a name,
+  // so we don't apply the name-shape bonus. A signature name is typically
+  // a bare noun-phrase ("ראובן זכאים") with no terminator.
+  if (
+    lines.length === 1 &&
+    wordCount <= 4 &&
+    trimmed.length < 80 &&
+    !/[?!.:]$/.test(trimmed)
+  ) {
+    score += 6;
+    // Extra bonus if it looks like a proper Hebrew name (Hebrew letters, no digits)
+    if (!/\d/.test(trimmed) && /[\u0590-\u05FF]/.test(trimmed)) score += 2;
+  }
+
+  // Lines that are just contact info (phone/email/URL each on its own line)
+  const contactLines = lines.filter((l) =>
+    PHONE_RE.test(l) || URL_RE.test(l) || EMAIL_RE.test(l)
+  ).length;
+  if (contactLines >= 1 && contactLines === lines.length - 1) score += 4;
+
+  // Penalty: paragraph with sentence-like structure
+  if (hasEndingPunct && trimmed.length > 120) score -= 6;
+
+  return score;
+}
+
+/**
+ * Two-phase signature detector:
+ *
+ * Phase 1 — Inline cut at the first closer phrase (e.g. "בכבוד רב")
+ *   preceded by a sentence/line boundary. This handles the common case
+ *   where the whole sign-off is glued into the final paragraph.
+ *
+ * Phase 2 — Walk the remaining paragraphs from the end, scoring each on
+ *   signature-like SHAPE (phone, email, URL, delimiter, short name-line,
+ *   etc). Strip contiguous signature-scored paragraphs.
+ *
+ * Doing inline first prevents Phase 2 from over-cutting an entire
+ * paragraph when only the last sentence was a sign-off.
+ */
+function detectAndStripSignature(text) {
+  if (!text) return text;
+
+  let body = text.replace(/\r\n?/g, '\n');
+
+  // ── Phase 1: inline closer phrase ───────────────────────────────────────
+  const inline = body.match(CLOSER_PHRASE_RE);
+  if (inline && inline.index != null) {
+    // CLOSER_PHRASE_RE captures:
+    //   match[0] = boundary + phrase    (e.g. "\nבכבוד רב" or ". בכבוד רב")
+    //   match[1] = phrase               (e.g. "בכבוד רב")
+    // The boundary has length = match[0].length - match[1].length.
+    const boundaryLen = inline[0].length - inline[1].length;
+    const cutAt      = inline.index + boundaryLen;
+    const before     = body.slice(0, cutAt).trim();
+    // Keep the cut only when real content precedes the sign-off. If the
+    // whole message IS the sign-off (e.g. the rabbi only typed their name),
+    // leave it untouched so we don't drop everything.
+    if (before.length >= 20) {
+      body = before;
+    }
+  }
+
+  // ── Phase 2: paragraph-shape walk from the end ──────────────────────────
+  const paragraphs = body.split(/\n\s*\n/);
+  let keepCount = paragraphs.length;
+  for (let i = paragraphs.length - 1; i >= 0; i--) {
+    const score = _signatureScore(paragraphs[i]);
+    if (score >= 10) {
+      keepCount = i;
+    } else {
+      break;
+    }
+  }
+
+  return paragraphs.slice(0, keepCount).join('\n\n').trim();
+}
 
 /** HTML tag stripper */
 const HTML_TAG_RE    = /<[^>]*>/g;
@@ -165,9 +276,8 @@ function cleanEmailBody(rawText) {
 
   // 1a. Convert block-level HTML tags to newlines BEFORE stripping the rest.
   //     Otherwise <br>/<p>/<div>/<li> become spaces and the whole message
-  //     collapses to a single line — killing the line-by-line signature
-  //     detection below. Gmail's HTML-only replies in particular hit this
-  //     path (e.g. the "בכבוד רב <שם הרב>" sign-off glued to the body text).
+  //     collapses to a single line — killing the paragraph-based signature
+  //     detection below.
   text = text
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<\/\s*(?:p|div|li|h[1-6]|tr|blockquote)\s*>/gi, '\n');
@@ -179,7 +289,9 @@ function cleanEmailBody(rawText) {
   text = text.replace(NBSP_RE, ' ');
   text = text.replace(HTML_ENTITY_RE, (ent) => HTML_ENTITIES[ent.toLowerCase()] || '');
 
-  // 3. Remove reply chains and signatures
+  // 3a. Cut quoted-reply history at its first deterministic marker.
+  //     These are reliable (email-client generated): Gmail's "בתאריך",
+  //     Outlook's "Original Message", forwarded headers, etc.
   const lines = text.split(/\r?\n/);
   let cutAt = lines.length;
   for (let i = 0; i < lines.length; i++) {
@@ -190,13 +302,13 @@ function cleanEmailBody(rawText) {
   }
   text = lines.slice(0, cutAt).join('\n');
 
+  // 3b. Signature detection — heuristic, works by SHAPE not specific words.
+  //     Scores paragraphs from the end; strips those that look like sigs.
+  text = detectAndStripSignature(text);
+
   // 4. Collapse horizontal whitespace (preserve newlines)
   text = text.replace(EXCESS_SPACE, ' ');
-
-  // Strip trailing whitespace per line
   text = text.replace(/[ \t]+$/gm, '');
-
-  // Collapse 3+ blank lines to 2
   text = text.replace(/\n{3,}/g, '\n\n');
 
   // 5. Trim
@@ -502,4 +614,6 @@ module.exports = {
   // Email-action routing (claim / release / answer)
   extractEmailAction,
   findRabbiByEmail,
+  // Exposed for one-shot backfill scripts that want to re-clean stored answers
+  detectAndStripSignature,
 };

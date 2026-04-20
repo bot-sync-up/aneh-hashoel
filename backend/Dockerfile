@@ -35,6 +35,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Copy application source
 COPY package.json package-lock.json ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 # Create uploads directory with correct permissions before switching user
 RUN mkdir -p uploads && \

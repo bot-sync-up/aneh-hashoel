@@ -91,12 +91,20 @@ const REPLY_BOUNDARY_PATTERNS = [
   /^_{8,}/,
   // Common divider lines
   /^[-=*]{3,}\s*$/,
-  // Hebrew signatures: "בכבוד רב", "בברכה", "בהוקרה"
-  /^בכבוד רב[,.]?\s*$/,
-  /^בברכה[,.]?\s*$/,
-  /^בהוקרה[,.]?\s*$/,
-  /^בידידות[,.]?\s*$/,
-  /^כבוד הרב[,.]?\s*$/,
+  // Hebrew sign-offs. Match when the line STARTS with the phrase — the rabbi's
+  // name typically follows ("בכבוד רב ראובן זכאים", "בברכה, הרב יוסף" etc.),
+  // so we can't require end-of-line here. The boundary after the phrase is a
+  // whitespace, punctuation, or EOL to avoid false positives mid-sentence.
+  /^בכבוד רב(?:\s|[,.]|$)/,
+  /^בכבוד\s+רב\s+ו/,            // "בכבוד רב ובברכה" style
+  /^בברכה(?:\s|[,.]|$)/,
+  /^בהוקרה(?:\s|[,.]|$)/,
+  /^בהערכה(?:\s|[,.]|$)/,
+  /^בידידות(?:\s|[,.]|$)/,
+  /^כבוד הרב(?:\s|[,.]|$)/,
+  /^בכל\s+הכבוד/,
+  /^ידידך(?:\s|[,.]|$)/,
+  /^אוהבך(?:\s|[,.]|$)/,
   // "Get Outlook for iOS" / similar app footers
   /^Get (Outlook|Mail) for /i,
 ];
@@ -155,7 +163,16 @@ function cleanEmailBody(rawText) {
 
   let text = rawText;
 
-  // 1. Strip HTML tags
+  // 1a. Convert block-level HTML tags to newlines BEFORE stripping the rest.
+  //     Otherwise <br>/<p>/<div>/<li> become spaces and the whole message
+  //     collapses to a single line — killing the line-by-line signature
+  //     detection below. Gmail's HTML-only replies in particular hit this
+  //     path (e.g. the "בכבוד רב <שם הרב>" sign-off glued to the body text).
+  text = text
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/\s*(?:p|div|li|h[1-6]|tr|blockquote)\s*>/gi, '\n');
+
+  // 1b. Strip remaining HTML tags
   text = text.replace(HTML_TAG_RE, ' ');
 
   // 2. Decode HTML entities

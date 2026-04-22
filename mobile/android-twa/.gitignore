@@ -1,0 +1,43 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Bubblewrap generated Android project
+app/
+build/
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+local.properties
+
+# Signing keys — NEVER commit these!
+android.keystore
+*.jks
+*.keystore
+signing-key.*
+signing.properties
+keystore.properties
+
+# Build artifacts
+*.aab
+*.apk
+*.ap_
+*.dex
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bubblewrap runtime files
+.bubblewrap/
+twa-manifest.json.bak

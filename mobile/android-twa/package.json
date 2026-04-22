@@ -1,0 +1,23 @@
+{
+  "name": "ask-rabai-twa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TWA (Trusted Web Activity) wrapper for the \"שאל את הרב\" PWA — produces a signed .aab ready for Google Play Store upload.",
+  "author": "Moreshet Maran",
+  "license": "UNLICENSED",
+  "scripts": {
+    "doctor": "bubblewrap doctor",
+    "init": "bubblewrap init --manifest=./twa-manifest.json",
+    "update": "bubblewrap update",
+    "build": "bubblewrap build",
+    "validate": "bubblewrap validate",
+    "install-app": "bubblewrap install",
+    "fingerprint": "bubblewrap fingerprint"
+  },
+  "devDependencies": {
+    "@bubblewrap/cli": "^1.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

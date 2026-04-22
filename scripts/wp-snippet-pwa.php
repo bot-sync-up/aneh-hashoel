@@ -29,10 +29,23 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ask-rabbi) so we're resilient to either slug.
  */
 function aneh_pwa_is_ask_rabai_page() {
-	$uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+	// Primary signal: WordPress's own resolved permalink / query vars.
+	// REQUEST_URI can be rewritten by reverse proxies, so prefer WP's view.
+	global $wp;
+	if ( isset( $wp ) && ! empty( $wp->request ) ) {
+		$req = trim( (string) $wp->request, '/' );
+		if ( $req !== '' &&
+		     ( strpos( $req, 'ask-rabai' ) === 0 || strpos( $req, 'ask-rabbi' ) === 0 ) ) {
+			return true;
+		}
+	}
+
+	// Fallback: raw REQUEST_URI (useful for REST or pre-WP paths like the SW).
+	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
 	$path = strtok( $uri, '?' );
 	$path = trim( (string) $path, '/' );
-	return ( $path === 'ask-rabai' || $path === 'ask-rabbi' );
+	if ( $path === '' ) return false;
+	return ( strpos( $path, 'ask-rabai' ) === 0 || strpos( $path, 'ask-rabbi' ) === 0 );
 }
 
 /**
@@ -41,8 +54,10 @@ function aneh_pwa_is_ask_rabai_page() {
  * (see pwa-icons/README.md).
  */
 function aneh_pwa_manifest_data() {
-	$icon_192 = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-192.png';
-	$icon_512 = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-512.png';
+	$icon_192           = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-192.png';
+	$icon_512           = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-512.png';
+	$icon_192_maskable  = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-192-maskable.png';
+	$icon_512_maskable  = 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-512-maskable.png';
 
 	return array(
 		'name'             => 'שאל את הרב — המרכז למורשת מרן',
@@ -65,7 +80,7 @@ function aneh_pwa_manifest_data() {
 				'purpose' => 'any',
 			),
 			array(
-				'src'     => $icon_192,
+				'src'     => $icon_192_maskable,
 				'sizes'   => '192x192',
 				'type'    => 'image/png',
 				'purpose' => 'maskable',
@@ -77,7 +92,7 @@ function aneh_pwa_manifest_data() {
 				'purpose' => 'any',
 			),
 			array(
-				'src'     => $icon_512,
+				'src'     => $icon_512_maskable,
 				'sizes'   => '512x512',
 				'type'    => 'image/png',
 				'purpose' => 'maskable',
@@ -274,7 +289,7 @@ add_action( 'wp_head', function () {
 	}
 
 	$manifest_url  = esc_url( rest_url( 'aneh-pwa/v1/manifest' ) );
-	$apple_icon    = esc_url( 'https://moreshet-maran.com/wp-content/uploads/2026/04/icon-192.png' );
+	$apple_icon    = esc_url( 'https://moreshet-maran.com/wp-content/uploads/2026/04/apple-touch-icon-180.png' );
 	?>
 <link rel="manifest" href="<?php echo $manifest_url; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>">
 <meta name="theme-color" content="#1B2B5E">

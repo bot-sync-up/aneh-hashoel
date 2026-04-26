@@ -22,12 +22,30 @@ android.keystore
 signing-key.*
 signing.properties
 keystore.properties
+KEYSTORE_PASSWORD.txt
+SHA256.txt
 
 # Build artifacts
 *.aab
 *.apk
+*.apk.idsig
 *.ap_
 *.dex
+
+# Bubblewrap local helpers (Windows SSL workaround scripts)
+run-init.js
+run-build.js
+run-update.js
+run-init.stdout.log
+run-build.stdout.log
+init-driver.log
+build-driver.log
+update-driver.log
+update.log
+
+# Bubblewrap runtime state
+manifest-checksum.txt
+gradle.properties
 
 # IDE
 .idea/

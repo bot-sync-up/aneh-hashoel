@@ -1,42 +1,32 @@
 {
   "packageId": "com.moreshetmaran.askrabai",
   "host": "moreshet-maran.com",
-  "name": "שאל את הרב",
+  "name": "שאל את הרב — המרכז למורשת מרן",
   "launcherName": "שאל את הרב",
   "display": "standalone",
   "themeColor": "#1B2B5E",
-  "themeColorDark": "#1B2B5E",
-  "navigationColor": "#1B2B5E",
-  "navigationColorDark": "#1B2B5E",
-  "navigationDividerColor": "#1B2B5E",
-  "navigationDividerColorDark": "#1B2B5E",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
   "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
   "startUrl": "/ask-rabai/",
-  "webManifestUrl": "https://moreshet-maran.com/wp-json/aneh-pwa/v1/manifest",
-  "iconUrl": "https://moreshet-maran.com/wp-content/uploads/pwa-icon-512.png",
-  "maskableIconUrl": "https://moreshet-maran.com/wp-content/uploads/pwa-icon-512.png",
-  "monochromeIconUrl": "https://moreshet-maran.com/wp-content/uploads/pwa-icon-512.png",
-  "shortcuts": [],
-  "generatorApp": "bubblewrap-cli",
-  "appVersionName": "1.0.0",
-  "appVersion": 1,
-  "appVersionCode": 1,
+  "iconUrl": "https://moreshet-maran.com/wp-content/uploads/2026/04/icon-512.png",
+  "maskableIconUrl": "https://moreshet-maran.com/wp-content/uploads/2026/04/icon-512-maskable.png",
+  "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
     "alias": "android"
   },
-  "splashScreenFadeOutDuration": 300,
-  "enableNotifications": true,
-  "orientation": "portrait",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://moreshet-maran.com/wp-json/aneh-pwa/v1/manifest",
   "fallbackType": "customtabs",
-  "features": {
-    "locationDelegation": {
-      "enabled": false
-    },
-    "playBilling": {
-      "enabled": false
-    }
-  },
+  "features": {},
   "alphaDependencies": {
     "enabled": false
   },
@@ -45,10 +35,13 @@
   "isMetaQuest": false,
   "fullScopeUrl": "https://moreshet-maran.com/ask-rabai/",
   "minSdkVersion": 21,
-  "serviceAccountJsonFile": "",
+  "orientation": "portrait",
+  "fingerprints": [],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
   "fileHandlers": [],
-  "launchHandlerClientMode": "auto"
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1.0.0"
 }

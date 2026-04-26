@@ -272,10 +272,32 @@ self.addEventListener('notificationclick', (event) => {
 }
 
 function aneh_pwa_emit_assetlinks() {
-	// Stub for TWA — the second agent will replace with real SHA256 fingerprints.
+	// Digital Asset Links — proves to Chrome/Android that this domain owns the
+	// signing key of the TWA app. Without a matching SHA-256 here, Chrome will
+	// fall back to a CustomTabs URL bar instead of a chrome-less TWA window.
+	//
+	// Fingerprints:
+	//   1. Local upload-signing key (used to sign the .aab uploaded to Play
+	//      Console). Required for Internal Testing / direct sideload.
+	//   2. After the app is published, Play Store re-signs the bundle with
+	//      Google's App-Signing key. That key's SHA-256 must be appended here
+	//      (Play Console → App signing → App signing key certificate SHA-256)
+	//      otherwise users who install from the Store will see the URL bar.
 	header( 'Content-Type: application/json; charset=utf-8' );
 	header( 'Cache-Control: public, max-age=60' );
-	echo '[]';
+	echo wp_json_encode( array(
+		array(
+			'relation' => array( 'delegate_permission/common.handle_all_urls' ),
+			'target'   => array(
+				'namespace'                => 'android_app',
+				'package_name'             => 'com.moreshetmaran.askrabai',
+				'sha256_cert_fingerprints' => array(
+					// Local upload key — generated 2026-04-24
+					'5F:E3:FC:04:8D:2B:BA:89:A7:E6:2C:96:4A:FB:85:6E:30:DB:B5:71:5A:77:2F:A3:80:1D:A3:71:81:33:5D:02',
+				),
+			),
+		),
+	) );
 	exit;
 }
 

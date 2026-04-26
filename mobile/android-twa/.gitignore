@@ -59,3 +59,4 @@ Thumbs.db
 # Bubblewrap runtime files
 .bubblewrap/
 twa-manifest.json.bak
+screenshots/

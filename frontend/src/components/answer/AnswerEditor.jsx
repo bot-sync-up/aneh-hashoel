@@ -285,7 +285,22 @@ export default function AnswerEditor({ questionId, existingAnswer, onSave, onOpe
   }, [editor, questionId, onSave, isPrivate]);
 
   const handlePublishConfirm = useCallback(async ({ html }) => {
+    // Snapshot the draft into localStorage BEFORE attempting to publish.
+    // If the publish fails (e.g. server returns 403 because the question
+    // belongs to another rabbi, or a transient network blip), we want the
+    // typed text to survive — otherwise reopening the editor would show a
+    // blank field and the rabbi loses their work.
+    if (questionId) {
+      try {
+        localStorage.setItem(draftKey(questionId), JSON.stringify({
+          html,
+          savedAt: new Date().toISOString(),
+          source:  'pre-publish',
+        }));
+      } catch { /* ignore quota / privacy mode */ }
+    }
     await api.post(`/questions/answer/${questionId}`, { content: html, publishNow: true, isPrivate });
+    // Only clear the local backup AFTER a successful publish.
     try { localStorage.removeItem(draftKey(questionId)); } catch { /* ignore */ }
     onSave?.({ html, publishNow: true });
   }, [questionId, onSave, isPrivate]);

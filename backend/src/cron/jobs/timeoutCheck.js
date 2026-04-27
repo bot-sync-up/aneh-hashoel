@@ -27,18 +27,31 @@ async function runTimeoutCheck() {
 
   const hoursToTimeout = sla.hours_to_timeout;
 
-  // מציאת שאלות שחרגו מהזמן
+  // מציאת שאלות שחרגו מהזמן.
+  // הערה: ב-PostgreSQL `RETURNING` מחזיר את הערך **החדש** של העמודה אחרי
+  // ה-UPDATE — לכן `RETURNING assigned_rabbi_id` היה תמיד מחזיר NULL,
+  // וה-audit_log איבד את זהות הרב הקודם. ה-CTE שלמטה תופס את הערך הישן
+  // לפני העדכון ומאפשר להחזיר אותו נכון.
   const result = await query(
-    `UPDATE questions
+    `WITH expired AS (
+       SELECT id,
+              assigned_rabbi_id AS prev_rabbi_id,
+              title             AS prev_title
+       FROM   questions
+       WHERE  status = 'in_process'
+         AND  lock_timestamp IS NOT NULL
+         AND  lock_timestamp < NOW() - INTERVAL '1 hour' * $1
+       FOR UPDATE
+     )
+     UPDATE questions q
      SET    status            = 'pending',
             assigned_rabbi_id = NULL,
             lock_timestamp    = NULL,
             warning_sent      = FALSE,
             updated_at        = NOW()
-     WHERE  status = 'in_process'
-       AND  lock_timestamp IS NOT NULL
-       AND  lock_timestamp < NOW() - INTERVAL '1 hour' * $1
-     RETURNING id, assigned_rabbi_id AS previous_rabbi_id, title`,
+     FROM   expired e
+     WHERE  q.id = e.id
+     RETURNING q.id, e.prev_rabbi_id AS previous_rabbi_id, e.prev_title AS title`,
     [hoursToTimeout]
   );
 

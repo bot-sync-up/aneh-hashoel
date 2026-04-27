@@ -9,11 +9,19 @@
  * Must be chained AFTER the `authenticate` (or `authenticateToken`) middleware
  * so that req.rabbi is already populated.
  *
+ * Self-heal: if the question is free (status='pending' AND assigned_rabbi_id
+ * IS NULL), the middleware auto-claims it atomically for the calling rabbi.
+ * This removes the foot-gun where a rabbi answers a pending question without
+ * an explicit claim and gets a 403, loses their typed text, then has to redo
+ * the entire flow. Atomic `UPDATE ... WHERE status='pending' AND
+ * assigned_rabbi_id IS NULL` prevents racing rabbis from both winning.
+ *
  * Returns:
  *   401 – authenticate was not run first (req.rabbi absent)
  *   400 – req.params.id is missing or not a non-empty string
  *   404 – question not found
- *   403 – the authenticated rabbi is not the assigned owner
+ *   403 – the authenticated rabbi is not the assigned owner (and the
+ *         question wasn't free, so auto-claim could not save them)
  *
  * On success, the question row is attached to req.question so downstream
  * handlers can use it without hitting the DB a second time.
@@ -73,7 +81,7 @@ async function questionOwnership(req, res, next) {
     }
   }
 
-  // ── Regular rabbi: enforce ownership ─────────────────────────────────────
+  // ── Regular rabbi: enforce ownership (with self-heal auto-claim) ─────────
   try {
     const { rows } = await query(
       `SELECT id, status, assigned_rabbi_id
@@ -89,7 +97,38 @@ async function questionOwnership(req, res, next) {
       });
     }
 
-    const question = rows[0];
+    let question = rows[0];
+
+    // Self-heal: a rabbi acting on a free question (pending + no owner)
+    // gets auto-claimed atomically. This avoids the UX trap where a rabbi
+    // clicks "ענה" on a pending question, hits 403, claims, and then has
+    // to re-do the whole flow. The atomic UPDATE ... WHERE prevents two
+    // rabbis from racing into the same question.
+    const isFree = question.status === 'pending' && question.assigned_rabbi_id === null;
+    if (isFree) {
+      const claim = await query(
+        `UPDATE questions
+         SET    status            = 'in_process',
+                assigned_rabbi_id = $1,
+                lock_timestamp    = NOW(),
+                updated_at        = NOW()
+         WHERE  id = $2
+           AND  status = 'pending'
+           AND  assigned_rabbi_id IS NULL
+         RETURNING id, status, assigned_rabbi_id`,
+        [req.rabbi.id, questionId]
+      );
+      if (claim.rowCount === 1) {
+        question = claim.rows[0];
+      } else {
+        // Lost the race — re-read and fall through to ownership check
+        const { rows: refetch } = await query(
+          `SELECT id, status, assigned_rabbi_id FROM questions WHERE id = $1`,
+          [questionId]
+        );
+        if (refetch.length > 0) question = refetch[0];
+      }
+    }
 
     // Compare as strings to handle numeric vs uuid edge cases uniformly
     if (String(question.assigned_rabbi_id) !== String(req.rabbi.id)) {
